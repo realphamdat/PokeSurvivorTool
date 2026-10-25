@@ -17,7 +17,7 @@
 // PSBot.exportConfig() / nút "Xuất data.js" (F6) = tải data.js chứa nhãn + build; chép đè vào thư mục extension để máy khác có sẵn
 // While loaded, Firestore/RTDB writes whose path matches CFG.rankRe are replaced by no-ops.
 // Reload the page to play normally (unblocked) again.
-(function start() {
+(function start(tries = 0) {
   // Per-version hooks; methods run later, once the helpers below them (visible, readCard, ...) exist
   const SITES = {
     default: {
@@ -91,12 +91,19 @@
   let sitePick = 'auto';
   try { sitePick = localStorage.getItem(SITE_KEY) || 'auto'; } catch {}
   const autoSite = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
-  const SITE = SITES[sitePick] || SITES[autoSite];
-  // Loaded by the extension at document_idle the game page may not exist yet: retry until it does
-  if (!SITE.ready()) return void setTimeout(start, 500);
+  let SITE = SITES[sitePick] || SITES[autoSite];
+  // Loaded by the extension at document_idle the game page may not exist yet: retry until it does.
+  // A forced version whose page never shows up (e.g. "default" picked on doofcraft) would leave no panel to switch
+  // back with: after ~5 s the host's own version takes over and the override is cleared.
+  if (!SITE.ready()) {
+    if (SITE === SITES[autoSite] || tries < 10 || !SITES[autoSite].ready()) return void setTimeout(() => start(tries + 1), 500);
+    console.warn(`[PSBot] trang này không phải bản "${SITE.label}" — dùng lại bản tự nhận (${SITES[autoSite].label})`);
+    try { localStorage.removeItem(SITE_KEY); } catch {}
+    sitePick = 'auto'; SITE = SITES[autoSite];
+  }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.3.0';
+  const VERSION = '1.3.1';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
