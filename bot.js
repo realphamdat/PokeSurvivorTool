@@ -3,6 +3,7 @@
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
 // @match        https://pokesurvivor.com/*
+// @match        https://pokesurvivor.doofcraft.com/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -17,11 +18,85 @@
 // While loaded, Firestore/RTDB writes whose path matches CFG.rankRe are replaced by no-ops.
 // Reload the page to play normally (unblocked) again.
 (function start() {
-  // Loaded by the extension at document_idle the game canvas may not exist yet: retry until it does
-  if (!document.getElementById('game')) return void setTimeout(start, 500);
+  // Per-version hooks; methods run later, once the helpers below them (visible, readCard, ...) exist
+  const SITES = {
+    default: {
+      id: 'default', label: 'Mặc định · pokesurvivor.com',
+      ready: () => !!document.getElementById('game'),
+      canvas: () => document.getElementById('game'),
+      // World sprites are drawn scaled by the camera zoom, the HUD untransformed
+      isWorld: d => d.s !== 1,
+      camera: world => world[0],
+      enemyRe: /\/assets\/pokemon\/\d+\/(?!Faint)\w+\.png/,
+      tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard' },
+      sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
+      cfg: {},
+      levelUp() {
+        if (!visible(document.getElementById('lvl-num'))) return null;
+        return { cards: [...document.querySelectorAll('div.key')].filter(visible).map(readCard), rerolls: +(document.getElementById('lvl-rr-n') || {}).innerText || 0 };
+      },
+      choiceOpen: () => visible(document.getElementById('lvl-num')),
+      otherChoice() {},
+      menu: buttons => buttons.some(b => /^(play|jugar)/i.test((b.innerText || '').trim()) && /dungeon|mazmorra/i.test(b.innerText)),
+      restartButton(buttons) {
+        for (const re of CFG.restartSteps) {
+          const b = buttons.find(b => { const x = (b.innerText || '').trim(); return re.test(x) && !CFG.restartAvoid.test(x); });
+          if (b) return b;
+        }
+      },
+    },
+    doofcraft: {
+      id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
+      ready: () => !!document.getElementById('app'),
+      canvas: () => document.querySelector('canvas.ps-canvas'),
+      // The whole frame is scaled by devicePixelRatio; the world also gets the camera translation, the HUD doesn't
+      isWorld: d => d.e !== 0 || d.f !== 0,
+      // Effects (beams, slashes) add their own translate / rotate: pokémon sprites carry the plain camera transform
+      camera: (world, pokes) => pokes[0] || world[0],
+      enemyRe: /\/sprites\/[\w-]+\/(?:s\/)?(?!Faint)\w+\.png/,
+      // Pickup colours from the game's source: xp / big xp diamonds, heal berry and magnet orbs, item / chest halo
+      tags: { 'fill:#7fe0ff': 'xp', 'fill:#ffd95e': 'xp', 'fill:#5fe08a': 'good', 'fill:#ff9ed8': 'good', 'fill:#ffe14d': 'good' },
+      sizeTags: false,
+      // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
+      cfg: { useItems: false, swapEvery: 200, blockRank: false },
+      levelUp() {
+        const box = dcBox();
+        if (!box || !/^level|cleared/i.test(dcTitle(box))) return null;
+        const rr = box.querySelector('[data-testid="reroll"]');
+        return { cards: [...box.querySelectorAll('button.ps-card')].map(readDcCard), rerolls: rr ? +((rr.innerText.match(/\((\d+)\)/) || [])[1] || 0) : 0 };
+      },
+      choiceOpen: () => !!document.querySelector('.ps-choice:not(.hidden) .ps-box'),
+      // Choice Band slot / waves chest: no scoring, take the first option so the run doesn't wait forever
+      otherChoice() {
+        const box = dcBox();
+        if (!box || /^level|cleared|an item|bond/i.test(dcTitle(box))) return;
+        const cards = [...box.querySelectorAll('button.ps-card')];
+        if (!cards.length) return;
+        pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80) })));
+      },
+      menu: buttons => buttons.some(b => b.matches('[data-testid="menu-solo"], [data-testid="solo-start"]')),
+      // Results -> menu, continue a saved run (or confirm ending it), Solo -> Play
+      restartButton(buttons) {
+        for (const sel of ['[data-testid="game-exit"]', '[data-testid="saved-run-new-confirm"] [data-testid="dialog-confirm"]',
+          '[data-testid="saved-run-resume"]', '[data-testid="solo-start"]', '[data-testid="menu-solo"]']) {
+          const b = buttons.find(b => b.matches(sel));
+          if (b) return b;
+        }
+      },
+    },
+  };
+  // Two versions of the game: pokesurvivor.com ("default") and pokesurvivor.doofcraft.com, a rewrite with its own
+  // canvas, sprite paths and menus. Picked from the host; the panel's "Bản game" select overrides it (per site).
+  const SITE_KEY = 'psbot.site';
+  let sitePick = 'auto';
+  try { sitePick = localStorage.getItem(SITE_KEY) || 'auto'; } catch {}
+  const autoSite = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
+  const SITE = SITES[sitePick] || SITES[autoSite];
+  // Loaded by the extension at document_idle the game page may not exist yet: retry until it does
+  if (!SITE.ready()) return void setTimeout(start, 500);
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -43,9 +118,9 @@
     aim: false,           // true = move the mouse cursor onto the nearest enemy (if moves aim at the cursor)
     hazardMargin: 40,     // world units added around hazard effects
     autoTelegraph: true,  // untagged red-ish path shapes (attack range previews) count as hazards
-    enemyRe: /\/assets\/pokemon\/\d+\/(?!Faint)\w+\.png/,
+    enemyRe: SITE.enemyRe,
     // src -> 'good' | 'hazard' | 'rift' | 'wall' | 'buff' | 'safe'; edit with F6/F7, saved in localStorage
-    tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard' },
+    tags: { ...SITE.tags },
     autoPick: true,
     // Consumable item slots (hotkeys 5-8): pressed blindly while a run is unpaused, so any item gets used at once
     useItems: true,
@@ -91,9 +166,11 @@
     blockRank: true,
     rankRe: /rank|leader|board|score|season/i,
     logNet: true,
+    ...SITE.cfg,
   };
 
-  const canvas = document.getElementById('game');
+  // Doofcraft builds a new game canvas for every run: re-looked up each frame (a detached placeholder until then)
+  let canvas = SITE.canvas() || document.createElement('canvas');
   const state = {
     // Idle until ▶ Chạy in the control panel (or F8); target = runs to play (0 = forever), done = runs finished
     on: false, target: 0, done: 0, debug: true, keys: {}, dir: null, frame: [], lastFrame: [], texts: [], hudTexts: new Set(),
@@ -134,7 +211,7 @@
     return k;
   };
   // Exact key first, then the size-only key (older tags / defaults)
-  const tagOf = src => CFG.tags[src] || CFG.tags[src.split('#')[0]];
+  const tagOf = src => CFG.tags[src] || (SITE.sizeTags ? CFG.tags[src.split('#')[0]] : undefined);
   const record = (ctx, src, cx, cy, w, h, img, rect) => {
     const m = ctx.getTransform();
     state.frame.push({ src, x: m.a * cx + m.c * cy + m.e, y: m.b * cx + m.d * cy + m.f, w: w * m.a, h: h * m.d, s: m.a, e: m.e, f: m.f, img, rect });
@@ -179,13 +256,12 @@
   };
   const styleKey = s => typeof s === 'string' ? s.replace(/\s+/g, '') : 'gradient';
   const recordShape = (ctx, kind, pts, style) => {
-    const s = ctx.getTransform().a;
-    if (s === 1 || pts.length < 2) return;                          // HUD / UI is drawn untransformed
+    const m = ctx.getTransform(), s = m.a;
+    if (!SITE.isWorld({ s, e: m.e, f: m.f }) || pts.length < 2) return;   // HUD / UI
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
     const lw = kind === 'line' ? ctx.lineWidth * s : 0;
     if ((x1 - x0 + lw) * (y1 - y0 + lw) < 150) return;              // ignore tiny particles
-    const m = ctx.getTransform();
     state.frame.push({ src: `${kind === 'line' ? 'stroke' : 'fill'}:${styleKey(style)}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0 + lw, h: y1 - y0 + lw,
       s, e: m.e, f: m.f, shape: kind, pts, lw, alpha: ctx.globalAlpha });
   };
@@ -201,7 +277,8 @@
     return pathOrig.ellipse.call(this, x, y, rx, ry, rot, a0, a1, ccw);
   };
   P.fill = function (...a) {
-    if (this.canvas === canvas && !a.length) PATH.subs.forEach(sp => sp.length >= 3 && recordShape(this, 'poly', sp, this.fillStyle));
+    // fill() / fill('evenodd') fill the tracked path (doofcraft passes the rule); fill(path2D) is not tracked
+    if (this.canvas === canvas && typeof a[0] !== 'object') PATH.subs.forEach(sp => sp.length >= 3 && recordShape(this, 'poly', sp, this.fillStyle));
     return pathOrig.fill.apply(this, a);
   };
   P.stroke = function (...a) {
@@ -261,11 +338,12 @@
   const DIRS = Array.from({ length: 16 }, (_, i) => [Math.cos(i * Math.PI / 8), Math.sin(i * Math.PI / 8)]);
 
   function tick(frame) {
-    const world = frame.filter(d => d.s !== 1);
+    const world = frame.filter(SITE.isWorld);
     if (!world.length) return;
-    const s = world[0].s;
-    const me = { x: canvas.width / 2, y: canvas.height / 2 };
     const pokes = world.filter(d => CFG.enemyRe.test(d.src));
+    const cam = SITE.camera(world, pokes);
+    const s = cam.s;
+    const me = { x: canvas.width / 2, y: canvas.height / 2 };
     // The sprite closest to the camera centre is the player itself
     const self = pokes.reduce((b, d) => { const r = Math.hypot(d.x - me.x, d.y - me.y); return r < 40 * s && (!b || r < b.r) ? { d, r } : b; }, null);
     if (self) { me.x = self.d.x; me.y = self.d.y; }
@@ -279,7 +357,7 @@
     // Each stuck event leaves a temporary "wall" point ahead of the player; repeated
     // stuck events trigger an escape run in a random direction away from those walls.
     const now = performance.now();
-    const e0 = world[0].e, f0 = world[0].f;
+    const e0 = cam.e, f0 = cam.f;
     const toScreen = w => ({ x: w.x * s + e0, y: w.y * s + f0 });
     const meW = { x: (me.x - e0) / s, y: (me.y - f0) / s };
     state.walls = state.walls.filter(w => w.until > now);
@@ -315,6 +393,7 @@
       }
     }
     if (!state.on) return;
+    if (state.dead) return void applyDir(null);
 
     const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) / s;
     const nearestTo = list => list.reduce((b, d) => (!b || dist(d, me) < dist(b, me) ? d : b), null);
@@ -423,14 +502,35 @@
     const title = leaves.reduce((b, e) => (!b || fontSize(e) > fontSize(b) ? e : b), null);
     const name = title ? title.innerText.trim() : '';
     const shownLv = t.match(/\b(?:Lv|Nv|Niv)\.?\s*(\d+)/i);                 // "Lv. 3" chip on owned skills, if the game shows one
-    const level = Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), shownLv ? +shownLv[1] - 1 : 0);
-    const isNew = /\bNew\b|Nuevo|Novo|Mới/i.test(t);
+    return scoreCard({
+      key: k.innerText.trim(), name, t,
+      level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), shownLv ? +shownLv[1] - 1 : 0),
+      isNew: /\bNew\b|Nuevo|Novo|Mới/i.test(t),
+      evo: CFG.evoRe.test(t) || /evo|awaken|ultimate/i.test(card.className + ' ' + [...card.querySelectorAll('[class]')].map(e => e.className).join(' ')),
+      fitLow: !!card.querySelector('.fit-low'), fitHigh: !!card.querySelector('.fit-high'),
+    });
+  }
+  // Doofcraft's choice dialog: answerable once "armed" (input is locked for 1 s after it opens) and not yet submitted
+  const dcBox = () => { const b = document.querySelector('.ps-choice:not(.hidden) .ps-box.armed'); return b && !b.querySelector('.ps-cards.done') ? b : null; };
+  const dcTitle = box => ((box.querySelector('h2') || {}).innerText || '').trim();
+  // Card = button.ps-card > .txt > .nm (title text + chips "New · Fire" / "Lv.2 > 3" / "EVOLUTION") + .ds (description)
+  const dcName = c => { const nm = c.querySelector('.nm'); return nm ? [...nm.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : ''; };
+  function readDcCard(c, i) {
+    const t = c.innerText, name = dcName(c);
+    const lv = t.match(/\bLv\.?\s*(\d+)\s*>/i);                          // upgrade chip: current level > next
+    return scoreCard({
+      key: String(i + 1), name, t,
+      level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), lv ? +lv[1] : 0),
+      isNew: /\bNew\b/i.test(t), evo: c.classList.contains('evo') || CFG.evoRe.test(t), fitLow: false, fitHigh: false,
+    });
+  }
+  function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh }) {
     const build = currentBuild();
     const buildIdx = build ? build.findIndex(m => m.toLowerCase() === name.toLowerCase()) : -1;
     const why = [];
     let score = 0;
     // A card that completes a maxed skill's evolution beats everything else
-    if (CFG.evoRe.test(t) || /evo|awaken|ultimate/i.test(card.className + ' ' + [...card.querySelectorAll('[class]')].map(e => e.className).join(' '))) {
+    if (evo) {
       score += 40; why.push('mở tiến hoá skill');
     }
     if (buildIdx >= 0) {
@@ -444,20 +544,19 @@
       score += room ? 3 : -3; why.push(build ? 'skill mới ngoài build' : room ? 'skill mới (còn slot)' : 'skill mới (đủ skill rồi)');
     } else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
     else if (DEF_RE.test(t)) { score += 1; why.push('nội tại phòng thủ'); }
-    if (card.querySelector('.fit-low')) { score -= 3; why.push('hợp kém với pokémon'); }
-    if (card.querySelector('.fit-high')) { score += 2; why.push('hợp tốt'); }
+    if (fitLow) { score -= 3; why.push('hợp kém với pokémon'); }
+    if (fitHigh) { score += 2; why.push('hợp tốt'); }
     if (CFG.bonusRe && CFG.bonusRe.test(t)) { score += CFG.bonusScore || 0; why.push('ưu tiên preset'); }   // set by presets (farmMoney.js)
-    return { key: k.innerText.trim(), name, isNew, score, why: why.join(', '), text: t.replace(/\s+/g, ' ').slice(0, 100) };
+    return { key, name, isNew, score, why: why.join(', '), text: t.replace(/\s+/g, ' ').slice(0, 100) };
   }
   function levelUp() {
-    if (!CFG.autoPick || !state.on || !visible(document.getElementById('lvl-num')) || performance.now() < state.pickAt) return;
-    const keys = [...document.querySelectorAll('div.key')].filter(visible);
-    if (!keys.length) return;
-    const cards = keys.map(readCard).sort((a, b) => b.score - a.score);
+    if (!CFG.autoPick || !state.on || performance.now() < state.pickAt) return;
+    const found = SITE.levelUp();
+    if (!found || !found.cards.length) return;
+    const cards = found.cards.sort((a, b) => b.score - a.score);
     state.pickAt = performance.now() + 800;
     console.table(cards);
-    const rerolls = +(document.getElementById('lvl-rr-n') || {}).innerText || 0;
-    if (cards[0].score < 2 && rerolls > 0) { log('reroll'); tap('r', 'KeyR', 82); return; }
+    if (cards[0].score < 2 && found.rerolls > 0) { log('reroll'); tap('r', 'KeyR', 82); return; }
     const c = cards[0];
     state.picks[c.name] = (state.picks[c.name] || 0) + 1;
     if (c.isNew) state.newSkills++;
@@ -467,14 +566,14 @@
 
   // Only while the run timer is ticking and no level-up is open: the dialogs also use digit hotkeys
   function useItems(t) {
-    if (!CFG.useItems || !state.on || t < (state.itemAt || 0)) return;
-    if (!state.timerText || t - state.timerChangedAt > 1100 || visible(document.getElementById('lvl-num'))) return;
+    if (!CFG.useItems || !state.on || state.dead || t < (state.itemAt || 0)) return;
+    if (!state.timerText || t - state.timerChangedAt > 1100 || SITE.choiceOpen()) return;
     state.itemAt = t + CFG.itemEvery;
     CFG.itemKeys.forEach(k => tap(k, `Digit${k}`, 48 + +k));
   }
   function swapSkills(t) {
-    if (!CFG.swapSkills || !state.on || t < (state.swapAt || 0)) return;
-    if (!state.timerText || t - state.timerChangedAt > 1100 || visible(document.getElementById('lvl-num'))) return;
+    if (!CFG.swapSkills || !state.on || state.dead || t < (state.swapAt || 0)) return;
+    if (!state.timerText || t - state.timerChangedAt > 1100 || SITE.choiceOpen()) return;
     state.swapAt = t + CFG.swapEvery;
     // Press + release at once: tap()'s 60 ms hold would leave E down and swallow the next presses
     sendKey('keydown', 'e', 'KeyE', 69); sendKey('keyup', 'e', 'KeyE', 69);
@@ -506,7 +605,7 @@
     if (!CFG.autoPick || !state.on || now < state.pickAt || now < (state.itemScanAt || 0)) return;
     state.itemScanAt = now + 300;                                     // full DOM scan, so not every frame
     const head = [...document.querySelectorAll('body *')].find(e => !e.children.length && visible(e) && /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''));
-    if (!head) return;
+    if (!head) return void SITE.otherChoice();
 
     if (/bond/i.test(head.innerText)) {
       // A pokémon's build IS its bond set: build moves always go first, in build order.
@@ -541,7 +640,7 @@
     if (!CFG.autoRestart || !state.on || now < (state.restartAt || 0)) return;
     state.restartAt = now + 1500;
     // Paused for a choice (level-up / item / bond) is not the end of a run
-    if (visible(document.getElementById('lvl-num'))) return;
+    if (SITE.choiceOpen()) return;
     const leaves = [...document.querySelectorAll('body *')].filter(e => !e.children.length && visible(e));
     if (leaves.some(e => /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''))) return;
     // Only buttons actually on top at their centre (not faded out / covered by the game canvas);
@@ -552,8 +651,8 @@
       return !!t && (t === b || b.contains(t));
     };
     const buttons = [...document.querySelectorAll('button, [role=button]')].filter(b => visible(b) && !dock.contains(b) && onTop(b));
-    const over = leaves.some(e => /you fell|game over|has caído|caíste/i.test(e.innerText || ''));
-    const menu = buttons.some(b => /^(play|jugar)/i.test((b.innerText || '').trim()) && /dungeon|mazmorra/i.test(b.innerText));
+    const over = leaves.some(e => /you fell|run over|game over|has caído|caíste/i.test(e.innerText || ''));
+    const menu = SITE.menu(buttons);
     if (!over && !menu && now - (state.timerChangedAt || 0) < 2500) return;
     const justEnded = over && !state.runEnded;
     state.runEnded = over;
@@ -562,10 +661,8 @@
       log(`xong ván ${state.done}${state.target ? `/${state.target}` : ''}`);
       if (state.target && state.done >= state.target) { state.on = false; applyDir(null); log('đã chơi đủ số ván — dừng'); return; }
     }
-    for (const re of CFG.restartSteps) {
-      const b = buttons.find(b => { const x = (b.innerText || '').trim(); return re.test(x) && !CFG.restartAvoid.test(x); });
-      if (b) { log('tự chơi lại: bấm', JSON.stringify(b.innerText.trim().slice(0, 40))); b.click(); return; }
-    }
+    const b = SITE.restartButton(buttons);
+    if (b) { log('tự chơi lại: bấm', JSON.stringify(b.innerText.trim().slice(0, 40))); b.click(); }
   }
 
   // ---------- leaderboard guard ----------
@@ -713,6 +810,11 @@
     <label style="display:flex;align-items:center;gap:6px">Số ván
       <input data-ctl="runs" type="number" min="0" step="1" style="width:60px;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
       <span style="color:#9ab">0 = vô hạn</span></label>
+    <label style="display:flex;align-items:center;gap:6px" title="Đổi bản game sẽ tải lại trang">Bản game
+      <select data-ctl="site" style="flex:1;min-width:0;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
+        <option value="auto">Tự nhận (${SITES[autoSite].label.split(' · ')[0]})</option>
+        ${Object.values(SITES).map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+      </select></label>
     <div style="display:flex;gap:4px">
       <button data-ctl="play" style="${btnCss};background:#4c4">▶ Chạy</button>
       <button data-ctl="pause" style="${btnCss};background:#fc3">⏸ Tạm dừng</button>
@@ -730,6 +832,12 @@
   draggable(dock, 'psbot.pos.dock', ctl);   // the title row moves the whole dock (panel + HUD line + docked popups)
   const $ =k => ctl.querySelector(`[data-ctl="${k}"]`);
   try { $('runs').value = localStorage.getItem(RUNS_KEY) || '5'; } catch { $('runs').value = '5'; }
+  // Hooks, defaults and tags are set up for one version at load: switching reloads the page
+  $('site').value = SITES[sitePick] ? sitePick : 'auto';
+  $('site').onchange = () => {
+    try { localStorage.setItem(SITE_KEY, $('site').value); } catch {}
+    location.reload();
+  };
   // Collapse to the title row (small screens); the <style> above hides every other row, the farm line included
   const MIN_KEY = 'psbot.min';
   const setMin = min => {
@@ -848,7 +956,7 @@
     const now = performance.now();
     const groups = new Map();
     for (const d of frame) {
-      if (d.s === 1) continue;
+      if (!SITE.isWorld(d)) continue;
       let g = groups.get(d.src);
       if (!g) groups.set(d.src, g = []);
       g.push({ x: (d.x - d.e) / d.s, y: (d.y - d.f) / d.s, d });
@@ -978,6 +1086,7 @@
   let running = true, lastResend = 0, lastPanel = 0;
   function loop(t) {
     if (!running) return;
+    canvas = SITE.canvas() || canvas;
     const frame = state.frame; state.frame = [];
     if (state.texts.length) {
       state.hudTexts = new Set(state.texts); state.texts = [];
@@ -985,6 +1094,9 @@
       if (timer) state.lastTimer = t;                                                            // run timer on screen = in a run
       if (timer !== state.timerText) { state.timerText = timer; state.timerChangedAt = t; }      // frozen timer = game paused (menus)
       if ([...state.hudTexts].some(t => /^0:0[0-2]$/.test(t))) { state.picks = {}; state.newSkills = 0; }   // new run
+      // Down in a multiplayer run: the HUD offers "Spectate" / shows "Spectating X's Y" and 0 HP. Keys then steer the
+      // spectator camera (E / A / D switch the watched player), so the bot stops pressing them until revived
+      state.dead = [...state.hudTexts].some(x => /^spectat/i.test(x) || /^0 \/ \d+$/.test(x));
     }
     if (frame.length) { state.lastFrame = frame; collect(frame); tick(frame); }
     if (t - lastPanel > 1000 && !panel.matches(':hover')) { lastPanel = t; renderPanel(); }
@@ -1011,7 +1123,7 @@
     const r = canvas.getBoundingClientRect();
     const x = (e.clientX - r.left) * canvas.width / r.width, y = (e.clientY - r.top) * canvas.height / r.height;
     const hit = state.lastFrame
-      .filter(d => d.s !== 1 && Math.abs(d.x - x) <= Math.abs(d.w) / 2 + 4 && Math.abs(d.y - y) <= Math.abs(d.h) / 2 + 4)
+      .filter(d => SITE.isWorld(d) && Math.abs(d.x - x) <= Math.abs(d.w) / 2 + 4 && Math.abs(d.y - y) <= Math.abs(d.h) / 2 + 4)
       .sort((a, b) => Math.abs(a.w * a.h) - Math.abs(b.w * b.h))[0];
     e.preventDefault(); e.stopImmediatePropagation();
     tag.pending = hit ? hit.src : null; tag.box = hit || null;
@@ -1040,7 +1152,7 @@
   window.addEventListener('keydown', onKey, true);
 
   window.PSBot = {
-    CFG, state, ctl,       // ctl = control panel (top-left); presets append their own lines to it
+    CFG, state, ctl, SITE, // ctl = control panel (top-left); presets append their own lines to it · SITE = game version profile
     // PSBot.play(5) = chơi 5 ván (0 = vô hạn) · PSBot.pause() / resume() / stop()
     play(n) { if (n !== undefined) $('runs').value = n; control.play(); },
     pause: () => control.pause(), resume: () => control.resume(), stop: () => control.stop(),

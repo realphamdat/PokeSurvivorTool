@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         PokeSurvivor Bot
 // @namespace    https://github.com/damhieu2808/PokeSurvivorTool
-// @version      1.0.0
-// @description  Bot tự chơi pokesurvivor.com — luôn tải bản mới nhất từ repo gốc
+// @version      1.1.0
+// @description  Bot tự chơi pokesurvivor.com + pokesurvivor.doofcraft.com — luôn tải bản mới nhất từ repo gốc
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
 // @license      MIT
 // @match        https://pokesurvivor.com/*
+// @match        https://pokesurvivor.doofcraft.com/*
 // @grant        none
 // @inject-into  page
 // @run-at       document-idle
