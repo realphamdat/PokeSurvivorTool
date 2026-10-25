@@ -60,11 +60,11 @@
     // so this ranking favours damage/cooldown, then survival, then utility. Edit freely.
     itemScores: {
       'quick claw': 9,      // -20% cooldown on every move, no downside
-      'life orb': 8,        // +30% damage, small HP cost per attack (never KOs)
+      'life orb': 1,        // +30% damage, small HP cost per attack (never KOs)
       'choice band': 0,     // +40% damage, but locks moves (breaks E skill cycling): only when nothing else is offered
       'leftovers': 7,       // 1.5% max HP/s regen
       'assault vest': 7,    // -20% damage taken
-      'lucky egg': 6,       // +30% XP -> more levels
+      'lucky egg': 9,       // +30% XP -> more levels
       'focus sash': 6,      // survive a KO hit once per 60 s
       'choice scarf': 5,    // +35% speed
       'shell bell': 5,      // heal 4% of damage dealt
@@ -374,7 +374,7 @@
         }
       }
       for (const w of walls) {
-        const d = dist(p, w), r = (w.w ? Math.max(w.w, w.h) / 2 / s : 0) + 70;
+        const d = dist(p, w), r = ((w.w ? Math.max(w.w, w.h) / 2 / s : 0) + 70) * 0.4;
         if (d < r) c += 15 * (1 - d / r) + 3;
       }
       if (escape) c -= dir ? 8 * (dir[0] * escape[0] + dir[1] * escape[1]) : 0;
@@ -660,7 +660,7 @@
     ring(v.xps, '#0fc', () => 4);
     ring(v.cases, '#fa0', () => Math.max(6, CFG.caseReach * v.s));
     g.strokeStyle = '#0fc6'; g.setLineDash([2, 6]); g.beginPath(); g.arc(v.me.x, v.me.y, state.magnet * v.s, 0, 7); g.stroke(); g.setLineDash([]);
-    ring(v.walls || [], '#88f', d => (d.w ? Math.max(d.w, d.h) / 2 : 0) + 70 * v.s);
+    ring(v.walls || [], '#88f', d => ((d.w ? Math.max(d.w, d.h) / 2 : 0) + 70 * v.s) * 0.4);
     g.strokeStyle = '#ff4'; g.beginPath(); g.arc(v.me.x, v.me.y, CFG.contact * v.s, 0, 7); g.stroke();
     if (v.target) { g.strokeStyle = '#fff8'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.target.x, v.target.y); g.stroke(); g.setLineDash([]); }
     if (state.dir) { g.strokeStyle = '#4cf'; g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.me.x + state.dir[0] * 40, v.me.y + state.dir[1] * 40); g.stroke(); }
