@@ -670,12 +670,43 @@
   const RUNS_KEY = 'psbot.runs';
   // Events stopped at the bot's panels so typing / clicks / touches there never reach the game (keys, touch joystick)
   const UI_EVENTS = ['keydown', 'keyup', 'pointerdown', 'mousedown', 'click', 'touchstart', 'touchmove', 'touchend'];
+  // Drag a panel by its [data-drag] title row, listened for on grip (the dock's panels stop pointerdown); position kept in
+  // localStorage. Popups living in the dock are pulled out of it (position:fixed on body) on first move so they can go anywhere.
+  function draggable(el, key, grip = el) {
+    const detach = () => {
+      if (el.parentNode === document.body) return;
+      const r = el.getBoundingClientRect();
+      document.body.append(el);
+      Object.assign(el.style, { position: 'fixed', zIndex: '99999', left: r.left + 'px', top: r.top + 'px', maxHeight: 'calc(100vh - 8px)' });
+    };
+    const place = (x, y) => {
+      el.style.left = Math.min(Math.max(0, x), innerWidth - 40) + 'px';
+      el.style.top = Math.min(Math.max(0, y), innerHeight - 24) + 'px';
+    };
+    try { const p = JSON.parse(localStorage.getItem(key)); if (p) { detach(); place(p.x, p.y); } } catch {}
+    grip.addEventListener('pointerdown', e => {
+      if (e.button || !e.target.closest('[data-drag]') || e.target.closest('button,a,input,select,[data-ms="close"]')) return;
+      e.preventDefault();
+      detach();
+      const r = el.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+      const move = ev => { ev.stopPropagation(); place(ev.clientX - dx, ev.clientY - dy); };
+      const up = () => {
+        ['pointermove', 'pointerup', 'pointercancel'].forEach(t => removeEventListener(t, t === 'pointermove' ? move : up, true));
+        try { localStorage.setItem(key, JSON.stringify({ x: parseFloat(el.style.left), y: parseFloat(el.style.top) })); } catch {}
+      };
+      addEventListener('pointermove', move, true);
+      addEventListener('pointerup', up, true);
+      addEventListener('pointercancel', up, true);
+    });
+  }
+  const dragCss = 'cursor:move;touch-action:none;user-select:none';
+
   const ctl = document.createElement('div');
   ctl.dataset.psbotCtl = ctl.dataset.psbotUi = '';
   ctl.style.cssText = 'order:0;pointer-events:auto;font:12px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:5px;min-width:190px';
   const btnCss = 'font:12px monospace;padding:3px 8px;border:1px solid #456;border-radius:4px;cursor:pointer;color:#000';
   ctl.innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px;font-weight:bold;color:#7cf"><span style="flex:1">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" style="font-weight:normal;color:#9ab;text-decoration:none" title="Repo gốc trên GitHub">· by damhieu2808</a></span>
+    <div data-drag style="display:flex;align-items:center;gap:6px;font-weight:bold;color:#7cf;${dragCss}" title="Kéo để di chuyển"><span style="flex:1">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" style="font-weight:normal;color:#9ab;text-decoration:none" title="Repo gốc trên GitHub">· by damhieu2808</a></span>
       <button data-ctl="min" style="${btnCss};background:#9ab;padding:0 8px" title="Thu gọn / mở rộng">–</button></div>
     <style>[data-psbot-ctl][data-min] > :not(:first-child) { display: none !important }
       @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } }</style>
@@ -696,7 +727,8 @@
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" style="order:1;border-top:1px solid #345;padding-top:4px;color:#9ab;text-decoration:none">⭐ Tác giả <b style="color:#7cf">damhieu2808</b> · github.com/damhieu2808/PokeSurvivorTool</a>
     <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="display:none;color:#000;background:#fc3;border-radius:4px;padding:3px 6px;text-decoration:none;font-weight:bold"></a>`;
   dock.append(ctl);
-  const $ = k => ctl.querySelector(`[data-ctl="${k}"]`);
+  draggable(dock, 'psbot.pos.dock', ctl);   // the title row moves the whole dock (panel + HUD line + docked popups)
+  const $ =k => ctl.querySelector(`[data-ctl="${k}"]`);
   try { $('runs').value = localStorage.getItem(RUNS_KEY) || '5'; } catch { $('runs').value = '5'; }
   // Collapse to the title row (small screens); the <style> above hides every other row, the farm line included
   const MIN_KEY = 'psbot.min';
@@ -761,7 +793,7 @@
   ms.style.cssText = 'order:1;pointer-events:auto;width:300px;max-width:calc(100vw - 8px);font:12px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;padding:6px 8px;display:none;flex-direction:column;gap:5px';
   const inCss = 'font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px';
   ms.innerHTML = `
-    <div style="display:flex;justify-content:space-between;font-weight:bold;color:#7cf">Moveset (4 move ưu tiên)<span data-ms="close" style="cursor:pointer;color:#9ab">✕</span></div>
+    <div data-drag style="display:flex;justify-content:space-between;font-weight:bold;color:#7cf;${dragCss}" title="Kéo để di chuyển">Moveset (4 move ưu tiên)<span data-ms="close" style="cursor:pointer;color:#9ab">✕</span></div>
     <div style="display:flex;gap:4px"><input data-ms="mon" list="psbot-mons" placeholder="Tên pokémon" style="${inCss};flex:1;min-width:0">
       <button data-ms="cur" style="${btnCss};background:#9ab" title="Pokémon đang chơi">Hiện tại</button></div>
     <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
@@ -772,6 +804,7 @@
     <div data-ms="msg" style="color:#9ab"></div>
     <div data-ms="list" style="color:#9ab;max-height:120px;overflow:auto"></div>`;
   dock.append(ms);
+  draggable(ms, 'psbot.pos.moveset');
   UI_EVENTS.forEach(t => ms.addEventListener(t, e => e.stopPropagation()));
   const $m = k => ms.querySelector(`[data-ms="${k}"]`);
   const moveLabel = m => `${m.name} · ${m.cat === 'status' ? 'buff' : `${m.kind} ${m.dmg ?? '?'}dmg/${m.cd ?? '?'}s`}`;
@@ -873,12 +906,13 @@
   panel.dataset.psbotUi = '';
   panel.style.cssText = 'order:3;pointer-events:auto;width:380px;max-width:calc(100vw - 8px);min-height:0;flex:0 1 auto;overflow:auto;font:11px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;display:none';
   dock.append(panel);
+  draggable(panel, 'psbot.pos.catalog');
   const TAG_LABEL = { good: ['Tốt', '#4f4'], hazard: ['Nguy hiểm', '#f90'], rift: ['Rift', '#f4f'], wall: ['Vật cản', '#88f'], buff: ['Buff', '#ff0'], xp: ['Kinh nghiệm', '#0fc'], case: ['Vali (đứng 5s)', '#fa0'], safe: ['An toàn', '#9cf'] };
   function renderPanel() {
     if (panel.style.display === 'none') return;
     const now = performance.now();
     const esc = s => s.replace(/[&<>"]/g, ch => `&#${ch.charCodeAt(0)};`);
-    panel.innerHTML = `<div style="padding:6px;border-bottom:1px solid #345">Danh mục sprite (F6 đóng) · rê chuột = khoanh trên màn hình · <b>đậm</b> = đang có trên màn
+    panel.innerHTML = `<div data-drag style="padding:6px;border-bottom:1px solid #345;${dragCss}" title="Kéo để di chuyển">Danh mục sprite (F6 đóng) · rê chuột = khoanh trên màn hình · <b>đậm</b> = đang có trên màn
       <button data-export style="font:10px monospace;padding:1px 6px;margin-left:4px;background:#2a5;color:#000;border:1px solid #456;border-radius:3px;cursor:pointer" title="Tải data.js (nhãn + build) — chép đè vào thư mục extension">Xuất data.js</button></div>` +
       catalogRows().map(c => {
         const t = tagOf(c.src) || (/^(fill|stroke):/.test(c.src) && CFG.autoTelegraph && isTelegraph(c) ? 'hazard' : undefined);
