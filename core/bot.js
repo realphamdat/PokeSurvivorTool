@@ -25,10 +25,15 @@
   const h = {};
   const SITE = window.PSBotSite(h);
   // Loaded by the extension at document_idle the game page may not exist yet: retry until it does
-  if (!SITE.ready()) return void setTimeout(() => start(tries + 1), 500);
+  if (!SITE.ready()) {
+    // The on-screen loading line the userscript puts up (phones have no console): say what we are waiting for
+    const status = document.getElementById('psbot-status');
+    if (status && tries === 20) status.textContent = 'PSBot: chưa thấy màn hình game — vào game rồi đợi, hoặc tải lại trang';
+    return void setTimeout(() => start(tries + 1), 500);
+  }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -870,7 +875,7 @@
   ov.style.cssText = 'position:fixed;pointer-events:none;z-index:99999';
   // Top-left dock (60px down: the pokémon's HP bar sits in that corner) stacking the control panel, the HUD line and the F6 catalog (CSS order keeps that order)
   const dock = document.createElement('div');
-  dock.style.cssText = 'position:fixed;top:60px;left:0;z-index:99999;display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-height:calc(100vh - 44px);pointer-events:none';
+  dock.style.cssText = 'position:fixed;top:60px;left:0;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-height:calc(100vh - 44px);pointer-events:none';
   const hud = document.createElement('div');
   hud.style.cssText = 'order:2;font:12px monospace;background:#000a;color:#7cf;padding:4px 6px;border-radius:4px;pointer-events:none';
   dock.append(hud);
@@ -978,6 +983,8 @@
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" style="order:1;border-top:1px solid #345;padding-top:4px;color:#9ab;text-decoration:none">⭐ Tác giả <b style="color:#7cf">damhieu2808</b> · github.com/damhieu2808/PokeSurvivorTool</a>
     <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="display:none;color:#000;background:#fc3;border-radius:4px;padding:3px 6px;text-decoration:none;font-weight:bold"></a>`;
   dock.append(ctl);
+  const loadingLine = document.getElementById('psbot-status');      // the userscript's "loading…" line: the panel is up now
+  if (loadingLine) loadingLine.remove();
   draggable(dock, 'psbot.pos.dock', ctl);   // the title row moves the whole dock (panel + HUD line + docked popups)
   const $ =k => ctl.querySelector(`[data-ctl="${k}"]`);
   try { $('runs').value = localStorage.getItem(RUNS_KEY) || '5'; } catch { $('runs').value = '5'; }

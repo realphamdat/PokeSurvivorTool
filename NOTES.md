@@ -114,7 +114,7 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không. **iOS** (Safari + app Userscripts, hướng dẫn đã có trong README) **chưa thử**. Ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline), vì Userscripts có thể không có `GM_xmlhttpRequest` / `GM_addElement`. Nếu pokesurvivor.com chặn inline (giả thuyết 2 ở mục 0) thì cần thêm nhánh dùng `GM.xmlHttpRequest` của Userscripts.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
 12. [ ] **Phát hành** (khi bản thường đã ổn, và người dùng bảo):
-    1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.1`).
+    1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.2`).
     2. Commit trên `main`.
     3. `git tag vX.Y.Z && git push origin main main:release --tags`.
 
