@@ -21,6 +21,14 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 4. Tampermonkey tự mở trang cài script → bấm **Install** (Cài đặt).
 5. Vào game: panel **PokeSurvivor Bot** hiện ở góc trên bên trái.
 
+## Cài trên iPhone / iPad
+
+1. Cài app **Userscripts** (App Store, miễn phí).
+2. Mở **Cài đặt → Safari → Tiện ích → Userscripts**: bật lên và cho phép trên mọi trang web.
+3. Trong **Safari**, dán link ở bước 3 phần Android vào thanh địa chỉ rồi mở.
+4. Bấm biểu tượng tiện ích (hình mảnh ghép hoặc **aA**) trên thanh địa chỉ → **Userscripts** → **Cài đặt** (Install).
+5. Vào game trong Safari: panel hiện ở góc trên bên trái. iOS mới thử ít; nếu lỗi, báo qua liên hệ bên dưới.
+
 ## Dùng
 
 Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
