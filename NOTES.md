@@ -77,31 +77,16 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 
 ## 3. Checklist cho bản thường (làm theo thứ tự)
 
-0. [ ] **LỖI ƯU TIÊN: bản thường trên điện thoại (Tampermonkey) không chạy bot.**
-   - **NGUYÊN NHÂN ĐÃ TÌM RA (2026-10-26, tái hiện trên PC Chrome + Tampermonkey):** chưa **cho phép Tampermonkey truy cập `raw.githubusercontent.com`**. Userscript 1.2.0 tải bot bằng `GM_xmlhttpRequest`, và lần đầu Tampermonkey hỏi quyền. Chưa cho phép thì không file nào được tải: `window.PSBotSite` = false, không có panel. Trong lúc đó `#game` vẫn có (canvas 1001×563), nên giả thuyết canvas bên dưới **không phải nguyên nhân**. Sau khi cho phép, PC chạy bình thường (v1.4.1). README/trang cài đặt đã thêm bước "Always allow". **Còn chờ:** người dùng xác nhận trên điện thoại (Kiwi) sau khi cho phép.
-   - **Người dùng báo** (2026-10-26):
-     - Không hiện panel PokeSurvivor Bot.
-     - Skill chỉ dùng ô đầu tiên (trên PC bot bấm E để đổi skill, nên đây là dấu hiệu bot **không chạy**, không phải bot spam).
-     - Doofcraft trên cùng điện thoại thì **chạy bình thường**.
-     - PC (extension) bản thường thì ổn.
-   - **Giả thuyết theo thứ tự:**
-     1. `SITE.ready()` của bản thường là `!!document.getElementById('game')`. Giao diện điện thoại có thể không có `#game` (canvas khác/tạo muộn) nên `start()` thử lại mãi.
-     2. CSP của pokesurvivor.com chặn script inline. Cả `psbot.user.js` lẫn `loader.js` đều chèn code bằng `<script>.textContent`. Extension trên PC chạy `world: "MAIN"` nên không bị ảnh hưởng.
-     3. Game vào chế độ toàn màn hình nên panel (gắn vào `body`) bị che. Ít khả năng, vì khi đó bot vẫn phải đổi skill.
-   - **Cách kiểm tra:** trên PC mở pokesurvivor.com, DevTools (F12) → bật giả lập điện thoại (Ctrl+Shift+M, chọn máy có cảm ứng) → tải lại. Rồi thử:
-     - **Nạp bằng loader như điện thoại:** dán vào console `fetch('https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/loader.js').then(r => r.text()).then(t => { const s = document.createElement('script'); s.textContent = t; document.body.append(s); })`. Xem console có lỗi CSP ("Refused to execute inline script") không.
-     - `document.getElementById('game')` và `[...document.querySelectorAll('canvas')].map(c => [c.id, c.className, c.width, c.height])`.
-     - `document.fullscreenElement` khi đang chơi.
-     - Nếu cần thì debug thẳng trên điện thoại: Android + USB → `chrome://inspect` (hoặc `edge://inspect`) trên PC.
-   - **ĐÃ SỬA "MÒ" (chưa xác nhận trên điện thoại thật)**, cả 3 hướng:
-     1. `sites/default/site.js`: `ready()` / `canvas()` dùng `#game`, không có thì lấy canvas lớn nhất đang hiển thị (trừ overlay của bot, có `data-psbot-ui`).
-     2. `psbot.user.js` v1.2.0: Tampermonkey tải file bằng `GM_xmlhttpRequest` và chèn bằng `GM_addElement` (không bị CSP chặn). Trình quản lý khác vẫn dùng loader như cũ. **Người dùng phải cài lại userscript** (hoặc chờ Tampermonkey tự cập nhật) mới có cách nạp mới.
-     3. `core/bot.js`: chuyển overlay + panel vào `document.fullscreenElement` khi có sự kiện `fullscreenchange`.
-     - Nếu vẫn lỗi: làm theo "Cách kiểm tra" ở trên để biết giả thuyết nào đúng.
-   - **Hướng sửa tương ứng (đã làm như trên):**
-     1. `ready()` / `canvas()` tìm canvas game theo cách khác (ví dụ canvas lớn nhất).
-     2. Không chèn `<script>` inline: chạy code trực tiếp trong userscript (Tampermonkey không bị CSP của trang chặn), ví dụ `@grant GM_xmlhttpRequest` + `@connect raw.githubusercontent.com` rồi `eval`/`new Function` trong ngữ cảnh userscript, hoặc `@require`.
-     3. Chuyển `dock`/`ov` vào `document.fullscreenElement` khi có sự kiện `fullscreenchange`.
+0. [x] **Bản thường trên điện thoại (Kiwi + Tampermonkey) không chạy bot: ĐÃ RÕ NGUYÊN NHÂN, chấp nhận giới hạn.**
+   - **Nguyên nhân:** `index.html` của pokesurvivor.com có `<meta http-equiv="Content-Security-Policy" content="script-src 'self' file: https://www.gstatic.com https://apis.google.com https://*.firebaseio.com https://*.firebasedatabase.app; …">`, chặn mọi script chèn vào trang. Tampermonkey trên Chrome PC (userScripts API) vẫn chạy được, còn Tampermonkey trong Kiwi thì không. Dòng trạng thái báo "trang không chạy được code bot". Doofcraft không có CSP nên chạy được.
+   - **Đã loại trừ:** thiếu canvas `#game` (có, 1001×563); quyền `raw.githubusercontent.com` (đã cho phép, file tải về được); toàn màn hình.
+   - **Đã thử, không giúp:**
+     - Userscript 1.4.0 chèn bản lưu sẵn ở `document-start` (trước khi đọc thẻ meta).
+     - Bật Inject Mode "Tức thì" của Tampermonkey.
+   - **Quyết định:** **không tìm cách lách CSP của trang.** Userscript 1.5.0 quay về cách nạp của 1.3.0 (tải mới mỗi lần mở game), và khi bị chặn thì báo rõ "trang này chặn script trong trình duyệt hiện tại — dùng PC hoặc trình duyệt khác". README/trang cài đặt có cảnh báo.
+   - **Còn có thể thử (người dùng tự thử):** Microsoft Edge + Tampermonkey, Firefox + Violentmonkey trên Android. iOS (Safari + Userscripts) chưa thử.
+   - **Cũng đã thêm** (vẫn giữ, vô hại): `ready()`/`canvas()` của bản thường lấy canvas lớn nhất khi không có `#game`; panel chuyển vào phần tử toàn màn hình; panel ở `z-index` cao nhất; dòng trạng thái "PSBot: …" khi đang tải.
+   - **Mã nguồn bản thường công khai:** <https://github.com/JPTER78/pokesurvivor> (repo phục vụ pokesurvivor.com, nhánh `main`, file `index.html` + `js/…`). **Dùng repo này cho checklist bên dưới** (màu vùng skill/đạn, kích thước sprite vật thể, cấu hình tiến hoá…), không cần vào được trang game.
 1. [ ] **Chạy thử bot như hiện tại** 1 trận. Bật F9, xem console. Ghi lại: bot có chạy không, có chọn skill không, có lỗi đỏ không.
 2. [ ] **Thu dữ liệu:** trong trận, dán script ở mục 7 vào console (gần tường/cây/rương, và một lần lúc boss ra chiêu). Giữ các file `psbot-probe-default-*.json`.
 3. [ ] **Máu trên HUD:** xem `PSBot.state.hpRatio` khi đang chơi. Nếu `undefined` thì chữ máu không vẽ trên canvas → cần cách đọc máu khác (DOM?) để bật chế độ thủ.

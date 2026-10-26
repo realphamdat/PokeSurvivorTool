@@ -55,6 +55,9 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 
 ## Bẫy đã gặp
 
+- **Mã nguồn bản thường** công khai tại <https://github.com/JPTER78/pokesurvivor> (phục vụ pokesurvivor.com). Đọc ở đó để tìm màu/kích thước/cấu hình thay vì đoán.
+- pokesurvivor.com có `<meta>` CSP chặn script chèn vào trang. Trên điện thoại (Kiwi + Tampermonkey) bot **không chạy được** và đây là giới hạn đã chấp nhận: **không tìm cách lách CSP của trang** (xem NOTES.md mục 3, bước 0). PC (Tampermonkey/extension) chạy bình thường.
+
 - Chuỗi có `$` (regex `\$R\[`) trong lệnh shell bị hỏng → viết script ra file rồi chạy bằng `node`.
 - Bản thường dùng `sizeTags: true` → `tagOf()` **không** đọc `SITE.bySize`.
 - `sites/default/data.js` có nhãn `canvas:256x256#…` = `wall`. Nếu đó là mảng nền thì sẽ chặn cả vùng lớn trong A*.
