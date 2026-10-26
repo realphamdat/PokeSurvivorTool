@@ -23,7 +23,7 @@
     bonusRe: /magnet|pickup|pick-up|attract|radius|coin|fortune|luck|experience|\bxp\b|exp\b|imán|monedas|suerte/i,
     bonusScore: 4,
   });
-  Object.assign(CFG.itemScores, { 'amulet coin': 10, 'lucky egg': 8 });
+  Object.assign(CFG.itemScores, { 'amulet coin': 10 });              // second only to lucky egg (core: 20)
 
   // ---------- coin tracking ----------
   const KEY = 'psbot.farm';

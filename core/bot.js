@@ -85,7 +85,7 @@
       'choice band': 0,     // +40% damage, but locks moves (breaks E skill cycling): only when nothing else is offered
       'leftovers': 7,       // 1.5% max HP/s regen
       'assault vest': 7,    // -20% damage taken
-      'lucky egg': 9,       // +30% XP -> more levels
+      'lucky egg': 20,      // +30% XP -> more levels: always taken, never swapped away
       'focus sash': 6,      // survive a KO hit once per 60 s
       'choice scarf': 5,    // +35% speed
       'shell bell': 5,      // heal 4% of damage dealt
