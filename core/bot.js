@@ -47,6 +47,11 @@
     buffReach: 80,        // world units: this close to a buff shrine (gem pillar) counts as "visited"
     buffCooldown: 30000,  // ms before going back to the same shrine
     lookahead: 140,       // world units: how far ahead each candidate direction is evaluated
+    // Path finding (A*) around "wall" sprites and walls we got stuck on, when the straight line to the target is blocked
+    cell: 32,             // world units per grid cell
+    pathRadius: 48,       // cells around the player (the grid is (2r+1)²)
+    bodyRadius: 14,       // world units added around obstacles: the player's own size
+    pathMaxNodes: 6000,   // A* gives up (target treated as unreachable) after expanding this many cells
     aim: false,           // true = move the mouse cursor onto the nearest enemy (if moves aim at the cursor)
     hazardMargin: 40,     // world units added around hazard effects
     autoTelegraph: true,  // untagged red-ish path shapes (attack range previews) count as hazards
@@ -277,6 +282,68 @@
   }
   const DIRS = Array.from({ length: 16 }, (_, i) => [Math.cos(i * Math.PI / 8), Math.sin(i * Math.PI / 8)]);
 
+  // ---------- path finding ----------
+  // A grid of CFG.cell world units around the player, rebuilt for each search: cells under walls are blocked,
+  // hazards and enemy contact zones only cost more. fill(box, fn) calls fn(cell index, cell centre x, y) for the
+  // cells overlapping a world-space box
+  function makeGrid(cx, cy) {
+    const R = CFG.pathRadius, n = 2 * R + 1, cell = CFG.cell;
+    const g = { n, ox: Math.floor(cx / cell) - R, oy: Math.floor(cy / cell) - R, blocked: new Uint8Array(n * n), cost: new Float32Array(n * n) };
+    g.at = (x, y) => [Math.floor(x / cell) - g.ox, Math.floor(y / cell) - g.oy];
+    g.fill = (x0, y0, x1, y1, fn) => {
+      const [i0, j0] = g.at(x0, y0), [i1, j1] = g.at(x1, y1);
+      for (let j = Math.max(0, j0); j <= Math.min(n - 1, j1); j++)
+        for (let i = Math.max(0, i0); i <= Math.min(n - 1, i1); i++) fn(j * n + i, (g.ox + i + 0.5) * cell, (g.oy + j + 0.5) * cell);
+    };
+    return g;
+  }
+  // Straight walk from a to b (world) crosses no blocked cell; a's own cell is skipped (we may stand against a wall),
+  // cells outside the grid count as free
+  function lineClear(g, a, b) {
+    const [si, sj] = g.at(a.x, a.y), steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (CFG.cell / 2));
+    for (let k = 1; k <= steps; k++) {
+      const [i, j] = g.at(a.x + (b.x - a.x) * k / steps, a.y + (b.y - a.y) * k / steps);
+      if ((i !== si || j !== sj) && i >= 0 && j >= 0 && i < g.n && j < g.n && g.blocked[j * g.n + i]) return false;
+    }
+    return true;
+  }
+  const heapPush = (h, e) => { h.push(e); let i = h.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (h[p][0] <= e[0]) break; h[i] = h[p]; i = p; } h[i] = e; };
+  const heapPop = h => {
+    const top = h[0], last = h.pop();
+    if (h.length) {
+      let i = 0;
+      for (;;) { let c = 2 * i + 1; if (c >= h.length) break; if (c + 1 < h.length && h[c + 1][0] < h[c][0]) c++; if (h[c][0] >= last[0]) break; h[i] = h[c]; i = c; }
+      h[i] = last;
+    }
+    return top;
+  };
+  // A*, 8 directions, no diagonal squeeze between two blocked cells. The start (we may overlap a wall's margin) and
+  // the goal (an item next to a wall) are never treated as blocked. Returns cell indices start -> goal, null when the
+  // goal is unreachable, [] when the search gave up (CFG.pathMaxNodes; a horde makes many cells costly). The heuristic
+  // is weighted a little (x1.2): slightly longer paths, far fewer cells expanded
+  function findPath(g, start, goal) {
+    const n = g.n, gi = goal % n, gj = (goal - gi) / n;
+    const h = idx => { const i = idx % n, dx = Math.abs(i - gi), dy = Math.abs((idx - i) / n - gj); return 1.2 * (dx + dy - 0.586 * Math.min(dx, dy)); };
+    const cost = new Float32Array(n * n).fill(Infinity), from = new Int32Array(n * n).fill(-1), done = new Uint8Array(n * n);
+    const open = [[h(start), start]];
+    cost[start] = 0;
+    for (let expanded = 0; open.length && expanded < CFG.pathMaxNodes; expanded++) {
+      const cur = heapPop(open)[1];
+      if (cur === goal) { const path = [cur]; while (path[0] !== start) path.unshift(from[path[0]]); return path; }
+      if (done[cur]) continue;
+      done[cur] = 1;
+      const ci = cur % n, cj = (cur - ci) / n;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const ni = ci + dx, nj = cj + dy, idx = nj * n + ni;
+        if ((!dx && !dy) || ni < 0 || nj < 0 || ni >= n || nj >= n || done[idx] || (g.blocked[idx] && idx !== goal)) continue;
+        if (dx && dy && (g.blocked[cj * n + ni] || g.blocked[nj * n + ci])) continue;
+        const c = cost[cur] + (dx && dy ? 1.414 : 1) + g.cost[idx];
+        if (c < cost[idx]) { cost[idx] = c; from[idx] = cur; heapPush(open, [c + h(idx), idx]); }
+      }
+    }
+    return open.length ? [] : null;
+  }
+
   function tick(frame) {
     const world = frame.filter(SITE.isWorld);
     if (!world.length) return;
@@ -294,8 +361,8 @@
     state.view = { me, enemies, goods, hazards, rifts, buffs, xps, cases, s };
 
     // Stuck detection: player's world position barely changes while a key is held.
-    // Each stuck event leaves a temporary "wall" point ahead of the player; repeated
-    // stuck events trigger an escape run in a random direction away from those walls.
+    // Each stuck event leaves a "wall" point ahead of the player, kept for the whole run (path finding goes around
+    // it); repeated stuck events trigger an escape run in a random direction away from the nearby ones.
     const now = performance.now();
     const e0 = cam.e, f0 = cam.f;
     const toScreen = w => ({ x: w.x * s + e0, y: w.y * s + f0 });
@@ -320,11 +387,14 @@
     if (state.posHist.length > 20) {
       const old = state.posHist.shift();
       if (state.on && state.dir && Math.hypot(meW.x - old.x, meW.y - old.y) < 3) {
-        state.walls.push({ x: meW.x + state.dir[0] * 60, y: meW.y + state.dir[1] * 60, until: now + 6000 });
-        if (state.view.prevTarget && !state.view.prevTarget.enemy) state.ignore.push({ ...state.view.prevTarget.w, until: now + 8000 });
+        const ahead = { x: meW.x + state.dir[0] * 40, y: meW.y + state.dir[1] * 40 };
+        // Held back by a crowd of enemies is not a wall
+        if (!enemies.some(e => Math.hypot((e.x - e0) / s - ahead.x, (e.y - f0) / s - ahead.y) < CFG.contact + 20)) state.walls = state.walls.concat({ ...ahead, until: Infinity }).slice(-300);
         state.stuck = state.stuck.filter(t => t > now - 3000).concat(now);
         if (state.stuck.length >= 2) {
-          const away = state.walls.reduce((a, w) => [a[0] + meW.x - w.x, a[1] + meW.y - w.y], [0, 0]);
+          // Stuck again even with path finding (wall not tagged / not learnt yet): give the target up for a while
+          if (state.view.prevTarget && !state.view.prevTarget.enemy) state.ignore.push({ ...state.view.prevTarget.w, until: now + 20000 });
+          const away = state.walls.filter(w => Math.hypot(meW.x - w.x, meW.y - w.y) < 200).reduce((a, w) => [a[0] + meW.x - w.x, a[1] + meW.y - w.y], [0, 0]);
           const ang = Math.atan2(away[1], away[0]) + (Math.random() - 0.5) * Math.PI / 1.5;
           state.escape = { dir: [Math.cos(ang), Math.sin(ang)], until: now + 900 };
           state.stuck = [];
@@ -339,7 +409,13 @@
     const nearestTo = list => list.reduce((b, d) => (!b || dist(d, me) < dist(b, me) ? d : b), null);
     // Items that got us stuck (behind a wall) are ignored for a while
     const reachable = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
-    const walls = state.walls.map(toScreen).concat(byTag('wall'));
+    // Where walls block: a prop sprite (tree, rock…: only its trunk / base is solid) around the bottom of the sprite, a
+    // big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for points we got stuck on
+    const footprint = d => {
+      const w = Math.abs(d.w) / s, h = Math.abs(d.h) / s;
+      return Math.max(w, h) < 128 ? { x: d.x, y: d.y + (h / 2 - Math.min(w, h) / 4) * s, rw: Math.min(w, h) / 4 } : { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d };
+    };
+    const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').map(footprint));
     const rift = nearestTo(reachable(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
     const buff = nearestTo(reachable(buffs));
     // Once next to a buff shrine the buff is granted; skip that shrine for buffCooldown
@@ -372,6 +448,69 @@
     state.view.walls = walls;
     const escape = state.escape && state.escape.until > now ? state.escape.dir : null;
 
+    // Path finding: a wall between us and the target -> walk to the farthest cell of an A* path around it that we can
+    // reach in a straight line (wp). Re-planned every 300 ms, when the target moves or once that cell is reached
+    function planPath(from, to) {
+      const g = makeGrid(from.x, from.y), pad = CFG.bodyRadius, W = d => ({ x: (d.x - e0) / s, y: (d.y - f0) / s });
+      // Blocked: "wall" sprites (their box) and the walls we got stuck on
+      for (const d of walls) {
+        if (!d.rw) continue;                                          // stuck points: below, from state.walls
+        const c = W(d);
+        if (d.box) {
+          const hw = Math.abs(d.box.w) / 2 / s + pad, hh = Math.abs(d.box.h) / 2 / s + pad;
+          g.fill(c.x - hw, c.y - hh, c.x + hw, c.y + hh, i => { g.blocked[i] = 1; });
+          continue;
+        }
+        // Cells whose centre is within reach of the base, plus the cell holding it (props sit on tile centres)
+        const r = d.rw + pad, [ci, cj] = g.at(c.x, c.y);
+        g.fill(c.x - r, c.y - r, c.x + r, c.y + r, (i, x, y) => { if (Math.hypot(x - c.x, y - c.y) < r) g.blocked[i] = 1; });
+        if (ci >= 0 && cj >= 0 && ci < g.n && cj < g.n) g.blocked[cj * g.n + ci] = 1;
+      }
+      for (const w of state.walls) g.fill(w.x - 24 - pad, w.y - 24 - pad, w.x + 24 + pad, w.y + 24 + pad, i => { g.blocked[i] = 1; });
+      // Extra cost: hazards (telegraphs, tagged hazard sprites) and enemy contact zones
+      for (const h of hazards) {
+        if (h.shape) {
+          const xs = h.pts.map(p => (p.x - e0) / s), ys = h.pts.map(p => (p.y - f0) / s), m = CFG.hazardMargin + h.lw / 2 / s;
+          g.fill(Math.min(...xs) - m, Math.min(...ys) - m, Math.max(...xs) + m, Math.max(...ys) + m, (i, x, y) => {
+            const d = shapeDist(h, { x: x * s + e0, y: y * s + f0 }) / s;
+            if (d < CFG.hazardMargin) g.cost[i] += d < 0 ? 35 : 25;
+          });
+        } else {
+          const c = W(h), r = Math.max(Math.abs(h.w), Math.abs(h.h)) / 2 / s + CFG.hazardMargin;
+          g.fill(c.x - r, c.y - r, c.x + r, c.y + r, (i, x, y) => { if (Math.hypot(x - c.x, y - c.y) < r) g.cost[i] += 25; });
+        }
+      }
+      for (const e of enemies) {
+        const c = W(e), r = Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s + CFG.contact;
+        g.fill(c.x - r, c.y - r, c.x + r, c.y + r, (i, x, y) => { if (Math.hypot(x - c.x, y - c.y) < r) g.cost[i] += 3; });
+      }
+      const plan = { at: now, goal: to, wp: null, cells: [], none: false };
+      if (lineClear(g, from, to)) return plan;
+      // Goal outside the grid: aim at the grid edge on the way to it
+      const R = CFG.pathRadius - 1, [ti, tj] = g.at(to.x, to.y), [si, sj] = g.at(from.x, from.y);
+      const k = Math.min(1, R / Math.max(Math.abs(ti - si), Math.abs(tj - sj), 1));
+      const gi = Math.round(si + (ti - si) * k), gj = Math.round(sj + (tj - sj) * k);
+      const path = findPath(g, sj * g.n + si, gj * g.n + gi);
+      if (!path) return { ...plan, none: true };
+      if (!path.length) return plan;                                  // gave up: steer straight as before
+      plan.cells = path.map(idx => ({ x: (g.ox + idx % g.n + 0.5) * CFG.cell, y: (g.oy + Math.floor(idx / g.n) + 0.5) * CFG.cell }));
+      plan.wp = plan.cells[1] || to;
+      for (let i = plan.cells.length - 1; i > 1; i--) if (lineClear(g, from, plan.cells[i])) { plan.wp = plan.cells[i]; break; }
+      return plan;
+    }
+    let wp = null;
+    if (target && !hold && !escape) {
+      const tW = { x: (target.x - e0) / s, y: (target.y - f0) / s }, p = state.path;
+      if (!p || now - p.at > 300 || Math.hypot(p.goal.x - tW.x, p.goal.y - tW.y) > CFG.cell || (p.wp && Math.hypot(p.wp.x - meW.x, p.wp.y - meW.y) < CFG.cell)) {
+        state.path = planPath(meW, tW);
+        if (state.path.none && target !== foe) { state.ignore.push({ ...tW, until: now + 20000 }); log('không có đường tới mục tiêu — bỏ qua 20s'); }
+      }
+      wp = state.path.wp;
+    } else state.path = null;
+    const wpS = wp && toScreen(wp);
+    state.view.path = state.path && state.path.cells.map(toScreen);
+    state.view.wp = wpS;
+
     const cost = dir => {
       const at = k => ({ x: me.x + (dir ? dir[0] : 0) * CFG.lookahead * s * k, y: me.y + (dir ? dir[1] : 0) * CFG.lookahead * s * k });
       const p = at(1);
@@ -393,11 +532,12 @@
         }
       }
       for (const w of walls) {
-        const d = dist(p, w), r = ((w.w ? Math.max(w.w, w.h) / 2 / s : 0) + 70) * 0.4;
+        const d = dist(p, w), r = (w.rw + 70) * 0.4;
         if (d < r) c += 15 * (1 - d / r) + 3;
       }
       if (escape) c -= dir ? 8 * (dir[0] * escape[0] + dir[1] * escape[1]) : 0;
       else if (target && hold) c += weight * dist(p, target) / CFG.lookahead;     // already on top: stay put
+      else if (wpS) c += weight * (segDist(wpS, me, p) / s + 0.2 * dist(p, wpS)) / CFG.lookahead;   // around a wall
       // Pickups: score by how close the step passes over the item (not where it ends), so the
       // player walks straight through it instead of stopping a few pixels short
       else if (target && !stop) c += weight * (segDist(target, me, p) / s + 0.2 * dist(p, target)) / CFG.lookahead;
@@ -406,7 +546,7 @@
       return c;
     };
     // Standing still is never chosen while heading for a pickup / buff / rift
-    let pick = null, pickCost = target && !stop && !hold && !escape ? Infinity : cost(null) + (hold ? 0 : 0.1);
+    let pick = null, pickCost = target && (!stop || wpS) && !hold && !escape ? Infinity : cost(null) + (hold ? 0 : 0.1);
     DIRS.forEach(d => {
       const c = cost(d);
       if (c < pickCost) { pick = d; pickCost = c; }
@@ -450,7 +590,7 @@
       if (evo) { score = 500; why.push('mở tiến hoá skill'); }
       else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
       else if (buildIdx >= 0) { score = (buff ? 200 : 300) - buildIdx; why.push(`nâng ${buff ? 'buff' : 'move tấn công'} build #${buildIdx + 1} (cấp ${level})`); }
-      else if (owned) { score = 100 + level; why.push(`nâng skill ngoài build (cấp ${level})`); }
+      else if (owned && move) { score = 100 + level; why.push(`nâng skill ngoài build (cấp ${level})`); }
       else if (isNew || move) { score = buff ? 0 : 1; why.push('skill mới ngoài build'); }
       else if (ATK_RE.test(t)) { score = 150; why.push('nội tại tấn công'); }
       else if (DEF_RE.test(t)) { score = 146; why.push('nội tại phòng thủ'); }
@@ -691,7 +831,11 @@
     ring(v.xps, '#0fc', () => 4);
     ring(v.cases, '#fa0', () => Math.max(6, CFG.caseReach * v.s));
     g.strokeStyle = '#0fc6'; g.setLineDash([2, 6]); g.beginPath(); g.arc(v.me.x, v.me.y, state.magnet * v.s, 0, 7); g.stroke(); g.setLineDash([]);
-    ring(v.walls || [], '#88f', d => ((d.w ? Math.max(d.w, d.h) / 2 : 0) + 70 * v.s) * 0.4);
+    ring(v.walls || [], '#88f', d => (d.rw + 70) * v.s * 0.4);
+    // A* path around walls (dots) and the cell being walked to (circle)
+    g.fillStyle = '#fff';
+    (v.path || []).forEach(p => g.fillRect(p.x - 2, p.y - 2, 4, 4));
+    if (v.wp) { g.strokeStyle = '#fff'; g.beginPath(); g.arc(v.wp.x, v.wp.y, 8, 0, 7); g.stroke(); }
     g.strokeStyle = '#ff4'; g.beginPath(); g.arc(v.me.x, v.me.y, CFG.contact * v.s, 0, 7); g.stroke();
     if (v.target) { g.strokeStyle = '#fff8'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.target.x, v.target.y); g.stroke(); g.setLineDash([]); }
     if (state.dir) { g.strokeStyle = '#4cf'; g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.me.x + state.dir[0] * 40, v.me.y + state.dir[1] * 40); g.stroke(); }
@@ -1007,7 +1151,7 @@
       const timer = [...state.hudTexts].find(x => /^\d+:\d\d$/.test(x));
       if (timer) state.lastTimer = t;                                                            // run timer on screen = in a run
       if (timer !== state.timerText) { state.timerText = timer; state.timerChangedAt = t; }      // frozen timer = game paused (menus)
-      if ([...state.hudTexts].some(t => /^0:0[0-2]$/.test(t))) { state.picks = {}; state.newSkills = 0; }   // new run
+      if ([...state.hudTexts].some(t => /^0:0[0-2]$/.test(t))) { state.picks = {}; state.newSkills = 0; state.walls = []; state.path = null; }   // new run
       // Down in a multiplayer run: the HUD offers "Spectate" / shows "Spectating X's Y" and 0 HP. Keys then steer the
       // spectator camera (E / A / D switch the watched player), so the bot stops pressing them until revived
       state.dead = [...state.hudTexts].some(x => /^spectat/i.test(x) || /^0 \/ \d+$/.test(x));
