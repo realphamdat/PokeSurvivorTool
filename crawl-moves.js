@@ -1,6 +1,6 @@
-// Re-crawl the learnable moves of every pokémon from pokesurvivor.wiki into moves.js:  node crawl-moves.js
+// Re-crawl the learnable moves of every pokémon from pokesurvivor.wiki into core/moves.js:  node crawl-moves.js
 const fs = require('fs');
-const outFile = require('path').join(__dirname, 'moves.js');
+const outFile = require('path').join(__dirname, 'core', 'moves.js');
 let list;
 const parseDex = dex => {
   const mons = [...dex.matchAll(/slug:"([a-z0-9-]+)",dex:(\d+),name:"([^"]+)"/g)].map(m => ({ slug: m[1], dex: +m[2], name: m[3] }));

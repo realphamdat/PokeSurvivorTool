@@ -2,7 +2,9 @@
 // For browsers without Chrome extensions (Android / iOS): a bookmarklet runs this on pokesurvivor.com (or pokesurvivor.doofcraft.com),
 // it fetches the latest files from the original repo and runs them in the same order as manifest.json.
 (async () => {
-  const FILES = ['data.js', 'moves.js', 'bot.js', 'farmMoney.js'];
+  // Stays at the repo root: installed userscripts / bookmarklets fetch it from there
+  const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
+  const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
   const SOURCES = [
     f => `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/main/${f}?t=${Date.now()}`,
     f => `https://cdn.jsdelivr.net/gh/damhieu2808/PokeSurvivorTool@main/${f}`,

@@ -11,96 +11,21 @@
 // PokeSurvivor Bot — tác giả: damhieu2808 · https://github.com/damhieu2808/PokeSurvivorTool
 // MIT License (xem LICENSE): dùng lại / chỉnh sửa thì phải giữ dòng bản quyền và giấy phép.
 //
-// Paste into DevTools Console, install as a Tampermonkey userscript, or load this folder as a Chrome extension (manifest.json).
+// Load the repo folder as a Chrome extension (manifest.json), or run loader.js / psbot.user.js. Pasting into the Console:
+// sites/<bản game>/site.js + data.js and core/moves.js first, then this file. Per-version code lives in sites/<id>/.
 // F6 = danh mục mọi sprite (ảnh + chỉ số + nút gắn nhãn) · F7 = gắn nhãn bằng click (1 tốt / 2 nguy hiểm / 3 rift / 4 vật cản / 5 buff / 6 kinh nghiệm / 7 vali / 0 xoá)
 // F8 = bật/tắt bot · F9 = overlay · PSBot.catalog() = in + copy danh mục · PSBot.tags() = xem nhãn đã lưu
-// PSBot.exportConfig() / nút "Xuất data.js" (F6) = tải data.js chứa nhãn + build; chép đè vào thư mục extension để máy khác có sẵn
+// PSBot.exportConfig() / nút "Xuất data.js" (F6) = tải data.js chứa nhãn + build; chép đè vào sites/<bản game>/ để máy khác có sẵn
 // While loaded, Firestore/RTDB writes whose path matches CFG.rankRe are replaced by no-ops.
 // Reload the page to play normally (unblocked) again.
 (function start(tries = 0) {
-  // Per-version hooks; methods run later, once the helpers below them (visible, readCard, ...) exist
-  const SITES = {
-    default: {
-      id: 'default', label: 'Mặc định · pokesurvivor.com',
-      ready: () => !!document.getElementById('game'),
-      canvas: () => document.getElementById('game'),
-      // World sprites are drawn scaled by the camera zoom, the HUD untransformed
-      isWorld: d => d.s !== 1,
-      camera: world => world[0],
-      enemyRe: /\/assets\/pokemon\/\d+\/(?!Faint)\w+\.png/,
-      tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard' },
-      sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
-      cfg: {},
-      levelUp() {
-        if (!visible(document.getElementById('lvl-num'))) return null;
-        return { cards: [...document.querySelectorAll('div.key')].filter(visible).map(readCard), rerolls: +(document.getElementById('lvl-rr-n') || {}).innerText || 0 };
-      },
-      choiceOpen: () => visible(document.getElementById('lvl-num')),
-      otherChoice() {},
-      menu: buttons => buttons.some(b => /^(play|jugar)/i.test((b.innerText || '').trim()) && /dungeon|mazmorra/i.test(b.innerText)),
-      restartButton(buttons) {
-        for (const re of CFG.restartSteps) {
-          const b = buttons.find(b => { const x = (b.innerText || '').trim(); return re.test(x) && !CFG.restartAvoid.test(x); });
-          if (b) return b;
-        }
-      },
-    },
-    doofcraft: {
-      id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
-      ready: () => !!document.getElementById('app'),
-      canvas: () => document.querySelector('canvas.ps-canvas'),
-      // The whole frame is scaled by devicePixelRatio; the world also gets the camera translation, the HUD doesn't
-      isWorld: d => d.e !== 0 || d.f !== 0,
-      // Effects (beams, slashes) add their own translate / rotate: pokémon sprites carry the plain camera transform
-      camera: (world, pokes) => pokes[0] || world[0],
-      enemyRe: /\/sprites\/[\w-]+\/(?:s\/)?(?!Faint)\w+\.png/,
-      // Pickup colours from the game's source: xp / big xp diamonds, heal berry and magnet orbs, item / chest halo
-      tags: { 'fill:#7fe0ff': 'xp', 'fill:#ffd95e': 'xp', 'fill:#5fe08a': 'good', 'fill:#ff9ed8': 'good', 'fill:#ffe14d': 'good' },
-      sizeTags: false,
-      // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
-      cfg: { useItems: false, swapEvery: 200, blockRank: false },
-      levelUp() {
-        const box = dcBox();
-        if (!box || !/^level|cleared/i.test(dcTitle(box))) return null;
-        const rr = box.querySelector('[data-testid="reroll"]');
-        return { cards: [...box.querySelectorAll('button.ps-card')].map(readDcCard), rerolls: rr ? +((rr.innerText.match(/\((\d+)\)/) || [])[1] || 0) : 0 };
-      },
-      choiceOpen: () => !!document.querySelector('.ps-choice:not(.hidden) .ps-box'),
-      // Choice Band slot / waves chest: no scoring, take the first option so the run doesn't wait forever
-      otherChoice() {
-        const box = dcBox();
-        if (!box || /^level|cleared|an item|bond/i.test(dcTitle(box))) return;
-        const cards = [...box.querySelectorAll('button.ps-card')];
-        if (!cards.length) return;
-        pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80) })));
-      },
-      menu: buttons => buttons.some(b => b.matches('[data-testid="menu-solo"], [data-testid="solo-start"]')),
-      // Results -> menu, continue a saved run (or confirm ending it), Solo -> Play
-      restartButton(buttons) {
-        for (const sel of ['[data-testid="game-exit"]', '[data-testid="saved-run-new-confirm"] [data-testid="dialog-confirm"]',
-          '[data-testid="saved-run-resume"]', '[data-testid="solo-start"]', '[data-testid="menu-solo"]']) {
-          const b = buttons.find(b => b.matches(sel));
-          if (b) return b;
-        }
-      },
-    },
-  };
-  // Two versions of the game: pokesurvivor.com ("default") and pokesurvivor.doofcraft.com, a rewrite with its own
-  // canvas, sprite paths and menus. Picked from the host; the panel's "Bản game" select overrides it (per site).
-  const SITE_KEY = 'psbot.site';
-  let sitePick = 'auto';
-  try { sitePick = localStorage.getItem(SITE_KEY) || 'auto'; } catch {}
-  const autoSite = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
-  let SITE = SITES[sitePick] || SITES[autoSite];
-  // Loaded by the extension at document_idle the game page may not exist yet: retry until it does.
-  // A forced version whose page never shows up (e.g. "default" picked on doofcraft) would leave no panel to switch
-  // back with: after ~5 s the host's own version takes over and the override is cleared.
-  if (!SITE.ready()) {
-    if (SITE === SITES[autoSite] || tries < 10 || !SITES[autoSite].ready()) return void setTimeout(() => start(tries + 1), 500);
-    console.warn(`[PSBot] trang này không phải bản "${SITE.label}" — dùng lại bản tự nhận (${SITES[autoSite].label})`);
-    try { localStorage.removeItem(SITE_KEY); } catch {}
-    sitePick = 'auto'; SITE = SITES[autoSite];
-  }
+  // Game version profile (sites/<id>/site.js, picked by the manifest / loader from the host). Its methods run later,
+  // once the helpers they use (h, filled in below) exist
+  if (!window.PSBotSite) return void console.warn('[PSBot] chạy sites/<bản game>/site.js trước bot.js');
+  const h = {};
+  const SITE = window.PSBotSite(h);
+  // Loaded by the extension at document_idle the game page may not exist yet: retry until it does
+  if (!SITE.ready()) return void setTimeout(() => start(tries + 1), 500);
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
   const VERSION = '1.3.1';
@@ -500,37 +425,7 @@
     for (const t of state.hudTexts) { const b = CFG.builds[t.toLowerCase()]; if (b) return b; }
     return null;
   };
-  function readCard(k) {
-    let card = k;
-    while (card.parentElement && card.parentElement.querySelectorAll('div.key').length === 1) card = card.parentElement;
-    const t = card.innerText;
-    // Card title = the largest text in the card that is not the hotkey digit
-    const leaves = [...card.querySelectorAll('*')].filter(e => !e.children.length && e !== k && /\D/.test(e.innerText || ''));
-    const title = leaves.reduce((b, e) => (!b || fontSize(e) > fontSize(b) ? e : b), null);
-    const name = title ? title.innerText.trim() : '';
-    const shownLv = t.match(/\b(?:Lv|Nv|Niv)\.?\s*(\d+)/i);                 // "Lv. 3" chip on owned skills, if the game shows one
-    return scoreCard({
-      key: k.innerText.trim(), name, t,
-      level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), shownLv ? +shownLv[1] - 1 : 0),
-      isNew: /\bNew\b|Nuevo|Novo|Mới/i.test(t),
-      evo: CFG.evoRe.test(t) || /evo|awaken|ultimate/i.test(card.className + ' ' + [...card.querySelectorAll('[class]')].map(e => e.className).join(' ')),
-      fitLow: !!card.querySelector('.fit-low'), fitHigh: !!card.querySelector('.fit-high'),
-    });
-  }
-  // Doofcraft's choice dialog: answerable once "armed" (input is locked for 1 s after it opens) and not yet submitted
-  const dcBox = () => { const b = document.querySelector('.ps-choice:not(.hidden) .ps-box.armed'); return b && !b.querySelector('.ps-cards.done') ? b : null; };
-  const dcTitle = box => ((box.querySelector('h2') || {}).innerText || '').trim();
-  // Card = button.ps-card > .txt > .nm (title text + chips "New · Fire" / "Lv.2 > 3" / "EVOLUTION") + .ds (description)
-  const dcName = c => { const nm = c.querySelector('.nm'); return nm ? [...nm.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : ''; };
-  function readDcCard(c, i) {
-    const t = c.innerText, name = dcName(c);
-    const lv = t.match(/\bLv\.?\s*(\d+)\s*>/i);                          // upgrade chip: current level > next
-    return scoreCard({
-      key: String(i + 1), name, t,
-      level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), lv ? +lv[1] : 0),
-      isNew: /\bNew\b/i.test(t), evo: c.classList.contains('evo') || CFG.evoRe.test(t), fitLow: false, fitHigh: false,
-    });
-  }
+  Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow });   // for the site profile's methods
   function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh }) {
     const build = currentBuild();
     const buildIdx = build ? build.findIndex(m => m.toLowerCase() === name.toLowerCase()) : -1;
@@ -817,11 +712,6 @@
     <label style="display:flex;align-items:center;gap:6px">Số ván
       <input data-ctl="runs" type="number" min="0" step="1" style="width:60px;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
       <span style="color:#9ab">0 = vô hạn</span></label>
-    <label style="display:flex;align-items:center;gap:6px" title="Đổi bản game sẽ tải lại trang">Bản game
-      <select data-ctl="site" style="flex:1;min-width:0;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
-        <option value="auto">Tự nhận (${SITES[autoSite].label.split(' · ')[0]})</option>
-        ${Object.values(SITES).map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
-      </select></label>
     <div style="display:flex;gap:4px">
       <button data-ctl="play" style="${btnCss};background:#4c4">▶ Chạy</button>
       <button data-ctl="pause" style="${btnCss};background:#fc3">⏸ Tạm dừng</button>
@@ -839,12 +729,6 @@
   draggable(dock, 'psbot.pos.dock', ctl);   // the title row moves the whole dock (panel + HUD line + docked popups)
   const $ =k => ctl.querySelector(`[data-ctl="${k}"]`);
   try { $('runs').value = localStorage.getItem(RUNS_KEY) || '5'; } catch { $('runs').value = '5'; }
-  // Hooks, defaults and tags are set up for one version at load: switching reloads the page
-  $('site').value = SITES[sitePick] ? sitePick : 'auto';
-  $('site').onchange = () => {
-    try { localStorage.setItem(SITE_KEY, $('site').value); } catch {}
-    location.reload();
-  };
   // Collapse to the title row (small screens); the <style> above hides every other row, the farm line included
   const MIN_KEY = 'psbot.min';
   const setMin = min => {
@@ -1028,7 +912,7 @@
     const now = performance.now();
     const esc = s => s.replace(/[&<>"]/g, ch => `&#${ch.charCodeAt(0)};`);
     panel.innerHTML = `<div data-drag style="padding:6px;border-bottom:1px solid #345;${dragCss}" title="Kéo để di chuyển">Danh mục sprite (F6 đóng) · rê chuột = khoanh trên màn hình · <b>đậm</b> = đang có trên màn
-      <button data-export style="font:10px monospace;padding:1px 6px;margin-left:4px;background:#2a5;color:#000;border:1px solid #456;border-radius:3px;cursor:pointer" title="Tải data.js (nhãn + build) — chép đè vào thư mục extension">Xuất data.js</button></div>` +
+      <button data-export style="font:10px monospace;padding:1px 6px;margin-left:4px;background:#2a5;color:#000;border:1px solid #456;border-radius:3px;cursor:pointer" title="Tải data.js (nhãn + build) — chép đè vào sites/${SITE.id}/">Xuất data.js</button></div>` +
       catalogRows().map(c => {
         const t = tagOf(c.src) || (/^(fill|stroke):/.test(c.src) && CFG.autoTelegraph && isTelegraph(c) ? 'hazard' : undefined);
         const live = now - c.lastSeen < 1500, enemy = CFG.enemyRe.test(c.src);
@@ -1190,14 +1074,14 @@
     exportConfig() {
       const json = JSON.stringify({ tags: CFG.tags, builds: CFG.builds }, null, 2);
       const src = '// Nhãn sprite + build đã đánh dấu, đi kèm extension để máy nào cài cũng có sẵn.\n' +
-        '// Tạo lại file này bằng nút "Xuất data.js" trong bảng F6 (hoặc PSBot.exportConfig()), rồi chép đè vào thư mục extension.\n' +
+        `// Tạo lại file này bằng nút "Xuất data.js" trong bảng F6 (hoặc PSBot.exportConfig()), rồi chép đè vào sites/${SITE.id}/.\n` +
         `window.PSBotData = ${json};\n`;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
       a.download = 'data.js';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      log(`đã xuất data.js: ${Object.keys(CFG.tags).length} nhãn, ${Object.keys(CFG.builds).length} build — chép đè vào thư mục extension`);
+      log(`đã xuất data.js: ${Object.keys(CFG.tags).length} nhãn, ${Object.keys(CFG.builds).length} build — chép đè vào sites/${SITE.id}/`);
     },
     unload() {
       running = false; applyDir(null); clearInterval(updateTimer);

@@ -18,8 +18,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://pokesurvivor.com/*", "https://pokesurvivor.doofcraft.com/*"],
-      "js": ["data.js", "moves.js", "bot.js", "farmMoney.js"],
+      "matches": ["https://pokesurvivor.com/*"],
+      "js": ["sites/default/site.js", "sites/default/data.js", "core/moves.js", "core/bot.js", "core/farmMoney.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://pokesurvivor.doofcraft.com/*"],
+      "js": ["sites/doofcraft/site.js", "sites/doofcraft/data.js", "core/moves.js", "core/bot.js", "core/farmMoney.js"],
       "run_at": "document_idle",
       "world": "MAIN"
     }
