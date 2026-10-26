@@ -8,15 +8,17 @@ window.PSBotSite = h => {
   const dcTitle = box => ((box.querySelector('h2') || {}).innerText || '').trim();
   // Card = button.ps-card > .txt > .nm (title text + chips "New · Fire" / "Lv.2 > 3" / "EVOLUTION") + .ds (description)
   const dcName = c => { const nm = c.querySelector('.nm'); return nm ? [...nm.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : ''; };
+  // Phones (touch screen): the card button is tapped instead of pressing its digit key
+  const tapTarget = c => (matchMedia('(pointer: coarse)').matches ? c : null);
   function readDcCard(c, i) {
     const { state, CFG } = h;
     const t = c.innerText, name = dcName(c);
     const lv = t.match(/\bLv\.?\s*(\d+)\s*>/i);                          // upgrade chip: current level > next
-    return h.scoreCard({
+    return { ...h.scoreCard({
       key: String(i + 1), name, t,
       level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), lv ? +lv[1] : 0),
       isNew: /\bNew\b/i.test(t), evo: c.classList.contains('evo') || CFG.evoRe.test(t), fitLow: false, fitHigh: false,
-    });
+    }), el: tapTarget(c) };
   }
 
   return {
@@ -46,7 +48,7 @@ window.PSBotSite = h => {
       if (!box || /^level|cleared|an item|bond/i.test(dcTitle(box))) return;
       const cards = [...box.querySelectorAll('button.ps-card')];
       if (!cards.length) return;
-      h.pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80) })));
+      h.pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80), el: tapTarget(c) })));
     },
     menu: buttons => buttons.some(b => b.matches('[data-testid="menu-solo"], [data-testid="solo-start"]')),
     // Results -> menu, continue a saved run (or confirm ending it), Solo -> Play

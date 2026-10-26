@@ -240,6 +240,14 @@
   };
   const releaseAll = () => Object.keys(KEYS).forEach(k => setKey(k, false));
   const tap = (key, code, keyCode) => { sendKey('keydown', key, code, keyCode); setTimeout(() => sendKey('keyup', key, code, keyCode), 60); };
+  // Phones: the game hides the hotkey digits, so a choice is tapped instead (never a key on top: it could hit the next
+  // dialog). One pointerdown / pointerup / click on the topmost node at its centre, where the game's handler may sit
+  const tapEl = el => {
+    const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const t = document.elementsFromPoint(x, y).find(e => el.contains(e)) || el;
+    const o = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, pointerType: 'touch', isPrimary: true };
+    t.dispatchEvent(new PointerEvent('pointerdown', o)); t.dispatchEvent(new PointerEvent('pointerup', o)); t.click();
+  };
 
   function applyDir(dir) {
     state.dir = dir;
@@ -458,12 +466,13 @@
     const cards = found.cards.sort((a, b) => b.score - a.score);
     state.pickAt = performance.now() + 800;
     console.table(cards);
-    if (cards[0].score < 2 && found.rerolls > 0) { log('reroll'); tap('r', 'KeyR', 82); return; }
+    // No reroll when tapping (c.el): if R does nothing there, the bot would retry it forever instead of picking
+    if (cards[0].score < 2 && found.rerolls > 0 && !cards[0].el) { log('reroll'); tap('r', 'KeyR', 82); return; }
     const c = cards[0];
     state.picks[c.name] = (state.picks[c.name] || 0) + 1;
     if (c.isNew) state.newSkills++;
     log('chọn', c.key, c.name, '—', c.why);
-    tap(c.key, `Digit${c.key}`, 48 + +c.key);
+    if (c.el) tapEl(c.el); else tap(c.key, `Digit${c.key}`, 48 + +c.key);
   }
 
   // Only while the run timer is ticking and no level-up is open: the dialogs also use digit hotkeys
@@ -487,12 +496,20 @@
   function dialogRows(head, isDialog) {
     let dialog = head;
     while (dialog.parentElement && !isDialog(dialog)) dialog = dialog.parentElement;
-    const digits = [...dialog.querySelectorAll('*')].filter(e => !e.children.length && visible(e) && /^\d$/.test((e.innerText || '').trim()));
-    return digits.map(k => {
+    const isDigit = e => !e.children.length && /^\d$/.test((e.textContent || '').trim());
+    let digits = [...dialog.querySelectorAll('*')].filter(e => isDigit(e) && visible(e));
+    // Phones: digits hidden -> rows from the hidden digits, or the dialog's buttons if there are none; tapped (el)
+    const touch = !digits.length;
+    if (touch) digits = [...dialog.querySelectorAll('*')].filter(isDigit);
+    const rows = digits.map(k => {
       let row = k;
       while (row.parentElement && row.parentElement !== dialog && [...row.parentElement.querySelectorAll('*')].filter(e => digits.includes(e)).length === 1) row = row.parentElement;
-      return { key: k.innerText.trim(), text: row.innerText.replace(/\s+/g, ' ').trim() };
-    }).filter(o => o.text.length > 3);
+      return { key: k.textContent.trim(), row };
+    });
+    if (touch && !rows.length) [...dialog.querySelectorAll('button, [role=button]')].forEach((row, i) => rows.push({ key: String(i + 1), row }));
+    return rows.filter(o => !touch || visible(o.row))
+      .map(({ key, row }) => ({ key, text: row.innerText.replace(/\s+/g, ' ').trim(), el: touch ? row : null }))
+      .filter(o => o.text.length > 3);
   }
   function pickRow(kind, opts) {
     if (!opts.length) return;
@@ -500,7 +517,7 @@
     state.pickAt = performance.now() + 800;
     console.table(opts);
     log(kind, opts[0].key, opts[0].name || '?', opts[0].why || '');
-    tap(opts[0].key, `Digit${opts[0].key}`, 48 + +opts[0].key);
+    if (opts[0].el) tapEl(opts[0].el); else tap(opts[0].key, `Digit${opts[0].key}`, 48 + +opts[0].key);
   }
   function dialogPick() {
     const now = performance.now();
