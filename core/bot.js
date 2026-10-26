@@ -964,7 +964,7 @@
     <div data-drag style="display:flex;align-items:center;gap:6px;font-weight:bold;color:#7cf;${dragCss}" title="Kéo để di chuyển"><span style="flex:1">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" style="font-weight:normal;color:#9ab;text-decoration:none" title="Repo gốc trên GitHub">· by damhieu2808</a></span>
       <button data-ctl="min" style="${btnCss};background:#9ab;padding:0 8px" title="Thu gọn / mở rộng">–</button></div>
     <style>[data-psbot-ctl][data-min] > :not(:first-child) { display: none !important }
-      @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } }</style>
+      @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }</style>
     <label style="display:flex;align-items:center;gap:6px">Số ván
       <input data-ctl="runs" type="number" min="0" step="1" style="width:60px;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
       <span style="color:#9ab">0 = vô hạn</span></label>
@@ -972,6 +972,7 @@
       <button data-ctl="play" style="${btnCss};background:#4c4;flex:1">▶ Chạy</button>
       <button data-ctl="moveset" style="${btnCss};background:#7cf;flex:1">⚔ Moveset</button>
     </div>
+    <div data-ctl="keys" style="color:#9ab;font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
     <div data-ctl="status" style="color:#9ab"></div>
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" style="order:1;border-top:1px solid #345;padding-top:4px;color:#9ab;text-decoration:none">⭐ Tác giả <b style="color:#7cf">damhieu2808</b> · github.com/damhieu2808/PokeSurvivorTool</a>
     <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="display:none;color:#000;background:#fc3;border-radius:4px;padding:3px 6px;text-decoration:none;font-weight:bold"></a>`;
