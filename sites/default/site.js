@@ -87,12 +87,15 @@ window.PSBotSite = h => {
     const box = (o, size, src) => ({ src, x: X(o.x), y: Y(o.y), w: size * s, h: size * s, s, e, f });
     h.state.selfDex = String(P.dex);
     h.state.magnet = P.magnet;
-    const out = { me: { x: X(P.x), y: Y(P.y) }, enemies: [], hazard: [], xp: [], good: [], case: [], buff: [], rift: [], wall: [], break: [] };
-    // Enemies whose type hits ours super-effectively count as bigger (kept farther away); thieves never hit
+    const out = { me: { x: X(P.x), y: Y(P.y) }, enemies: [], hazard: [], xp: [], good: [], case: [], buff: [], rift: [], wall: [], break: [], prize: [] };
+    // Enemies whose type hits ours super-effectively count as bigger (kept farther away). Prizes: the coin thief (never
+    // hits, flees, gone after 15 s: 100 coins or a ×10 ticket) is only chased; a shiny (caught when beaten) is fought
     for (const o of G.EnemyMgr.all()) {
       if (o.dead || !near(o, 1400)) continue;
-      const k = o.behavior === 'thief' ? 0 : G.Types.mult(o.atkType, P.mon.types);
+      if (o.behavior === 'thief') { out.prize.push(box(o, 2 * o.r + 16, 'G:thief')); continue; }
+      const k = G.Types.mult(o.atkType, P.mon.types);
       out.enemies.push(box(o, 2 * o.r + 16 + 24 * Math.max(0, Math.min(2, k - 1)), `G:enemy:${o.dex}`));
+      if (o.shiny) out.prize.push({ ...box(o, 2 * o.r + 16, 'G:shiny'), engage: true });
     }
     // Telegraphs: a circle (zone) or a straight beam from the enemy
     for (const z of G.Hazards.all) {
@@ -119,7 +122,10 @@ window.PSBotSite = h => {
       else if (GOOD.has(p.kind)) out.good.push(box(p, 14, `G:${p.kind}`));
     }
     // Props: size 2.5 r, so the core's footprint (40 % of the width) blocks exactly the game's collision radius
-    for (const p of G.World.visibleProps(G.Camera)) {
+    // The big chest (a level's worth of XP + coins) also off screen, within 1200
+    const props = new Set(G.World.visibleProps(G.Camera));
+    for (const p of G.World.specialsNear(P.x, P.y, 1200)) if (p.type === 'bigchest') props.add(p);
+    for (const p of props) {
       const d = box(p, 2.5 * p.r, `G:${p.type}`);
       // Rocks / small chests only block: walking up to break them cost runs (~half the time spent on them, into hordes)
       if (p.type === 'tree' || ((p.type === 'rock' || p.type === 'chest') && p.hp > 0)) out.wall.push(d);

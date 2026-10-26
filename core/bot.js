@@ -46,6 +46,9 @@
     goodWeight: 5,
     riftWeight: 40,       // outweighs hazard / enemy avoidance (up to ~35): a rift is worth walking through them for
     riftIgnore: 3000,     // ms a rift is skipped after finding no path to it (other targets: 20 s); never for getting stuck
+    // Prizes ("prize" tag, from the site's scene): a fleeing coin thief, a shiny to catch. Chased right after rifts, unless
+    // inside a hazard; an enemy one (engage: true) is fought at CFG.engage like any enemy, the others walked into
+    prizeWeight: 10,
     magnet: 100,          // world units: initial XP pickup radius; re-learned while playing (state.magnet)
     xpRange: 900,         // world units: XP orbs within this (but outside the pickup radius) become the target
     xpWeight: 4,
@@ -409,7 +412,8 @@
       for (let t = 0; t < 256; t++) if (tiles[t]) out.push({ x: x0 + (t % 16) * tw, y: y0 + Math.floor(t / 16) * tw, w: tw, kind: tiles[t] });
       return out;
     }) : [];
-    state.view = { me, enemies, goods, hazards, rifts, buffs, xps, cases, s, terrain };
+    const prizes = byTag('prize');
+    state.view = { me, enemies, goods, hazards, rifts, buffs, xps, cases, prizes, s, terrain };
 
     // Stuck detection: player's world position barely changes while a key is held.
     // Each stuck event leaves a "wall" point ahead of the player, kept for the whole run (path finding goes around
@@ -482,6 +486,7 @@
     // A rift is always worth it: never put off by hazards / enemies around it, only by an unreachable spot
     const unignored = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
     const rift = nearestTo(unignored(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
+    const prize = nearestTo(unignored(prizes).filter(d => !inHazard(d) && !(low && d.engage)));
     const buff = nearestTo(reachable(buffs));
     // Once next to a buff shrine the buff is granted; skip that shrine for buffCooldown
     if (buff && dist(buff, me) < CFG.buffReach) state.ignore.push({ x: (buff.x - e0) / s, y: (buff.y - f0) / s, until: now + CFG.buffCooldown });
@@ -503,6 +508,7 @@
     // hold = stand right on the target (suitcase) instead of walking through it
     let target = null, weight = 0, stop = 0, hold = false, xp;
     if (rift) { target = rift; weight = CFG.riftWeight; }
+    else if (prize) { target = prize; weight = CFG.prizeWeight; stop = prize.engage ? CFG.engage : 0; }
     else if (kase && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
@@ -655,6 +661,8 @@
   // getClientRects (not offsetParent, which is null for position:fixed menus) + not hidden
   const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const ATK_RE = /damage|dmg|power|attack|crit|cooldown|hit|area|projectile|range|pierce|burst|daño|dano|ataque|dégât/i;
+  // The XP passive (both sites: "Learning — +12% experience gained."), not Magnet's "experience pickup radius"
+  const XP_RE = /^(learning|aprendizaje)$|experience gained|experiencia ganada/i;
   const DEF_RE = /hp|health|heal|regen|armor|armour|defen|shield|speed|magnet|pickup|vida|salud/i;
   const fontSize = el => parseFloat(getComputedStyle(el).fontSize) || 0;
   // The HUD draws the current pokémon's name; use it to look up its build
@@ -681,7 +689,7 @@
     const used = ms ? ms.used : isNew ? Math.min(1 + state.newSkills, slots - 1) : 1 + state.newSkills;
     if (build) {
       // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
-      // > new move outside the build while a slot is left over (the build's missing moves keep theirs) > upgrade a
+      // > new move outside the build while a slot is left over (the build's missing moves keep theirs) > XP passive > upgrade a
       // build attack move > passive a build move needs to evolve > upgrade a build buff > passive (attack > defence >
       // other) > upgrade a skill outside the build > new skill outside it with no slot left (score < 2: rerolled when
       // possible)
@@ -693,6 +701,7 @@
       if (evo) { score = 500; why.push('mở tiến hoá skill'); }
       else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
       else if (isNew && used + missing < slots) { score = buff ? 345 : 350; why.push(`thêm move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`); }
+      else if (!move && (XP_RE.test(name) || XP_RE.test(t))) { score = 320; why.push('tăng kinh nghiệm nhận được'); }
       else if (buildIdx >= 0 && !buff) { score = 300 - buildIdx; why.push(`nâng move tấn công build #${buildIdx + 1} (cấp ${level})`); }
       else if (needFor.length) { score = 250; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
       else if (buildIdx >= 0) { score = 200 - buildIdx; why.push(`nâng buff build #${buildIdx + 1} (cấp ${level})`); }
@@ -712,7 +721,8 @@
         const room = used < slots;
         score += room ? 50 : -3; why.push(room ? `skill mới (${used}/${slots} ô)` : 'skill mới (hết ô)');
         if (noDmg) { score -= 6; why.push('không gây sát thương'); }
-      } else if (noDmg) { score -= 6; why.push('không gây sát thương'); }
+      } else if (XP_RE.test(name) || XP_RE.test(t)) { score += 40; why.push('tăng kinh nghiệm nhận được'); }
+      else if (noDmg) { score -= 6; why.push('không gây sát thương'); }
       else if (level > 0) { score += 8 + 3 * level; why.push(`dồn skill đang có (cấp ${level})`); }
       else if (needFor.length) { score += 10; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
       else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
@@ -942,6 +952,7 @@
     g.lineWidth = 2;
     ring(v.goods, '#4f4', () => 8);
     ring(v.rifts, '#f4f', () => 16);
+    ring(v.prizes || [], '#fd3', () => 22);
     ring(v.buffs, '#ff0', () => 14);
     ring(v.xps, '#0fc', () => 4);
     ring(v.cases, '#fa0', () => Math.max(6, CFG.caseReach * v.s));

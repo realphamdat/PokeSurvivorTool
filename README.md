@@ -47,14 +47,15 @@ Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ đi�
 1. Thẻ **tiến hoá** một skill.
 2. **Lấy move trong build** chưa có (#1 trước #2…).
 3. **Lấy move mới ngoài build khi còn ô trống**: bot dùng xoay vòng mọi move, nên càng đủ ô (thường 4) càng nhiều đòn. Ô của các move build chưa có luôn được giữ lại; ví dụ build 2 move thì bot lấy thêm 2 move bất kỳ, build đủ 4 move thì không lấy move ngoài.
-4. **Nâng cấp move tấn công** trong build (#1 trước).
-5. **Nội tại mà move trong build cần để tiến hoá** (ví dụ Magnet cho Psychic), khi đã có move đó và chưa có nội tại.
-6. **Nâng cấp move buff** (không gây sát thương) trong build.
-7. Nội tại khác: tấn công (sát thương, hồi chiêu, tầm…) > phòng thủ (máu, hồi máu, giáp, tốc độ, hút…) > còn lại.
-8. Nâng cấp skill ngoài build (cấp cao trước).
-9. Skill mới ngoài build khi đã hết ô: chỉ lấy khi không còn gì khác. Nếu cả 3 thẻ đều thuộc loại này và còn lượt **Reroll** thì bot đổi thẻ (máy tính).
+4. **Learning** (nội tại tăng kinh nghiệm nhận được): thêm cấp nhanh hơn, nên đứng trước mọi nâng cấp.
+5. **Nâng cấp move tấn công** trong build (#1 trước).
+6. **Nội tại mà move trong build cần để tiến hoá** (ví dụ Magnet cho Psychic), khi đã có move đó và chưa có nội tại.
+7. **Nâng cấp move buff** (không gây sát thương) trong build.
+8. Nội tại khác: tấn công (sát thương, hồi chiêu, tầm…) > phòng thủ (máu, hồi máu, giáp, tốc độ, hút…) > còn lại.
+9. Nâng cấp skill ngoài build (cấp cao trước).
+10. Skill mới ngoài build khi đã hết ô: chỉ lấy khi không còn gì khác. Nếu cả 3 thẻ đều thuộc loại này và còn lượt **Reroll** thì bot đổi thẻ (máy tính).
 
-**Chưa có Moveset:** lấy skill mới cho tới khi đủ ô > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
+**Chưa có Moveset:** lấy skill mới cho tới khi đủ ô > Learning > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
 
 Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), doofcraft tính là 4. Các move đã **bond** chỉ chiếm chung 1 ô, nên sau khi bond bot lại lấy thêm move mới. Game chỉ đưa thẻ move mới khi còn ô trống, nên thấy thẻ đó là bot biết còn chỗ.
 
