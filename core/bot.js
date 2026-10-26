@@ -1020,6 +1020,9 @@
     [data-psbot-ui] .psb-foot b { color:#8fb4ff }
     [data-psbot-ui] .psb-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#7d8799 }
     [data-psbot-ui] .psb-dot.on { background:#3fbf6e; box-shadow:0 0 6px #3fbf6e }
+    [data-psbot-ui] .psb-tip { position:relative; font-size:12px; color:#cfd6e2; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:6px 24px 6px 9px }
+    [data-psbot-ui] .psb-tip b { color:#f5c542 }
+    [data-psbot-ui] .psb-tip .psb-icon { position:absolute; top:2px; right:2px; font-size:14px; color:#7d8799 }
     [data-psbot-ctl][data-min] > :not(:first-child) { display:none !important }
     [data-psbot-ctl][data-min] > .psb-head { border-bottom:0 }
     @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }`;
@@ -1038,6 +1041,8 @@
       </div>
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
+      <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
+        <b>💡 Mẹo đi 30 phút:</b> Tapu Fini — Draining Kiss · Aqua Ring · Harden · Whirlpool</div>
     </div>
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" class="psb-foot">⭐ Tác giả <b>damhieu2808</b> · GitHub</a>
     <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="order:2;display:none;color:#1b202b;background:#f5c542;padding:6px 12px;text-decoration:none;font-weight:bold;font-size:12px"></a>`;
@@ -1056,6 +1061,10 @@
   };
   try { setMin(!!localStorage.getItem(MIN_KEY)); } catch {}
   $('min').onclick = () => setMin(!('min' in ctl.dataset));
+  // Tip line, hidden for good once closed (a new tip gets a new key, so it shows again)
+  const TIP_KEY = 'psbot.tip.1';
+  try { if (localStorage.getItem(TIP_KEY)) $('tip').remove(); } catch {}
+  if ($('tipx')) $('tipx').onclick = () => { $('tip').remove(); try { localStorage.setItem(TIP_KEY, '1'); } catch {} };
   // Keep typing / clicks in the panel away from the game's keyboard and pointer handlers
   UI_EVENTS.forEach(t => ctl.addEventListener(t, e => e.stopPropagation()));
 
