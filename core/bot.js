@@ -358,7 +358,16 @@
     const byTag = t => world.filter(d => tagOf(d.src) === t);
     const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp'), cases = byTag('case');
     const hazards = world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
-    state.view = { me, enemies, goods, hazards, rifts, buffs, xps, cases, s };
+    // Terrain tiles the site profile reads off the map (doofcraft: walls / liquid baked into the chunk images), in
+    // screen space: kind 1 = wall (blocks), 2 = liquid (walkable, may hurt)
+    const terrain = SITE.terrain ? world.flatMap(d => {
+      const tiles = SITE.terrain(d);
+      if (!tiles) return [];
+      const tw = Math.abs(d.w) / 16, x0 = d.x - Math.abs(d.w) / 2, y0 = d.y - Math.abs(d.h) / 2, out = [];
+      for (let t = 0; t < 256; t++) if (tiles[t]) out.push({ x: x0 + (t % 16) * tw, y: y0 + Math.floor(t / 16) * tw, w: tw, kind: tiles[t] });
+      return out;
+    }) : [];
+    state.view = { me, enemies, goods, hazards, rifts, buffs, xps, cases, s, terrain };
 
     // Stuck detection: player's world position barely changes while a key is held.
     // Each stuck event leaves a "wall" point ahead of the player, kept for the whole run (path finding goes around
@@ -409,11 +418,13 @@
     const nearestTo = list => list.reduce((b, d) => (!b || dist(d, me) < dist(b, me) ? d : b), null);
     // Items that got us stuck (behind a wall) are ignored for a while
     const reachable = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
-    // Where walls block: a prop sprite (tree, rock…: only its trunk / base is solid) around the bottom of the sprite, a
-    // big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for points we got stuck on
+    // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
+    // around its middle, a big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for
+    // points we got stuck on
     const footprint = d => {
       const w = Math.abs(d.w) / s, h = Math.abs(d.h) / s;
-      return Math.max(w, h) < 128 ? { x: d.x, y: d.y + (h / 2 - Math.min(w, h) / 4) * s, rw: Math.min(w, h) / 4 } : { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d };
+      if (Math.max(w, h) >= 128) return { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d };
+      return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4 } : { x: d.x, y: d.y, rw: w * 0.4 };
     };
     const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').map(footprint));
     const rift = nearestTo(reachable(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
@@ -467,6 +478,12 @@
         if (ci >= 0 && cj >= 0 && ci < g.n && cj < g.n) g.blocked[cj * g.n + ci] = 1;
       }
       for (const w of state.walls) g.fill(w.x - 24 - pad, w.y - 24 - pad, w.x + 24 + pad, w.y + 24 + pad, i => { g.blocked[i] = 1; });
+      // Terrain: the cells under a wall tile (no margin: tiles line up with the grid, and a corridor one tile wide must
+      // stay open), extra cost under liquid
+      for (const t of terrain) {
+        const x = (t.x - e0) / s, y = (t.y - f0) / s, w = t.w / s;
+        g.fill(x + 1, y + 1, x + w - 1, y + w - 1, t.kind === 1 ? i => { g.blocked[i] = 1; } : i => { g.cost[i] += 15; });
+      }
       // Extra cost: hazards (telegraphs, tagged hazard sprites) and enemy contact zones
       for (const h of hazards) {
         if (h.shape) {
@@ -832,6 +849,8 @@
     ring(v.cases, '#fa0', () => Math.max(6, CFG.caseReach * v.s));
     g.strokeStyle = '#0fc6'; g.setLineDash([2, 6]); g.beginPath(); g.arc(v.me.x, v.me.y, state.magnet * v.s, 0, 7); g.stroke(); g.setLineDash([]);
     ring(v.walls || [], '#88f', d => (d.rw + 70) * v.s * 0.4);
+    // Terrain read off the map: walls (magenta) and liquid (cyan) tiles
+    for (const t of v.terrain || []) { g.strokeStyle = t.kind === 1 ? '#f0f8' : '#0ff6'; g.strokeRect(t.x + 1, t.y + 1, t.w - 2, t.w - 2); }
     // A* path around walls (dots) and the cell being walked to (circle)
     g.fillStyle = '#fff';
     (v.path || []).forEach(p => g.fillRect(p.x - 2, p.y - 2, 4, 4));
@@ -915,7 +934,8 @@
     play() {
       const n = Math.max(0, Math.floor(+$('runs').value || 0));
       try { localStorage.setItem(RUNS_KEY, String(n)); } catch {}
-      Object.assign(state, { target: n, done: 0, runEnded: false, on: true, started: true, restartAt: 0 });
+      // runEnded: true = a results screen already up when ▶ is pressed is not counted as one of the n runs
+      Object.assign(state, { target: n, done: 0, runEnded: true, on: true, started: true, restartAt: 0 });
       log(`chạy ${n ? `${n} ván` : 'vô hạn'}`);
     },
     pause() { state.on = false; applyDir(null); log('tạm dừng — bạn có thể tự điều khiển'); },

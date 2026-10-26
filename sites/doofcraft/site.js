@@ -10,6 +10,74 @@ window.PSBotSite = h => {
   const dcName = c => { const nm = c.querySelector('.nm'); return nm ? [...nm.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : ''; };
   // Phones (touch screen): the card button is tapped instead of pressing its digit key
   const tapTarget = c => (matchMedia('(pointer: coarse)').matches ? c : null);
+
+  // ---------- terrain: walls and liquid are baked into the map ----------
+  // The map is drawn as 256x256 chunk canvases of 16x16 tiles (16 px each, 32 world units), every pixel taken from the
+  // biome's palette. The palettes are read from the game's own scripts (22 biomes in its config; most list only base
+  // colours, the rest derived as the game does), so counting a tile's wall / liquid colours tells what it is.
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const shade = (c, t) => c.map(e => Math.round(t >= 0 ? e + (255 - e) * t : e * (1 + t)));   // the game's q()
+  const blend = (a, b, t) => a.map((e, i) => Math.round(e + (b[i] - e) * t));
+  const key = c => (c[0] << 16) | (c[1] << 8) | c[2];
+  const palettes = [];                                                // { floor, wall, liquid }: Sets of rgb keys
+  function addPalette(text) {
+    const get = k => { const m = text.match(new RegExp(`\\b${k}:(\\[[^\\]]*\\]|\`#[0-9a-fA-F]{6}\`)`)); return m ? m[1].match(/#[0-9a-fA-F]{6}/g).map(rgb) : []; };
+    const n = get('floor'), r = get('wall')[0], i = get('liquid')[0];
+    if (!n.length || !i) return;
+    const foam = get('foam')[0] || shade(i, 0.55);
+    const p = r
+      ? { floor: [n[0], shade(n[0], 0.05), shade(n[0], -0.06), shade(n[0], -0.16), shade(n[0], -0.12), shade(n[0], -0.2)],
+        wall: [r, shade(r, 0.07), shade(r, -0.07), shade(r, 0.32), shade(r, -0.7), shade(r, -0.3), shade(r, -0.38), shade(r, -0.55)],
+        liquid: [i, shade(i, -0.22), foam, blend(i, foam, 0.28)] }
+      : { floor: [...n, ...get('dirt')],
+        wall: ['wallTop', 'wallLight', 'wallEdge', 'wallFace', 'wallFaceDark'].flatMap(get),
+        liquid: [i, ...get('liquidDeep'), foam, blend(i, foam, 0.28)] };
+    palettes.push({ floor: new Set(p.floor.map(key)), wall: new Set(p.wall.map(key)), liquid: new Set(p.liquid.map(key)) });
+  }
+  (async () => {
+    try {
+      const entry = [...document.scripts].map(s => s.src).find(s => /\/assets\/index-[\w-]+\.js/.test(s));
+      if (!entry) return;
+      const names = new Set([...(await (await fetch(entry)).text()).matchAll(/assets\/([\w-]+\.js)/g)].map(m => m[1]));
+      for (const name of names) {
+        const src = await (await fetch(new URL(name, entry))).text();
+        for (const m of src.matchAll(/palette:\{/g)) {
+          let depth = 0, j = m.index + 8;
+          for (; j < src.length; j++) if (src[j] === '{') depth++; else if (src[j] === '}' && --depth === 0) break;
+          addPalette(src.slice(m.index + 8, j + 1));
+        }
+      }
+    } catch (e) { console.warn('[PSBot] không đọc được bảng màu bản đồ', e); }
+  })();
+  // Chunk canvas -> Uint8Array(256) of tiles (0 floor, 1 wall, 2 liquid), or null for any other canvas. The biome is the
+  // palette matching most pixels; a tile is wall / liquid when over half its pixels are
+  const terrainCache = new WeakMap();
+  function classify(img) {
+    let px;
+    try { px = img.getContext('2d').getImageData(0, 0, 256, 256).data; } catch { return null; }
+    const at = (x, y) => { const o = (y * 256 + x) * 4; return (px[o] << 16) | (px[o + 1] << 8) | px[o + 2]; };
+    let best = null, bestHits = 0;
+    for (const p of palettes) {
+      let hits = 0;
+      for (let y = 1; y < 256; y += 4) for (let x = 1; x < 256; x += 4) { const k = at(x, y); if (p.floor.has(k) || p.wall.has(k) || p.liquid.has(k)) hits++; }
+      if (hits > bestHits) { best = p; bestHits = hits; }
+    }
+    if (!best || bestHits < 4096 * 0.3) return null;
+    const tiles = new Uint8Array(256);
+    for (let t = 0; t < 256; t++) {
+      const tx = (t % 16) * 16, ty = Math.floor(t / 16) * 16;
+      let wall = 0, liquid = 0;
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const k = at(tx + x, ty + y); if (best.wall.has(k)) wall++; else if (best.liquid.has(k)) liquid++; }
+      tiles[t] = wall > 128 ? 1 : liquid > 128 ? 2 : 0;
+    }
+    return tiles;
+  }
+  function terrain(d) {
+    const img = d.img;
+    if (!palettes.length || d.rect || !img || img.width !== 256 || img.height !== 256 || !img.getContext) return null;
+    if (!terrainCache.has(img)) terrainCache.set(img, classify(img));
+    return terrainCache.get(img);
+  }
   function readDcCard(c, i) {
     const { state, CFG } = h;
     const t = c.innerText, name = dcName(c);
@@ -33,6 +101,7 @@ window.PSBotSite = h => {
     // Pickup colours from the game's source: xp / big xp diamonds, heal berry and magnet orbs, item / chest halo
     tags: { 'fill:#7fe0ff': 'xp', 'fill:#ffd95e': 'xp', 'fill:#5fe08a': 'good', 'fill:#ff9ed8': 'good', 'fill:#ffe14d': 'good' },
     sizeTags: false,
+    terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding
     // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
     cfg: { useItems: false, swapEvery: 200, blockRank: false },
     levelUp() {
