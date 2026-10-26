@@ -110,7 +110,7 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 7. [ ] **Vật thể (cây, đá, rương, bẫy):** tìm kích thước sprite. Vì bản thường có `sizeTags: true`, có 2 cách: gắn key `canvas:WxH` thẳng vào `tags`/data.js, hoặc sửa `tagOf()` trong `core/bot.js` để đọc cả `bySize`. Kiểm tra lại 2 nhãn có sẵn `canvas:14x14` / `canvas:12x12` = `hazard` có đúng không.
 8. [ ] **Vali** (`case`) của bản thường là loại đứng lên trên, giữ `caseReach: 25`, **đừng chép 45 của doofcraft**.
 9. [ ] **Tiến hoá:** xác nhận trong console có lý do "điều kiện tiến hoá …" khi chọn Power/Magnet… Nếu game cập nhật move: `node crawl-moves.js --evo`.
-10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không.
+10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không. **iOS** (Safari + app Userscripts, hướng dẫn đã có trong README) **chưa thử**. Ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline), vì Userscripts có thể không có `GM_xmlhttpRequest` / `GM_addElement`. Nếu pokesurvivor.com chặn inline (giả thuyết 2 ở mục 0) thì cần thêm nhánh dùng `GM.xmlHttpRequest` của Userscripts.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
 12. [ ] **Phát hành** (khi bản thường đã ổn, và người dùng bảo):
     1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.1`).
