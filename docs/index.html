@@ -36,6 +36,9 @@
   code { font: 14px ui-monospace, Consolas, monospace; background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; }
   .btn { display: block; text-align: center; font-weight: 700; font-size: 17px; padding: 14px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); text-decoration: none; margin-bottom: 14px; }
   .muted { color: var(--muted); margin: 0; }
+  .copy { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+  .copy code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 8px; }
+  .copy button { font: 700 15px system-ui, sans-serif; padding: 0 14px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
   footer { color: var(--muted); font-size: 13px; text-align: center; margin-top: 28px; }
   footer a { color: inherit; }
 </style>
@@ -50,7 +53,7 @@
     </div>
   </header>
 
-  <a class="btn" href="https://github.com/damhieu2808/PokeSurvivorTool/archive/refs/heads/release.zip">Tải bot (ZIP)</a>
+  <a class="btn" href="https://github.com/damhieu2808/PokeSurvivorTool/archive/refs/heads/release.zip">Tải bot cho máy tính (ZIP)</a>
 
   <div class="card">
     <h2>Cài đặt (Chrome trên máy tính)</h2>
@@ -63,11 +66,32 @@
   </div>
 
   <div class="card">
+    <h2>Cài đặt (điện thoại Android)</h2>
+    <ol>
+      <li>Cài <b>Kiwi Browser</b> (CH Play).</li>
+      <li>Trong Kiwi, cài tiện ích <b>Tampermonkey</b>.</li>
+      <li>Bấm <b>Copy</b>, dán vào <b>thanh địa chỉ</b> của Kiwi rồi mở:
+        <div class="copy"><code id="us">https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js</code><button type="button" id="copy-us">Copy</button></div></li>
+      <li>Tampermonkey tự mở trang cài script → bấm <b>Install</b> (Cài đặt).</li>
+      <li>Vào game: panel <b>PokeSurvivor Bot</b> hiện ở góc trên bên trái. Bot tự cập nhật, không cần cài lại.</li>
+    </ol>
+  </div>
+
+  <div class="card">
     <h2>Cần cài hộ?</h2>
     <p class="muted">Liên hệ TikTok <a href="https://www.tiktok.com/@phuongnguyenconhat">@phuongnguyenconhat</a>.</p>
   </div>
 
   <footer>PokeSurvivor Bot © damhieu2808 · <a href="https://github.com/damhieu2808/PokeSurvivorTool">GitHub</a> · MIT License</footer>
 </main>
+<script>
+  // Copy the userscript link; falls back to selecting it when the clipboard API is unavailable (http, old browsers)
+  document.getElementById('copy-us').addEventListener('click', async e => {
+    const text = document.getElementById('us').textContent;
+    try { await navigator.clipboard.writeText(text); e.target.textContent = 'Đã copy'; }
+    catch { getSelection().selectAllChildren(document.getElementById('us')); e.target.textContent = 'Giữ để copy'; }
+    setTimeout(() => { e.target.textContent = 'Copy'; }, 2000);
+  });
+</script>
 </body>
 </html>
