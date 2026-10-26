@@ -647,17 +647,25 @@
     const noDmg = /no damage|sin daño|sem dano/i.test(t);
     const why = [];
     let score = 0;
+    // A passive card an owned move needs before it can evolve (site profile: move -> passive card), not taken yet
+    const ownedMoves = new Set([...Object.keys(state.picks), ...state.hudTexts].map(n => n.toLowerCase()));
+    const needFor = SITE.evolveNeeds && !state.picks[name]
+      ? [...SITE.evolveNeeds].filter(([m, p]) => p.toLowerCase() === name.toLowerCase() && ownedMoves.has(m) && (!build || build.some(b => b.toLowerCase() === m))).map(([m]) => m)
+      : [];
     if (build) {
       // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
-      // > upgrade a build attack move > upgrade a build buff > passive (attack > defence > other)
-      // > upgrade a skill outside the build > new skill outside it (score < 2: rerolled when possible)
+      // > upgrade a build attack move > passive a build move needs to evolve > upgrade a build buff > passive
+      // (attack > defence > other) > upgrade a skill outside the build > new skill outside it (score < 2: rerolled
+      // when possible)
       const buildIdx = build.findIndex(m => m.toLowerCase() === name.toLowerCase());
       const move = moveByName.get(name.toLowerCase());
       const owned = level > 0 && !isNew;
       const buff = move ? move.cat === 'status' : noDmg;
       if (evo) { score = 500; why.push('mở tiến hoá skill'); }
       else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
-      else if (buildIdx >= 0) { score = (buff ? 200 : 300) - buildIdx; why.push(`nâng ${buff ? 'buff' : 'move tấn công'} build #${buildIdx + 1} (cấp ${level})`); }
+      else if (buildIdx >= 0 && !buff) { score = 300 - buildIdx; why.push(`nâng move tấn công build #${buildIdx + 1} (cấp ${level})`); }
+      else if (needFor.length) { score = 250; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
+      else if (buildIdx >= 0) { score = 200 - buildIdx; why.push(`nâng buff build #${buildIdx + 1} (cấp ${level})`); }
       else if (owned && move) { score = 100 + level; why.push(`nâng skill ngoài build (cấp ${level})`); }
       else if (isNew || move) { score = buff ? 0 : 1; why.push('skill mới ngoài build'); }
       else if (ATK_RE.test(t)) { score = 150; why.push('nội tại tấn công'); }
@@ -674,7 +682,8 @@
       else if (isNew) {
         const room = 1 + state.newSkills < CFG.maxSkills;
         score += room ? 3 : -3; why.push(room ? 'skill mới (còn slot)' : 'skill mới (đủ skill rồi)');
-      } else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
+      } else if (needFor.length) { score += 10; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
+      else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
       else if (DEF_RE.test(t)) { score += 1; why.push('nội tại phòng thủ'); }
     }
     if (fitLow) { score -= 3; why.push('hợp kém với pokémon'); }

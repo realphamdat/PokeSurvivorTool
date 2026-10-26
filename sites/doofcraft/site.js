@@ -34,11 +34,15 @@ window.PSBotSite = h => {
         liquid: [i, ...get('liquidDeep'), foam, blend(i, foam, 0.28)] };
     palettes.push({ floor: new Set(p.floor.map(key)), wall: new Set(p.wall.map(key)), liquid: new Set(p.liquid.map(key)) });
   }
+  // Evolutions: a maxed move evolves once the passive it "requires" is owned. Move name (lower-case) -> name of that
+  // passive's level-up card ("Power" for attack, "Reflexes" for cooldown, …), from the game config as well
+  const evolveNeeds = new Map();
   (async () => {
     try {
       const entry = [...document.scripts].map(s => s.src).find(s => /\/assets\/index-[\w-]+\.js/.test(s));
       if (!entry) return;
       const names = new Set([...(await (await fetch(entry)).text()).matchAll(/assets\/([\w-]+\.js)/g)].map(m => m[1]));
+      const passiveCard = {}, requires = [];
       for (const name of names) {
         const src = await (await fetch(new URL(name, entry))).text();
         for (const m of src.matchAll(/palette:\{/g)) {
@@ -46,8 +50,12 @@ window.PSBotSite = h => {
           for (; j < src.length; j++) if (src[j] === '{') depth++; else if (src[j] === '}' && --depth === 0) break;
           addPalette(src.slice(m.index + 8, j + 1));
         }
+        // The level-up passives come first, the shop upgrades (same ids) after them
+        for (const m of src.matchAll(/\{id:`([\w-]+)`,icon:`\w+`,name:`([^`]+)`/g)) passiveCard[m[1]] ??= m[2];
+        for (const m of src.matchAll(/name:`([^`]+)`,type:`\w+`,kind:`\w+`,description:`[^`]*`,stats:\{[^}]*\},evolution:\{requires:`(\w+)`\}/g)) requires.push([m[1], m[2]]);
       }
-    } catch (e) { console.warn('[PSBot] không đọc được bảng màu bản đồ', e); }
+      for (const [move, id] of requires) if (passiveCard[id]) evolveNeeds.set(move.toLowerCase(), passiveCard[id]);
+    } catch (e) { console.warn('[PSBot] không đọc được cấu hình game (bảng màu / tiến hoá)', e); }
   })();
   // Chunk canvas -> Uint8Array(256) of tiles (0 floor, 1 wall, 2 liquid), or null for any other canvas. The biome is the
   // palette matching most pixels; a tile is wall / liquid when over half its pixels are
@@ -104,8 +112,11 @@ window.PSBotSite = h => {
       'fill:#ff2445': 'hazard', 'fill:rgba(255,60,80,0.35)': 'shot' },
     sizeTags: false,
     // Prop sprites by size, from the game's sprite generators: rock (solid, breaks into xp / coins / heals), trap
-    // (hurts 10% max HP)
-    bySize: { 'canvas:22x17': 'break', 'canvas:14x14': 'hazard' },
+    // (hurts 10% max HP), the biome's tree (forest 30x40, crystal 26x40, dead 28x40: solid, never breaks), Halloween
+    // lantern / cage / fence post (solid) and pumpkin (breaks). Not by size: the 16x14 fence (same size as a chest)
+    bySize: { 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
+      'canvas:8x23': 'wall', 'canvas:24x28': 'wall', 'canvas:6x20': 'wall', 'canvas:14x11': 'break' },
+    evolveNeeds,              // move name -> passive card it needs to evolve
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding
     // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
     // Chests are solid here (radius 12): "next to" one is farther than a walk-over suitcase

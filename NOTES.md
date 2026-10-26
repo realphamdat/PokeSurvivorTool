@@ -30,7 +30,8 @@ Cập nhật: 2026-10-26. Bản thường (pokesurvivor.com) chưa test được
 
 - **Địa hình:** đọc 22 bảng màu biome từ mã nguồn game, phân loại từng ô của mảng nền 256×256 thành tường (chặn) / chất lỏng (tốn điểm) / nền (`terrain`).
 - **Nhãn theo màu của game:** `fill:#ff2445` là vùng skill quái/boss (`hazard`), `fill:rgba(255,60,80,0.35)` là đạn quái (`shot`).
-- **Nhãn theo kích thước sprite (`bySize`):** `canvas:22x17` là đá (`break`), `canvas:14x14` là bẫy (`hazard`).
+- **Nhãn theo kích thước sprite (`bySize`, lấy từ các hàm vẽ sprite của game):** `22x17` đá (`break`), `14x14` bẫy (`hazard`), cây theo biome là tường (`30x40` rừng, `26x40` pha lê, `28x40` cây chết), Halloween: `8x23` đèn lồng, `24x28` lồng, `6x20` cọc rào là tường, `14x11` bí ngô là `break`. Hàng rào `16x14` trùng kích thước rương nên không gắn.
+- **Tiến hoá (`evolveNeeds`):** đọc từ cấu hình game xem move nào cần nội tại nào để tiến hoá (86 move: Power = attack, Reflexes = cooldown, Sprint = speed, Synthesis = regen, Armor = defense, Magnet). Core xếp nội tại mà một move trong build đang có cần ở tầng 250 (trên nâng buff, dưới nâng move tấn công). Trận thật: lấy Magnet cho Psychic, Power cho Hyper Beam, và cả hai đã tiến hoá (`Hyper Beam+`, `Psychic+`).
 - **Rương cứng:** `caseReach: 45`.
 - **Điện thoại:** bấm thẳng `button.ps-card` khi màn hình cảm ứng.
 
@@ -49,7 +50,8 @@ Cập nhật: 2026-10-26. Bản thường (pokesurvivor.com) chưa test được
 
 - **Sống sót:** trước đây chết quanh 3:55–4:13 (3 trận liên tiếp). Nguyên nhân là bot lao vào giữa bầy 80–90 quái để nhặt kinh nghiệm, cộng thêm việc tính nhầm chính mình là quái. Sau khi sửa: sống tới **7:34** và **7:08** (2 trận). Cả hai lần chết đều do một đợt quái ập đến quanh mốc 7:00 (từ 25 lên 85 con trong 3 giây, hết máu trong khoảng 4 giây). Bot chưa có cách thoát vòng vây hình thành nhanh như vậy.
 - **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trở lên trong vòng 220 đơn vị thì chạy về hướng thưa nhất (chấm 16 hướng theo mật độ quái, bỏ hướng có tường), bỏ qua nhặt đồ. Kết quả 1 trận: chết ở **5:35** (Gloomy Graveyard), sớm hơn 2 trận không có chế độ này. Lúc chạy, quái trong vòng 220 vẫn tăng từ 20 lên 55, và việc chạy làm hạ quái chậm hơn. Chưa đủ dữ liệu để kết luận (mỗi trận một biome khác nhau), nên chưa đưa vào. Nếu thử lại: chỉ bật khi máu thấp, hoặc cân nhắc tốc độ hạ quái thay vì chỉ chạy.
-- Cây/vật cản riêng của từng biome (ví dụ pha lê ở Steel Fortress) chưa được nhận ra, chỉ học được sau khi đâm vào một lần.
+- Sau khi thêm tiến hoá và cây theo biome: 2 trận sống tới 5:27 và **10:18** (hạ boss Thundurus và Lunala). Kết quả dao động nhiều theo biome và theo thẻ game đưa ra (trận 10:18 không hề được đưa thẻ Hyper Beam).
+- Bản thường cũng có thể đọc `evolveNeeds` nếu tìm được cấu hình tương tự. Nếu không thì cần thêm điều kiện tiến hoá vào `moves.js` (sửa `crawl-moves.js`).
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng cho doofcraft.
 
 ## Cách test nhanh trong console (khi không dùng extension)
