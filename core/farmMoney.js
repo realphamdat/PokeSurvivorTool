@@ -64,7 +64,7 @@
   // ---------- HUD (a line in bot.js's control panel, top-left; own corner box if there is none) ----------
   const hud = document.createElement('div');
   if (window.PSBot.ctl) {
-    hud.style.cssText = 'color:#fc3;border-top:1px solid #345;padding-top:4px';
+    hud.style.cssText = 'color:#f5c542;border-top:1px solid #2e3646;padding:7px 12px;font-size:12px';
     window.PSBot.ctl.append(hud);
   } else {
     hud.style.cssText = 'position:fixed;bottom:4px;right:4px;z-index:99999;font:12px monospace;background:#000b;color:#fc3;padding:4px 6px;border-radius:4px;pointer-events:none';

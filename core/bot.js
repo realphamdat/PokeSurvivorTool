@@ -877,7 +877,7 @@
   const dock = document.createElement('div');
   dock.style.cssText = 'position:fixed;top:60px;left:0;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-height:calc(100vh - 44px);pointer-events:none';
   const hud = document.createElement('div');
-  hud.style.cssText = 'order:2;font:12px monospace;background:#000a;color:#7cf;padding:4px 6px;border-radius:4px;pointer-events:none';
+  hud.style.cssText = 'order:2;font:12px monospace;background:#1b202be6;color:#8fb4ff;border:1px solid #2e3646;padding:4px 8px;border-radius:8px;pointer-events:none';
   dock.append(hud);
   document.body.append(ov, dock);
   function draw() {
@@ -964,24 +964,52 @@
 
   const ctl = document.createElement('div');
   ctl.dataset.psbotCtl = ctl.dataset.psbotUi = '';
-  ctl.style.cssText = 'order:0;pointer-events:auto;font:12px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:5px;min-width:190px';
-  const btnCss = 'font:12px monospace;padding:3px 8px;border:1px solid #456;border-radius:4px;cursor:pointer;color:#000';
+  ctl.className = 'psb';
+  ctl.style.cssText = 'order:0;flex:0 0 auto;pointer-events:auto;width:250px;max-width:calc(100vw - 8px)';
+  // Shared look of the panel and the moveset popup (.psb*), scoped to the bot's own elements
+  const PSB_CSS = `
+    [data-psbot-ui].psb { box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#d6dbe4; background:#1b202bf2; border:1px solid #2e3646; border-radius:12px; box-shadow:0 8px 24px #0008 }
+    [data-psbot-ui] .psb-head { display:flex; align-items:center; gap:8px; padding:9px 12px; background:#222838; border-bottom:1px solid #2e3646 }
+    [data-psbot-ui] .psb-title { flex:1; min-width:0; font-weight:800; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:#8fb4ff }
+    [data-psbot-ui] .psb-title a { display:block; color:#7d8799; font-weight:600; font-size:11px; letter-spacing:0; text-transform:none; text-decoration:none }
+    [data-psbot-ui] .psb-body { display:flex; flex-direction:column; gap:8px; padding:10px 12px }
+    [data-psbot-ui] .psb-sec { border-left:3px solid #f5c542; padding-left:8px; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#aab3c2 }
+    [data-psbot-ui] .psb-row { display:flex; align-items:center; gap:6px }
+    [data-psbot-ui] .psb-btn { flex:1; font:700 13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#e6eaf0; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:7px 10px; cursor:pointer; white-space:nowrap }
+    [data-psbot-ui] .psb-btn:hover { filter:brightness(1.2) }
+    [data-psbot-ui] .psb-btn.go { color:#7ee2a0; background:#1f4a33; border-color:#3fbf6e }
+    [data-psbot-ui] .psb-btn.stop { color:#ff9a9a; background:#3a2228; border-color:#c94a4a }
+    [data-psbot-ui] .psb-btn.acc { color:#f5c542; border-color:#c99a1e }
+    [data-psbot-ui] .psb-btn.info { color:#6cc8ff; border-color:#2f8fd0 }
+    [data-psbot-ui] .psb-icon { flex:0 0 auto; background:none; border:0; padding:0 4px; font:700 16px system-ui,sans-serif; color:#8fb4ff; cursor:pointer }
+    [data-psbot-ui] .psb-in { box-sizing:border-box; font:13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#e6eaf0; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:6px 9px; outline:none }
+    [data-psbot-ui] .psb-in:focus { border-color:#f5c542 }
+    [data-psbot-ui] .psb-muted { color:#7d8799; font-size:12px }
+    [data-psbot-ui] .psb-foot { order:1; display:block; border-top:1px solid #2e3646; padding:7px 12px; font-size:11px; color:#7d8799; text-decoration:none }
+    [data-psbot-ui] .psb-foot b { color:#8fb4ff }
+    [data-psbot-ui] .psb-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#7d8799 }
+    [data-psbot-ui] .psb-dot.on { background:#3fbf6e; box-shadow:0 0 6px #3fbf6e }
+    [data-psbot-ctl][data-min] > :not(:first-child) { display:none !important }
+    [data-psbot-ctl][data-min] > .psb-head { border-bottom:0 }
+    @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }`;
   ctl.innerHTML = `
-    <div data-drag style="display:flex;align-items:center;gap:6px;font-weight:bold;color:#7cf;${dragCss}" title="Kéo để di chuyển"><span style="flex:1">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" style="font-weight:normal;color:#9ab;text-decoration:none" title="Repo gốc trên GitHub">· by damhieu2808</a></span>
-      <button data-ctl="min" style="${btnCss};background:#9ab;padding:0 8px" title="Thu gọn / mở rộng">–</button></div>
-    <style>[data-psbot-ctl][data-min] > :not(:first-child) { display: none !important }
-      @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }</style>
-    <label style="display:flex;align-items:center;gap:6px">Số ván
-      <input data-ctl="runs" type="number" min="0" step="1" style="width:60px;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
-      <span style="color:#9ab">0 = vô hạn</span></label>
-    <div style="display:flex;gap:4px">
-      <button data-ctl="play" style="${btnCss};background:#4c4;flex:1">▶ Chạy</button>
-      <button data-ctl="moveset" style="${btnCss};background:#7cf;flex:1">⚔ Moveset</button>
+    <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span class="psb-title">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc trên GitHub">by damhieu2808</a></span>
+      <button data-ctl="min" class="psb-icon" title="Thu gọn / mở rộng">–</button></div>
+    <style>${PSB_CSS}</style>
+    <div class="psb-body">
+      <div class="psb-sec">Điều khiển</div>
+      <label class="psb-row">Số ván
+        <input data-ctl="runs" class="psb-in" type="number" min="0" step="1" style="width:70px">
+        <span class="psb-muted">0 = vô hạn</span></label>
+      <div class="psb-row">
+        <button data-ctl="play" class="psb-btn go">▶ Chạy</button>
+        <button data-ctl="moveset" class="psb-btn acc">⚔ Moveset</button>
+      </div>
+      <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
+      <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
     </div>
-    <div data-ctl="keys" style="color:#9ab;font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
-    <div data-ctl="status" style="color:#9ab"></div>
-    <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" style="order:1;border-top:1px solid #345;padding-top:4px;color:#9ab;text-decoration:none">⭐ Tác giả <b style="color:#7cf">damhieu2808</b> · github.com/damhieu2808/PokeSurvivorTool</a>
-    <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="display:none;color:#000;background:#fc3;border-radius:4px;padding:3px 6px;text-decoration:none;font-weight:bold"></a>`;
+    <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" class="psb-foot">⭐ Tác giả <b>damhieu2808</b> · GitHub</a>
+    <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="order:2;display:none;color:#1b202b;background:#f5c542;padding:6px 12px;text-decoration:none;font-weight:bold;font-size:12px"></a>`;
   dock.append(ctl);
   const loadingLine = document.getElementById('psbot-status');      // the userscript's "loading…" line: the panel is up now
   if (loadingLine) loadingLine.remove();
@@ -1034,7 +1062,8 @@
   function renderCtl() {
     const finished = state.target && state.done >= state.target;
     $('play').textContent = state.on ? '■ Dừng' : '▶ Chạy';
-    $('play').style.background = state.on ? '#f66' : '#4c4';
+    $('play').className = `psb-btn ${state.on ? 'stop' : 'go'}`;
+    $('dot').className = `psb-dot${state.on ? ' on' : ''}`;
     $('status').textContent = finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'
       : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`;
@@ -1049,19 +1078,23 @@
   const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t]) || '';
   const ms = document.createElement('div');
   ms.dataset.psbotUi = '';
-  ms.style.cssText = 'order:1;pointer-events:auto;width:300px;max-width:calc(100vw - 8px);font:12px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;padding:6px 8px;display:none;flex-direction:column;gap:5px';
-  const inCss = 'font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px';
+  ms.className = 'psb';
+  ms.style.cssText = 'order:1;flex:0 0 auto;pointer-events:auto;width:320px;max-width:calc(100vw - 8px);display:none';
   ms.innerHTML = `
-    <div data-drag style="display:flex;justify-content:space-between;font-weight:bold;color:#7cf;${dragCss}" title="Kéo để di chuyển">Moveset (4 move ưu tiên)<span data-ms="close" style="cursor:pointer;color:#9ab">✕</span></div>
-    <div style="display:flex;gap:4px"><input data-ms="mon" list="psbot-mons" placeholder="Tên pokémon hoặc bấm 🎯 khi đang chơi" style="${inCss};flex:1;min-width:0">
-      <button data-ms="cur" style="${btnCss};background:#9ab" title="Bấm khi đang trong trận để lấy pokémon và danh sách move">🎯 Pokémon đang chơi</button></div>
-    <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
-    <div data-ms="slots" style="display:flex;flex-direction:column;gap:3px"></div>
-    <div style="display:flex;gap:4px">
-      <button data-ms="save" style="${btnCss};background:#4c4">Lưu</button>
-      <button data-ms="del" style="${btnCss};background:#f66">Xoá build</button></div>
-    <div data-ms="msg" style="color:#9ab"></div>
-    <div data-ms="list" style="color:#9ab;max-height:120px;overflow:auto"></div>`;
+    <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span class="psb-title">Moveset</span><span data-ms="close" class="psb-icon" style="font-size:14px">✕</span></div>
+    <div class="psb-body">
+      <div class="psb-sec">Pokémon</div>
+      <div class="psb-row"><input data-ms="mon" class="psb-in" list="psbot-mons" placeholder="Tên pokémon hoặc bấm 🎯" style="flex:1;min-width:0">
+        <button data-ms="cur" class="psb-btn info" style="flex:0 0 auto" title="Bấm khi đang trong trận để lấy pokémon và danh sách move">🎯 Đang chơi</button></div>
+      <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
+      <div class="psb-sec">4 move ưu tiên</div>
+      <div data-ms="slots" style="display:flex;flex-direction:column;gap:5px"></div>
+      <div class="psb-row">
+        <button data-ms="save" class="psb-btn go">Lưu</button>
+        <button data-ms="del" class="psb-btn stop">Xoá build</button></div>
+      <div data-ms="msg" class="psb-muted"></div>
+      <div data-ms="list" class="psb-muted" style="max-height:120px;overflow:auto"></div>
+    </div>`;
   dock.append(ms);
   draggable(ms, 'psbot.pos.moveset');
   UI_EVENTS.forEach(t => ms.addEventListener(t, e => e.stopPropagation()));
@@ -1069,12 +1102,12 @@
   const moveLabel = m => `${m.name} · ${m.cat === 'status' ? 'buff' : `${m.kind} ${m.dmg ?? '?'}dmg/${m.cd ?? '?'}s`}`;
   function renderMoveset() {
     const name = $m('mon').value.trim().toLowerCase(), list = learnable(name), build = CFG.builds[name] || [];
-    $m('slots').innerHTML = list.length ? [0, 1, 2, 3].map(i => `<label style="display:flex;gap:6px;align-items:center">#${i + 1}
-      <select data-slot style="${inCss};flex:1;min-width:0"><option value="">(trống)</option>${list.map((m, j) =>
+    $m('slots').innerHTML = list.length ? [0, 1, 2, 3].map(i => `<label class="psb-row"><span class="psb-muted" style="width:18px">#${i + 1}</span>
+      <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${list.map((m, j) =>
         `<option value="${m.name}" ${build[i] === m.name ? 'selected' : ''}>${j ? '' : '★ '}${moveLabel(m)}</option>`).join('')}</select></label>`).join('')
-      : `<div style="color:#f96">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
+      : `<div style="color:#ff9a9a">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
     const saved = Object.entries(CFG.builds);
-    $m('list').innerHTML = saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#7cf;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa có build nào';
+    $m('list').innerHTML = saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa có build nào';
   }
   function openMoveset() {
     const show = ms.style.display === 'none';
