@@ -47,7 +47,8 @@ Cập nhật: 2026-10-26. Bản thường (pokesurvivor.com) chưa test được
 
 ## Vấn đề còn mở (doofcraft)
 
-- **Sống sót:** trước đây chết quanh 3:55–4:13 (3 trận liên tiếp). Nguyên nhân là bot lao vào giữa bầy 80–90 quái để nhặt kinh nghiệm, cộng thêm việc tính nhầm chính mình là quái. Sau khi sửa: sống tới **7:34** và **7:08** (2 trận). Cả hai lần chết đều do một đợt quái ập đến quanh mốc 7:00 (từ 25 lên 85 con trong 3 giây, hết máu trong khoảng 4 giây). Bot chưa có cách thoát vòng vây hình thành nhanh như vậy. Hướng tiếp theo: phát hiện mật độ quái tăng đột ngột và chạy ra hướng thưa nhất trước khi bị vây.
+- **Sống sót:** trước đây chết quanh 3:55–4:13 (3 trận liên tiếp). Nguyên nhân là bot lao vào giữa bầy 80–90 quái để nhặt kinh nghiệm, cộng thêm việc tính nhầm chính mình là quái. Sau khi sửa: sống tới **7:34** và **7:08** (2 trận). Cả hai lần chết đều do một đợt quái ập đến quanh mốc 7:00 (từ 25 lên 85 con trong 3 giây, hết máu trong khoảng 4 giây). Bot chưa có cách thoát vòng vây hình thành nhanh như vậy.
+- **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trở lên trong vòng 220 đơn vị thì chạy về hướng thưa nhất (chấm 16 hướng theo mật độ quái, bỏ hướng có tường), bỏ qua nhặt đồ. Kết quả 1 trận: chết ở **5:35** (Gloomy Graveyard), sớm hơn 2 trận không có chế độ này. Lúc chạy, quái trong vòng 220 vẫn tăng từ 20 lên 55, và việc chạy làm hạ quái chậm hơn. Chưa đủ dữ liệu để kết luận (mỗi trận một biome khác nhau), nên chưa đưa vào. Nếu thử lại: chỉ bật khi máu thấp, hoặc cân nhắc tốc độ hạ quái thay vì chỉ chạy.
 - Cây/vật cản riêng của từng biome (ví dụ pha lê ở Steel Fortress) chưa được nhận ra, chỉ học được sau khi đâm vào một lần.
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng cho doofcraft.
 
