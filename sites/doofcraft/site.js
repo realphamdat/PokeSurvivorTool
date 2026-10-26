@@ -98,12 +98,18 @@ window.PSBotSite = h => {
     // Effects (beams, slashes) add their own translate / rotate: pokémon sprites carry the plain camera transform
     camera: (world, pokes) => pokes[0] || world[0],
     enemyRe: /\/sprites\/[\w-]+\/(?:s\/)?(?!Faint)\w+\.png/,
-    // Pickup colours from the game's source: xp / big xp diamonds, heal berry and magnet orbs, item / chest halo
-    tags: { 'fill:#7fe0ff': 'xp', 'fill:#ffd95e': 'xp', 'fill:#5fe08a': 'good', 'fill:#ff9ed8': 'good', 'fill:#ffe14d': 'good' },
+    // Colours from the game's source: xp / big xp diamonds, heal berry and magnet orbs, item / chest halo; every enemy
+    // and boss attack zone / beam is filled with #ff2445, and each enemy shot has a rgba(255,60,80,.35) ring under it
+    tags: { 'fill:#7fe0ff': 'xp', 'fill:#ffd95e': 'xp', 'fill:#5fe08a': 'good', 'fill:#ff9ed8': 'good', 'fill:#ffe14d': 'good',
+      'fill:#ff2445': 'hazard', 'fill:rgba(255,60,80,0.35)': 'shot' },
     sizeTags: false,
+    // Prop sprites by size, from the game's sprite generators: rock (solid, breaks into xp / coins / heals), trap
+    // (hurts 10% max HP)
+    bySize: { 'canvas:22x17': 'break', 'canvas:14x14': 'hazard' },
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding
     // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
-    cfg: { useItems: false, swapEvery: 200, blockRank: false },
+    // Chests are solid here (radius 12): "next to" one is farther than a walk-over suitcase
+    cfg: { useItems: false, swapEvery: 200, blockRank: false, caseReach: 45 },
     levelUp() {
       const box = dcBox();
       if (!box || !/^level|cleared/i.test(dcTitle(box))) return null;

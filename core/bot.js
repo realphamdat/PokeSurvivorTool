@@ -13,7 +13,7 @@
 //
 // Load the repo folder as a Chrome extension (manifest.json), or run loader.js / psbot.user.js. Pasting into the Console:
 // sites/<bản game>/site.js + data.js and core/moves.js first, then this file. Per-version code lives in sites/<id>/.
-// F6 = danh mục mọi sprite (ảnh + chỉ số + nút gắn nhãn) · F7 = gắn nhãn bằng click (1 tốt / 2 nguy hiểm / 3 rift / 4 vật cản / 5 buff / 6 kinh nghiệm / 7 vali / 0 xoá)
+// F6 = danh mục mọi sprite (ảnh + chỉ số + nút gắn nhãn) · F7 = gắn nhãn bằng click (1 tốt / 2 nguy hiểm / 3 rift / 4 vật cản / 5 buff / 6 kinh nghiệm / 7 vali / 8 phá được / 0 xoá)
 // F8 = bật/tắt bot · F9 = overlay · PSBot.catalog() = in + copy danh mục · PSBot.tags() = xem nhãn đã lưu
 // PSBot.exportConfig() / nút "Xuất data.js" (F6) = tải data.js chứa nhãn + build; chép đè vào sites/<bản game>/ để máy khác có sẵn
 // While loaded, Firestore/RTDB writes whose path matches CFG.rankRe are replaced by no-ops.
@@ -44,6 +44,7 @@
     xpWeight: 4,
     caseReach: 25,        // world units: player must stand on top of a suitcase ("case" tag) to open it
     caseTime: 5500,       // ms of (unpaused) game time to stay next to a suitcase
+    breakRange: 500,      // world units: breakables ("break" tag) farther than this are not worth the walk
     buffReach: 80,        // world units: this close to a buff shrine (gem pillar) counts as "visited"
     buffCooldown: 30000,  // ms before going back to the same shrine
     lookahead: 140,       // world units: how far ahead each candidate direction is evaluated
@@ -54,6 +55,7 @@
     pathMaxNodes: 6000,   // A* gives up (target treated as unreachable) after expanding this many cells
     aim: false,           // true = move the mouse cursor onto the nearest enemy (if moves aim at the cursor)
     hazardMargin: 40,     // world units added around hazard effects
+    shotLookahead: 600,   // ms: an enemy shot ("shot" tag) counts as a hazard along the path it flies in that time
     autoTelegraph: true,  // untagged red-ish path shapes (attack range previews) count as hazards
     enemyRe: SITE.enemyRe,
     // src -> 'good' | 'hazard' | 'rift' | 'wall' | 'buff' | 'safe'; edit with F6/F7, saved in localStorage
@@ -147,8 +149,9 @@
     }
     return k;
   };
-  // Exact key first, then the size-only key (older tags / defaults)
-  const tagOf = src => CFG.tags[src] || (SITE.sizeTags ? CFG.tags[src.split('#')[0]] : undefined);
+  // Exact key first, then the size-only key (older tags / defaults), then the site's own tags by sprite size (doofcraft
+  // builds each prop sprite at a size of its own: "canvas:22x17" = rock)
+  const tagOf = src => CFG.tags[src] || (SITE.sizeTags ? CFG.tags[src.split('#')[0]] : SITE.bySize && SITE.bySize[src.split('#')[0]]) || undefined;
   const record = (ctx, src, cx, cy, w, h, img, rect) => {
     const m = ctx.getTransform();
     state.frame.push({ src, x: m.a * cx + m.c * cy + m.e, y: m.b * cx + m.d * cy + m.f, w: w * m.a, h: h * m.d, s: m.a, e: m.e, f: m.f, img, rect });
@@ -197,9 +200,9 @@
     if (!SITE.isWorld({ s, e: m.e, f: m.f }) || pts.length < 2) return;   // HUD / UI
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const lw = kind === 'line' ? ctx.lineWidth * s : 0;
-    if ((x1 - x0 + lw) * (y1 - y0 + lw) < 150) return;              // ignore tiny particles
-    state.frame.push({ src: `${kind === 'line' ? 'stroke' : 'fill'}:${styleKey(style)}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0 + lw, h: y1 - y0 + lw,
+    const lw = kind === 'line' ? ctx.lineWidth * s : 0, src = `${kind === 'line' ? 'stroke' : 'fill'}:${styleKey(style)}`;
+    if ((x1 - x0 + lw) * (y1 - y0 + lw) < 150 && !tagOf(src)) return;   // ignore tiny particles (tagged ones, e.g. shots, kept)
+    state.frame.push({ src, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0 + lw, h: y1 - y0 + lw,
       s, e: m.e, f: m.f, shape: kind, pts, lw, alpha: ctx.globalAlpha });
   };
   P.beginPath = function () { if (this.canvas === canvas) { PATH.subs = []; PATH.cur = null; } return pathOrig.beginPath.call(this); };
@@ -319,15 +322,17 @@
   };
   // A*, 8 directions, no diagonal squeeze between two blocked cells. The start (we may overlap a wall's margin) and
   // the goal (an item next to a wall) are never treated as blocked. Returns cell indices start -> goal, null when the
-  // goal is unreachable, [] when the search gave up (CFG.pathMaxNodes; a horde makes many cells costly). The heuristic
-  // is weighted a little (x1.2): slightly longer paths, far fewer cells expanded
+  // goal is unreachable, [] when the search gave up (CFG.pathMaxNodes; a horde makes many cells costly) or ran out of
+  // cells almost at once (the start boxed in by wall margins: nothing to say about the goal). The heuristic is
+  // weighted a little (x1.2): slightly longer paths, far fewer cells expanded
   function findPath(g, start, goal) {
     const n = g.n, gi = goal % n, gj = (goal - gi) / n;
     const h = idx => { const i = idx % n, dx = Math.abs(i - gi), dy = Math.abs((idx - i) / n - gj); return 1.2 * (dx + dy - 0.586 * Math.min(dx, dy)); };
     const cost = new Float32Array(n * n).fill(Infinity), from = new Int32Array(n * n).fill(-1), done = new Uint8Array(n * n);
     const open = [[h(start), start]];
     cost[start] = 0;
-    for (let expanded = 0; open.length && expanded < CFG.pathMaxNodes; expanded++) {
+    let expanded = 0;
+    for (; open.length && expanded < CFG.pathMaxNodes; expanded++) {
       const cur = heapPop(open)[1];
       if (cur === goal) { const path = [cur]; while (path[0] !== start) path.unshift(from[path[0]]); return path; }
       if (done[cur]) continue;
@@ -341,7 +346,7 @@
         if (c < cost[idx]) { cost[idx] = c; from[idx] = cur; heapPush(open, [c + h(idx), idx]); }
       }
     }
-    return open.length ? [] : null;
+    return open.length || expanded < 30 ? [] : null;
   }
 
   function tick(frame) {
@@ -358,6 +363,19 @@
     const byTag = t => world.filter(d => tagOf(d.src) === t);
     const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp'), cases = byTag('case');
     const hazards = world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
+    // Enemy shots: matched to last frame's (nearest within 80 world units) for their speed, then added as a hazard
+    // line over where they fly in the next CFG.shotLookahead ms
+    {
+      const now = performance.now(), dt = Math.max(1, now - (state.shotsAt || now)), prev = state.shots || [];
+      const shots = byTag('shot').map(d => ({ d, x: (d.x - cam.e) / s, y: (d.y - cam.f) / s }));
+      for (const p of shots) {
+        const q = prev.reduce((b, q) => { const r = Math.hypot(q.x - p.x, q.y - p.y); return r < 80 && (!b || r < b.r) ? { q, r } : b; }, null);
+        const k = q ? CFG.shotLookahead / dt : 0, end = { x: p.x + (p.x - (q ? q.q.x : p.x)) * k, y: p.y + (p.y - (q ? q.q.y : p.y)) * k };
+        hazards.push({ src: p.d.src, shape: 'line', lw: Math.max(Math.abs(p.d.w), Math.abs(p.d.h)), x: p.d.x, y: p.d.y, w: p.d.w, h: p.d.h,
+          pts: [{ x: p.d.x, y: p.d.y }, { x: end.x * s + cam.e, y: end.y * s + cam.f }] });
+      }
+      state.shots = shots; state.shotsAt = now;
+    }
     // Terrain tiles the site profile reads off the map (doofcraft: walls / liquid baked into the chunk images), in
     // screen space: kind 1 = wall (blocks), 2 = liquid (walkable, may hurt)
     const terrain = SITE.terrain ? world.flatMap(d => {
@@ -401,8 +419,9 @@
         if (!enemies.some(e => Math.hypot((e.x - e0) / s - ahead.x, (e.y - f0) / s - ahead.y) < CFG.contact + 20)) state.walls = state.walls.concat({ ...ahead, until: Infinity }).slice(-300);
         state.stuck = state.stuck.filter(t => t > now - 3000).concat(now);
         if (state.stuck.length >= 2) {
-          // Stuck again even with path finding (wall not tagged / not learnt yet): give the target up for a while
-          if (state.view.prevTarget && !state.view.prevTarget.enemy) state.ignore.push({ ...state.view.prevTarget.w, until: now + 20000 });
+          // Stuck again with no path around (wall not tagged / not learnt yet): give the target up for a while. While
+          // following an A* path, clipping a corner only adds the learnt wall and the path is planned again
+          if (state.prevTarget && !state.prevTarget.enemy && !(state.path && state.path.cells.length)) state.ignore.push({ ...state.prevTarget.w, until: now + 20000 });
           const away = state.walls.filter(w => Math.hypot(meW.x - w.x, meW.y - w.y) < 200).reduce((a, w) => [a[0] + meW.x - w.x, a[1] + meW.y - w.y], [0, 0]);
           const ang = Math.atan2(away[1], away[0]) + (Math.random() - 0.5) * Math.PI / 1.5;
           state.escape = { dir: [Math.cos(ang), Math.sin(ang)], until: now + 900 };
@@ -416,31 +435,36 @@
 
     const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) / s;
     const nearestTo = list => list.reduce((b, d) => (!b || dist(d, me) < dist(b, me) ? d : b), null);
-    // Items that got us stuck (behind a wall) are ignored for a while
-    const reachable = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
+    // Pickups inside a telegraph / a shot's path wait until it is over; items that got us stuck (behind a wall) are
+    // ignored for a while
+    const inHazard = d => hazards.some(h => (h.shape ? shapeDist(h, d) : Math.hypot(d.x - h.x, d.y - h.y) - Math.max(Math.abs(h.w), Math.abs(h.h)) / 2) < 0);
+    const reachable = list => list.filter(d => !inHazard(d) && !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
     // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
     // around its middle, a big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for
     // points we got stuck on
     const footprint = d => {
       const w = Math.abs(d.w) / s, h = Math.abs(d.h) / s;
-      if (Math.max(w, h) >= 128) return { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d };
-      return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4 } : { x: d.x, y: d.y, rw: w * 0.4 };
+      if (Math.max(w, h) >= 128) return { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d, of: d };
+      return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4, of: d } : { x: d.x, y: d.y, rw: w * 0.4, of: d };
     };
-    const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').map(footprint));
+    const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').map(footprint), byTag('break').map(footprint));
     const rift = nearestTo(reachable(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
     const buff = nearestTo(reachable(buffs));
     // Once next to a buff shrine the buff is granted; skip that shrine for buffCooldown
     if (buff && dist(buff, me) < CFG.buffReach) state.ignore.push({ x: (buff.x - e0) / s, y: (buff.y - f0) / s, until: now + CFG.buffCooldown });
-    // Suitcase: stay within caseReach for caseTime of game time (paused time doesn't count),
-    // then skip it for a minute. Leaving the radius restarts the countdown.
+    // Suitcase / breakable ("break": rock, …): stay within caseReach for caseTime of game time (paused time doesn't
+    // count), then skip it for a minute. Leaving the radius restarts the countdown. A breakable is only worth it when
+    // nothing better is around (lower priority below), and only within breakRange
     const kase = nearestTo(reachable(cases));
+    const rock = nearestTo(reachable(byTag('break')).filter(d => dist(d, me) < CFG.breakRange));
     const paused = now - (state.timerChangedAt || now) > 1500;
     const dt = Math.min(100, now - (state.lastTick || now)); state.lastTick = now;
-    if (kase && dist(kase, me) < CFG.caseReach) {
-      const kw = { x: (kase.x - e0) / s, y: (kase.y - f0) / s };
+    const dwellOn = [kase, rock].find(d => d && dist(d, me) < CFG.caseReach);
+    if (dwellOn) {
+      const kw = { x: (dwellOn.x - e0) / s, y: (dwellOn.y - f0) / s };
       if (!state.dwell || Math.hypot(state.dwell.x - kw.x, state.dwell.y - kw.y) > 30) state.dwell = { ...kw, t: 0 };
       if (!paused) state.dwell.t += dt;
-      if (state.dwell.t > CFG.caseTime) { state.ignore.push({ ...kw, until: now + 60000 }); state.dwell = null; log('mở vali xong'); }
+      if (state.dwell.t > CFG.caseTime) { state.ignore.push({ ...kw, until: now + 60000 }); state.dwell = null; log(dwellOn === kase ? 'mở vali xong' : 'đứng cạnh vật phá được xong'); }
     } else state.dwell = null;
 
     // hold = stand right on the target (suitcase) instead of walking through it
@@ -450,12 +474,16 @@
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
     // XP: only walk until the orb is inside the pickup radius; it flies in by itself from there
-    else if ((xp = nearestTo(xps.filter(d => dist(d, me) > state.magnet * 0.8))) && dist(xp, me) < CFG.xpRange) {
+    else if ((xp = nearestTo(xps.filter(d => dist(d, me) > state.magnet * 0.8 && !inHazard(d)))) && dist(xp, me) < CFG.xpRange) {
       target = xp; weight = CFG.xpWeight; stop = state.magnet * 0.6;
     }
-    else if (foe) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
+    // Breakable: stand next to it while fighting, so area moves / stray shots break it (drops xp, coins, heals). One
+    // close by (a small detour) comes before xp, farther ones after it
+    if (rock && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
+    else if (!target && foe) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
     state.view.target = target;
-    state.view.prevTarget = target && { enemy: target === foe, w: { x: (target.x - e0) / s, y: (target.y - f0) / s } };
+    // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
+    state.prevTarget = target && { enemy: target === foe, w: { x: (target.x - e0) / s, y: (target.y - f0) / s } };
     state.view.walls = walls;
     const escape = state.escape && state.escape.until > now ? state.escape.dir : null;
 
@@ -465,7 +493,7 @@
       const g = makeGrid(from.x, from.y), pad = CFG.bodyRadius, W = d => ({ x: (d.x - e0) / s, y: (d.y - f0) / s });
       // Blocked: "wall" sprites (their box) and the walls we got stuck on
       for (const d of walls) {
-        if (!d.rw) continue;                                          // stuck points: below, from state.walls
+        if (!d.rw || d.of === target) continue;                       // stuck points: below; the target itself (a rock to break) stays reachable
         const c = W(d);
         if (d.box) {
           const hw = Math.abs(d.box.w) / 2 / s + pad, hh = Math.abs(d.box.h) / 2 / s + pad;
@@ -509,7 +537,7 @@
       const gi = Math.round(si + (ti - si) * k), gj = Math.round(sj + (tj - sj) * k);
       const path = findPath(g, sj * g.n + si, gj * g.n + gi);
       if (!path) return { ...plan, none: true };
-      if (!path.length) return plan;                                  // gave up: steer straight as before
+      if (!path.length) return { ...plan, gaveUp: true };             // gave up: steer straight as before
       plan.cells = path.map(idx => ({ x: (g.ox + idx % g.n + 0.5) * CFG.cell, y: (g.oy + Math.floor(idx / g.n) + 0.5) * CFG.cell }));
       plan.wp = plan.cells[1] || to;
       for (let i = plan.cells.length - 1; i > 1; i--) if (lineClear(g, from, plan.cells[i])) { plan.wp = plan.cells[i]; break; }
@@ -520,7 +548,14 @@
       const tW = { x: (target.x - e0) / s, y: (target.y - f0) / s }, p = state.path;
       if (!p || now - p.at > 300 || Math.hypot(p.goal.x - tW.x, p.goal.y - tW.y) > CFG.cell || (p.wp && Math.hypot(p.wp.x - meW.x, p.wp.y - meW.y) < CFG.cell)) {
         state.path = planPath(meW, tW);
-        if (state.path.none && target !== foe) { state.ignore.push({ ...tW, until: now + 20000 }); log('không có đường tới mục tiêu — bỏ qua 20s'); }
+        // A search giving up again and again on the same target (~10 searches, escapes in between included) is treated
+        // like no path at all
+        const g = state.giveUps;
+        state.giveUps = state.path.gaveUp ? { ...tW, n: (g && Math.hypot(g.x - tW.x, g.y - tW.y) <= CFG.cell ? g.n : 0) + 1 } : null;
+        if ((state.path.none || (state.giveUps && state.giveUps.n >= 10)) && target !== foe) {
+          state.ignore.push({ ...tW, until: now + 20000 }); state.giveUps = null;
+          log('không có đường tới mục tiêu — bỏ qua 20s');
+        }
       }
       wp = state.path.wp;
     } else state.path = null;
@@ -743,6 +778,7 @@
     };
     const buttons = [...document.querySelectorAll('button, [role=button]')].filter(b => visible(b) && !dock.contains(b) && onTop(b));
     const over = leaves.some(e => /you fell|run over|game over|has caído|caíste/i.test(e.innerText || ''));
+    if (state.runEnded === null) state.runEnded = over;
     const menu = SITE.menu(buttons);
     if (!over && !menu && now - (state.timerChangedAt || 0) < 2500) return;
     const justEnded = over && !state.runEnded;
@@ -821,7 +857,7 @@
     g.clearRect(0, 0, ov.width, ov.height);
     const v = state.view;
     hud.textContent = tag.on
-      ? (tag.pending ? `${tag.pending}: 1=tốt 2=nguy hiểm 3=rift 4=vật cản 5=buff 6=kinh nghiệm 7=vali 0=xoá nhãn Esc=huỷ` : 'GẮN NHÃN (F7): click vào vật trên màn hình')
+      ? (tag.pending ? `${tag.pending}: 1=tốt 2=nguy hiểm 3=rift 4=vật cản 5=buff 6=kinh nghiệm 7=vali 8=phá được 0=xoá nhãn Esc=huỷ` : 'GẮN NHÃN (F7): click vào vật trên màn hình')
       : `bot ${state.on ? 'ON' : 'OFF'} (F8) · ván ${state.done + 1}${state.target ? `/${state.target}` : ''}${state.dwell ? ` · mở vali ${(state.dwell.t / 1000).toFixed(1)}/${CFG.caseTime / 1000}s` : ''} · địch ${v ? v.enemies.length : 0} · exp ${v ? v.xps.length : 0} (hút ${Math.round(state.magnet)}) · tốt ${v ? v.goods.length : 0} · buff ${v ? v.buffs.length : 0} · nguy hiểm ${v ? v.hazards.length : 0} · rift ${v ? v.rifts.length : 0} · chặn rank ${state.netBlocked}`;
     if (tag.on && tag.box) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(tag.box.x - tag.box.w / 2, tag.box.y - tag.box.h / 2, tag.box.w, tag.box.h); }
     if (state.highlight) {
@@ -934,8 +970,9 @@
     play() {
       const n = Math.max(0, Math.floor(+$('runs').value || 0));
       try { localStorage.setItem(RUNS_KEY, String(n)); } catch {}
-      // runEnded: true = a results screen already up when ▶ is pressed is not counted as one of the n runs
-      Object.assign(state, { target: n, done: 0, runEnded: true, on: true, started: true, restartAt: 0 });
+      // runEnded: null = not known yet; autoRestart's first look sets it, so a results screen already up when ▶ is
+      // pressed is not counted as one of the n runs
+      Object.assign(state, { target: n, done: 0, runEnded: null, on: true, started: true, restartAt: 0 });
       log(`chạy ${n ? `${n} ván` : 'vô hạn'}`);
     },
     pause() { state.on = false; applyDir(null); log('tạm dừng — bạn có thể tự điều khiển'); },
@@ -1093,7 +1130,7 @@
   panel.style.cssText = 'order:3;pointer-events:auto;width:380px;max-width:calc(100vw - 8px);min-height:0;flex:0 1 auto;overflow:auto;font:11px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;display:none';
   dock.append(panel);
   draggable(panel, 'psbot.pos.catalog');
-  const TAG_LABEL = { good: ['Tốt', '#4f4'], hazard: ['Nguy hiểm', '#f90'], rift: ['Rift', '#f4f'], wall: ['Vật cản', '#88f'], buff: ['Buff', '#ff0'], xp: ['Kinh nghiệm', '#0fc'], case: ['Vali (đứng 5s)', '#fa0'], safe: ['An toàn', '#9cf'] };
+  const TAG_LABEL = { good: ['Tốt', '#4f4'], hazard: ['Nguy hiểm', '#f90'], rift: ['Rift', '#f4f'], wall: ['Vật cản', '#88f'], buff: ['Buff', '#ff0'], xp: ['Kinh nghiệm', '#0fc'], case: ['Vali (đứng 5s)', '#fa0'], break: ['Phá được', '#c96'], safe: ['An toàn', '#9cf'] };
   function renderPanel() {
     if (panel.style.display === 'none') return;
     const now = performance.now();
@@ -1195,7 +1232,7 @@
 
   // ---------- tag mode (F7): click an object, then press 1/2/3/0 ----------
   const tag = { on: false, pending: null, box: null };
-  const TAGS = { Digit1: 'good', Digit2: 'hazard', Digit3: 'rift', Digit4: 'wall', Digit5: 'buff', Digit6: 'xp', Digit7: 'case' };
+  const TAGS = { Digit1: 'good', Digit2: 'hazard', Digit3: 'rift', Digit4: 'wall', Digit5: 'buff', Digit6: 'xp', Digit7: 'case', Digit8: 'break' };
   const onClick = e => {
     if (!tag.on || !e.isTrusted) return;
     const r = canvas.getBoundingClientRect();
