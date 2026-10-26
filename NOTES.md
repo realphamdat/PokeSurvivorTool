@@ -78,6 +78,7 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 ## 3. Checklist cho bản thường (làm theo thứ tự)
 
 0. [ ] **LỖI ƯU TIÊN: bản thường trên điện thoại (Tampermonkey) không chạy bot.**
+   - **NGUYÊN NHÂN ĐÃ TÌM RA (2026-10-26, tái hiện trên PC Chrome + Tampermonkey):** chưa **cho phép Tampermonkey truy cập `raw.githubusercontent.com`**. Userscript 1.2.0 tải bot bằng `GM_xmlhttpRequest`, và lần đầu Tampermonkey hỏi quyền. Chưa cho phép thì không file nào được tải: `window.PSBotSite` = false, không có panel. Trong lúc đó `#game` vẫn có (canvas 1001×563), nên giả thuyết canvas bên dưới **không phải nguyên nhân**. Sau khi cho phép, PC chạy bình thường (v1.4.1). README/trang cài đặt đã thêm bước "Always allow". **Còn chờ:** người dùng xác nhận trên điện thoại (Kiwi) sau khi cho phép.
    - **Người dùng báo** (2026-10-26):
      - Không hiện panel PokeSurvivor Bot.
      - Skill chỉ dùng ô đầu tiên (trên PC bot bấm E để đổi skill, nên đây là dấu hiệu bot **không chạy**, không phải bot spam).

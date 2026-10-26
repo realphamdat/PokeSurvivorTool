@@ -19,7 +19,8 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 ```
 
 4. Tampermonkey tự mở trang cài script → bấm **Install** (Cài đặt).
-5. Vào game: panel **PokeSurvivor Bot** hiện ở góc trên bên trái.
+5. Vào game. Lần đầu, Tampermonkey hỏi quyền truy cập `raw.githubusercontent.com` (nơi bot tải code): chọn **Always allow** (luôn cho phép) rồi tải lại trang. Không cho phép thì bot không chạy.
+6. Panel **PokeSurvivor Bot** hiện ở góc trên bên trái.
 
 ## Cài trên iPhone / iPad
 
