@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.3';
+  const VERSION = '1.5.4';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
