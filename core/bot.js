@@ -1009,7 +1009,7 @@
   const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
   async function checkUpdate() {
     try {
-      const r = await fetch('https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/main/manifest.json', { cache: 'no-store' });
+      const r = await fetch('https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/manifest.json', { cache: 'no-store' });
       const latest = (await r.json()).version;
       if (!latest || !newer(latest, VERSION)) return;
       $('update').style.display = 'block';

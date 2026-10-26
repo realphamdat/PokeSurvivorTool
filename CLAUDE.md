@@ -7,7 +7,19 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 ## Người dùng & cách làm việc
 
 - Người dùng nói tiếng Việt → trả lời tiếng Việt. Chữ hiển thị trong game/panel/log (`log(...)`, `why`, tooltip) viết **tiếng Việt**; comment trong code viết **tiếng Anh**, ngắn, đúng mật độ comment xung quanh.
-- **Chỉ commit/push khi người dùng bảo.** Push lên `main` = phát hành ngay cho người dùng userscript/bookmarklet (chúng tải code từ GitHub). Người cài ZIP chỉ thấy thông báo cập nhật khi tăng version ở **cả** `manifest.json` và `const VERSION` trong `core/bot.js`.
+- **Chỉ commit/push khi người dùng bảo.**
+- **Hai nhánh:**
+  - **`main`:** nơi làm việc. Push thoải mái, người dùng không thấy.
+  - **`release`:** bản người dùng đang dùng. `loader.js` (userscript/bookmarklet tải file bot từ đây), link ZIP trong README/`docs/index.html`, và thông báo cập nhật (`manifest.json` trên `release`) đều đọc nhánh này.
+  - **Không checkout `release`.** Chỉ cập nhật nó bằng lệnh phát hành bên dưới, và **chỉ khi người dùng bảo phát hành**.
+- **Phát hành:**
+  1. Tăng version ở **cả** `manifest.json` và `const VERSION` trong `core/bot.js`.
+  2. Commit trên `main`.
+  3. `git tag vX.Y.Z && git push origin main main:release --tags`
+  4. (Tuỳ chọn) `gh release create vX.Y.Z --notes "…"`.
+  - **Lùi bản:** `git push -f origin vX.Y.Z:release`.
+- **Chỉ tăng version lúc phát hành.** Bản ZIP cũ (≤ 1.4.0) kiểm tra version bằng `manifest.json` trên `main`, nên tăng sớm sẽ báo "có bản mới" khi bản đó chưa lên `release`.
+- **`loader.js` phải luôn có ở `main`:** userscript/bookmarklet cài trước đây tải nó từ `main`. Nó trỏ tới `release`, nên những người này vẫn chỉ nhận bản đã phát hành.
 - Commit message: dòng tiêu đề tiếng Anh, thân giải thích lý do. Repo **công khai**: không bao giờ đưa mật khẩu, thông tin mạng/công ty của người dùng vào file hay commit.
 - `account_test.js` (tài khoản test, `module.exports = { normal: {site,name,password}, doofcraft: {…} }`) nằm trong `.gitignore`, **không commit**. Nếu chưa có thì hỏi người dùng.
 

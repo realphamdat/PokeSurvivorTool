@@ -88,7 +88,12 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 9. [ ] **Tiến hoá:** xác nhận trong console có lý do "điều kiện tiến hoá …" khi chọn Power/Magnet… Nếu game cập nhật move: `node crawl-moves.js --evo`.
 10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
-12. [ ] **Phát hành:** tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.0`) để người cài ZIP nhận thông báo.
+12. [ ] **Phát hành** (khi bản thường đã ổn, và người dùng bảo):
+    1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.0`).
+    2. Commit trên `main`.
+    3. `git tag vX.Y.Z && git push origin main main:release --tags`.
+
+    Người dùng chỉ nhận code từ nhánh `release`, nên push `main` lúc đang làm không ảnh hưởng gì. Chi tiết trong `CLAUDE.md`.
 
 ---
 

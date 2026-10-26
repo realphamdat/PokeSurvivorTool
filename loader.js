@@ -1,13 +1,14 @@
 // PokeSurvivor Bot loader (damhieu2808 · https://github.com/damhieu2808/PokeSurvivorTool) — MIT License
 // For browsers without Chrome extensions (Android / iOS): a bookmarklet runs this on pokesurvivor.com (or pokesurvivor.doofcraft.com),
-// it fetches the latest files from the original repo and runs them in the same order as manifest.json.
+// it fetches the released files from the original repo and runs them in the same order as manifest.json.
 (async () => {
-  // Stays at the repo root: installed userscripts / bookmarklets fetch it from there
+  // Stays at the repo root, on main as well as release: userscripts / bookmarklets installed earlier fetch it from main.
+  // The bot files themselves come from the "release" branch (main = work in progress)
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
   const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
   const SOURCES = [
-    f => `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/main/${f}?t=${Date.now()}`,
-    f => `https://cdn.jsdelivr.net/gh/damhieu2808/PokeSurvivorTool@main/${f}`,
+    f => `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/${f}?t=${Date.now()}`,
+    f => `https://cdn.jsdelivr.net/gh/damhieu2808/PokeSurvivorTool@release/${f}`,
   ];
   const get = async f => {
     for (const src of SOURCES) {
