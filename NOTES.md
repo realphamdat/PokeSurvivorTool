@@ -1,64 +1,122 @@
 # Ghi chú: doofcraft đã làm, bản thường còn phải làm
 
-Cập nhật: 2026-10-26. Bản thường (pokesurvivor.com) chưa test được vì mạng nơi làm việc chặn trang. Mọi thứ bên dưới đã test trên **doofcraft thật** (tài khoản test) và trên game mô phỏng trong trình duyệt.
+Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa test được vì mạng nơi làm việc chặn trang, chỉ vào được doofcraft. Mọi thứ ghi "đã test" là test trên **doofcraft thật** (tài khoản test) hoặc trên trang giả lập trong trình duyệt.
 
-## Cấu trúc (nhắc lại)
+---
 
-- `core/`: lõi dùng chung cho cả 2 bản (`bot.js`, `moves.js`, `farmMoney.js`).
-- `sites/default/`: bản thường (`site.js` + `data.js`).
-- `sites/doofcraft/`: doofcraft (`site.js` + `data.js`).
-- `manifest.json` và `loader.js` chọn folder theo domain.
-- `account_test.js`: tài khoản test, đã có trong `.gitignore`, **không commit**.
+## 0. Bắt đầu buổi tối (bản thường)
 
-## Đã xong
+1. `git pull` để lấy bản mới nhất (`main`, từ commit `2db121f` trở đi).
+2. **Tài khoản test:** `account_test.js` nằm trong `.gitignore` nên **không có trên GitHub**. Ở nhà phải tự tạo lại (cùng định dạng `module.exports = { normal: {…}, doofcraft: {…} }`) và tuyệt đối không commit file này.
+3. Nạp bot: `chrome://extensions` → Load unpacked thư mục repo, hoặc nạp trong console theo thứ tự ở mục 6.
+4. Nếu làm cùng Claude: bảo Claude **đọc file này trước**, rồi đi lần lượt theo mục 3.
 
-### Trong core: áp dụng cho cả 2 bản, nhưng mới test thật trên doofcraft
+---
 
-| Tính năng | Ghi chú cho bản thường |
+## 1. Cấu trúc
+
+- `core/`: lõi dùng chung (`bot.js`, `moves.js`, `farmMoney.js`).
+- `sites/default/`: bản thường (`site.js` + `data.js`). **Mọi thứ riêng của bản thường viết vào đây.**
+- `sites/doofcraft/`: doofcraft (`site.js` + `data.js`). Có thể xem làm mẫu.
+- `manifest.json`, `loader.js`: chọn folder theo domain. `loader.js` phải nằm ở gốc repo vì userscript/bookmarklet tải nó từ đó.
+- `crawl-moves.js`: tạo `core/moves.js` từ pokesurvivor.wiki (wiki này viết cho **bản thường**).
+
+### Profile `site.js` có thể khai báo gì (core đọc các trường này)
+
+| Trường | Ý nghĩa | Bản thường | Doofcraft |
+|---|---|---|---|
+| `tags` | Nhãn theo key chính xác (`fill:#…`, `canvas:WxH#hash`, đường dẫn ảnh) | chỉ 2 nhãn `hazard` theo kích thước | màu vật phẩm, `hazard`, `shot` |
+| `sizeTags` | `true` = key dạng `canvas:WxH` (không có hash) trong `CFG.tags`/data.js áp cho mọi sprite cùng kích thước | **`true`** | `false` |
+| `bySize` | Nhãn theo kích thước sprite do profile tự khai | ❌ (và **bị bỏ qua** khi `sizeTags: true`, xem `tagOf()` trong core) | đá, bẫy, cây, vật Halloween |
+| `terrain(d)` | Mảng nền → 16×16 ô (0 nền, 1 tường, 2 chất lỏng) | ❌ | ✅ |
+| `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ❌ (core tự dùng `evo` trong `moves.js`, lấy từ wiki) | ✅ (đọc cấu hình game) |
+| `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `{}` | `caseReach: 45`, … |
+
+---
+
+## 2. Đã xong
+
+### 2a. Trong core: chạy cho cả 2 bản, nhưng mới test thật trên doofcraft
+
+| Tính năng | Bản thường cần kiểm tra gì |
 |---|---|
-| Tự chọn skill/đồ trên điện thoại (bấm vào thẻ khi ô số bị ẩn) | Bản thường tìm thẻ từ `div.key` bị ẩn, nếu không có thì tìm hàng thẻ giống nhau quanh `#lvl-num`. **Chưa thử trên Android thật.** |
-| Chọn skill theo Moveset theo tầng (tiến hoá > move build chưa có > nâng move tấn công > nâng buff > nội tại > skill ngoài build) | Dựa vào tên pokémon game vẽ lên canvas (nút 🎯 lấy được thì là ổn). |
-| Panel gọn: Số ván, ▶ Chạy/■ Dừng, ⚔ Moveset (F6 danh mục, F9 overlay vẫn còn) | |
-| Tìm đường A* vòng qua tường, nhớ điểm kẹt cả trận, bỏ qua mục tiêu không tới được 20s | Bản thường chỉ biết tường qua nhãn `wall` (data.js/F6) và điểm đã kẹt. |
-| Né đạn quái theo đường bay (nhãn `shot`), vùng skill (nhãn `hazard`), không nhặt đồ trong vùng nguy hiểm | Bản thường **chưa có nhãn** `shot`/`hazard` đúng màu của game, chỉ có đoán "hình đỏ = nguy hiểm". |
-| Nhãn mới `break` (Phá được, phím 8 ở F7): đứng cạnh để skill phá | Bản thường chưa gắn cho vật nào. |
-| Đếm ván đúng khi bấm Chạy giữa trận / ở màn hình kết quả | |
-| Không nhặt đồ có quái đứng sát; máu < 50% thì chế độ thủ (không nhặt kinh nghiệm/phá đá, né quái mạnh gấp đôi) | Đọc máu từ chữ "123 / 208" trên HUD. Bản thường phải kiểm tra HUD có vẽ chữ này lên canvas không, nếu không thì chế độ thủ không bao giờ bật. |
-| Nhận diện chính mình theo mã pokémon (số dex trong đường dẫn sprite), chọn mã được nhận nhiều nhất trong trận | Trước đây sprite ra đòn (Shoot/Attack) của chính mình bị tính là quái. Bản thường cũng có số dex trong đường dẫn (`/assets/pokemon/<dex>/…`). |
+| Tự chọn skill/đồ trên điện thoại (bấm vào thẻ khi ô số bị ẩn) | Tìm thẻ từ `div.key` bị ẩn, nếu không có thì tìm hàng thẻ giống nhau quanh `#lvl-num`. **Chưa thử trên Android thật.** |
+| Chọn skill theo Moveset theo tầng: tiến hoá > move build chưa có > nâng move tấn công build > **nội tại để tiến hoá** > nâng buff build > nội tại > skill ngoài build | Dựa vào tên pokémon game vẽ lên canvas (nút 🎯 trong popup Moveset lấy được tên thì ổn). |
+| Ưu tiên nội tại để tiến hoá (Power, Reflexes, Sprint, Synthesis, Armor, Magnet, Vigor) | Bản thường lấy từ `evo` trong `moves.js` (wiki, 97/103 move). Cần xác nhận **tên thẻ trên game khớp** các tên này: console phải hiện lý do "điều kiện tiến hoá …". |
+| Panel: Số ván, ▶ Chạy/■ Dừng, ⚔ Moveset, dòng "F8 bật/tắt bot · F9 hiển thị overlay" | F6 danh mục, F7 gắn nhãn vẫn còn. |
+| Tìm đường A* vòng qua vật cản, nhớ điểm kẹt cả trận, bỏ qua mục tiêu không tới được 20s | Bản thường chỉ biết vật cản qua nhãn `wall` (data.js/F6) và điểm đã kẹt (chưa có `terrain`). |
+| Né đạn quái theo đường bay (`shot`), vùng skill (`hazard`), không nhặt đồ trong vùng nguy hiểm | Bản thường **chưa có nhãn đúng màu** cho đạn/vùng skill, chỉ có đoán "hình đỏ không nhãn = nguy hiểm" (`autoTelegraph`). |
+| Nhãn `break` (Phá được, phím 8 ở F7): đứng cạnh để skill phá, phá đá gần trước khi nhặt kinh nghiệm | Chưa gắn cho vật nào. |
+| Không nhặt đồ có quái đứng sát; **máu < 50% thì chế độ thủ** | Máu đọc từ chữ dạng `123 / 208` game vẽ lên canvas. **Phải kiểm tra bản thường có vẽ chữ này không**, nếu không thì chế độ thủ không bao giờ bật. |
+| Nhận diện chính mình theo số dex trong đường dẫn sprite (không tính sprite ra đòn của mình là quái) | Regex lấy dex: `/\/(\d+)\//`. Bản thường dùng `/assets/pokemon/<dex>/…` nên chắc khớp. Kiểm tra `PSBot.state.selfDex` đúng số pokémon. |
+| Đếm ván đúng khi bấm Chạy giữa trận / ở màn hình kết quả | Dựa vào chữ "You fell / run over / game over…". |
 
-### Riêng doofcraft (`sites/doofcraft/site.js`)
+### 2b. Chỉ có ở doofcraft (`sites/doofcraft/site.js`): bản thường CHƯA có
 
-- **Địa hình:** đọc 22 bảng màu biome từ mã nguồn game, phân loại từng ô của mảng nền 256×256 thành tường (chặn) / chất lỏng (tốn điểm) / nền (`terrain`).
-- **Nhãn theo màu của game:** `fill:#ff2445` là vùng skill quái/boss (`hazard`), `fill:rgba(255,60,80,0.35)` là đạn quái (`shot`).
-- **Nhãn theo kích thước sprite (`bySize`, lấy từ các hàm vẽ sprite của game):** `22x17` đá (`break`), `14x14` bẫy (`hazard`), cây theo biome là tường (`30x40` rừng, `26x40` pha lê, `28x40` cây chết), Halloween: `8x23` đèn lồng, `24x28` lồng, `6x20` cọc rào là tường, `14x11` bí ngô là `break`. Hàng rào `16x14` trùng kích thước rương nên không gắn.
-- **Tiến hoá (`evolveNeeds`):** đọc từ cấu hình game xem move nào cần nội tại nào để tiến hoá (86 move: Power = attack, Reflexes = cooldown, Sprint = speed, Synthesis = regen, Armor = defense, Magnet). Core xếp nội tại mà một move trong build đang có cần ở tầng 250 (trên nâng buff, dưới nâng move tấn công). Trận thật: lấy Magnet cho Psychic, Power cho Hyper Beam, và cả hai đã tiến hoá (`Hyper Beam+`, `Psychic+`).
+- **Địa hình:** đọc 22 bảng màu biome từ mã nguồn game, phân loại từng ô của mảng nền 256×256 thành tường (chặn) / chất lỏng (tốn điểm) / nền.
+- **Nhãn theo màu của game:** `fill:#ff2445` là mọi vùng skill quái/boss (`hazard`), `fill:rgba(255,60,80,0.35)` là vòng đỏ dưới mỗi viên đạn quái (`shot`).
+- **`bySize`** (lấy từ các hàm vẽ sprite của game): `22x17` đá (`break`), `14x14` bẫy (`hazard`), cây là tường (`30x40` rừng, `26x40` pha lê, `28x40` cây chết), Halloween `8x23` đèn lồng / `24x28` lồng / `6x20` cọc rào là tường, `14x11` bí ngô là `break`. Hàng rào `16x14` trùng kích thước rương nên không gắn.
+- **`evolveNeeds`** đọc từ cấu hình game (86 move). Trận thật: Hyper Beam và Psychic đều tiến hoá.
 - **Rương cứng:** `caseReach: 45`.
 - **Điện thoại:** bấm thẳng `button.ps-card` khi màn hình cảm ứng.
 
-## Việc cần làm cho bản thường (checklist)
+### 2c. Cách đã làm ra các thông tin của doofcraft (làm lại y hệt cho bản thường)
 
-1. [ ] **Thu dữ liệu:** vào trận, bật bot, mở console (F12), dán **script thu dữ liệu** (cuối file này). Chạy ở gần tường/cây/rương, và chạy thêm một lần lúc boss ra chiêu. Gửi các file `psbot-probe-default-*.json` tải về.
-2. [ ] **Địa hình:** xem bản thường vẽ nền thế nào (có mảng 256×256 như doofcraft không?). `sites/default/data.js` đang có vài nhãn `canvas:256x256#…` = `wall`. Nếu đó là mảng nền thì gắn cả mảng là tường là **sai** (sẽ chặn cả vùng lớn), cần bỏ và viết `terrain()` riêng cho bản thường.
-3. [ ] **Vùng skill và đạn quái:** tìm màu thật mà bản thường dùng cho vùng cảnh báo và đạn quái, rồi thêm vào `tags` của `sites/default/site.js` (`hazard` / `shot`). Hình đã có nhãn sẽ không bị bộ lọc "hạt bụi nhỏ" loại bỏ.
-4. [ ] **Vật thể:** tìm sprite đá/vật phá được, bẫy, rương. Lưu ý: bản thường có `sizeTags: true` nên `tagOf()` **không đọc** `SITE.bySize`. Muốn dùng `bySize` thì phải sửa `tagOf()` trong `core/bot.js`, hoặc gắn nhãn thẳng vào `tags`/`data.js`.
-5. [ ] **Vali** (`case`) của bản thường là loại đứng lên trên, nên giữ `caseReach: 25`, đừng chép số 45 của doofcraft.
-6. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không.
-7. [ ] **Kiểm tra trên trận thật:** bật F9 xem overlay (vòng xanh tím = tường, đoạn cam = đạn, chấm trắng = đường A*), đếm log "không có đường tới mục tiêu" (mong đợi: vài lần mỗi phút, không ra cả loạt).
-8. [ ] **Version:** đang là `1.4.0`. Lần phát hành sau cho người cài ZIP thì tăng tiếp ở cả `manifest.json` lẫn `VERSION` trong `core/bot.js`.
+Mọi "id" của doofcraft đều lấy từ **mã nguồn JS của game**, không đoán bằng hình:
+1. Lấy danh sách file JS: trong console trang game, `[...document.scripts].map(s => s.src)`; file `index-*.js` liệt kê các file con.
+2. `fetch` từng file rồi tìm theo từ khoá:
+   - **Vùng skill:** hàm vẽ cảnh báo (doofcraft: `drawHazards` → `Qs`, `fillStyle` cố định).
+   - **Đạn quái:** `drawProjectiles`, phần `friendly === false`.
+   - **Kích thước sprite vật thể:** các hàm `Y(w,h)` tạo canvas (`rock`, `tree`, `chest`…).
+   - **Bảng màu nền:** `palette:{…}`. **Cấu hình:** `props:{tree:{solid…`, `evolution:{requires…`.
+3. Đối chiếu bằng overlay (F9) và `PSBot.state.lastFrame` trong trận thật.
 
-## Vấn đề còn mở (doofcraft)
+Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Script thu dữ liệu ở mục 7 giúp biết ngay game vẽ những gì.
 
-- **Sống sót:** trước đây chết quanh 3:55–4:13 (3 trận liên tiếp). Nguyên nhân là bot lao vào giữa bầy 80–90 quái để nhặt kinh nghiệm, cộng thêm việc tính nhầm chính mình là quái. Sau khi sửa: sống tới **7:34** và **7:08** (2 trận). Cả hai lần chết đều do một đợt quái ập đến quanh mốc 7:00 (từ 25 lên 85 con trong 3 giây, hết máu trong khoảng 4 giây). Bot chưa có cách thoát vòng vây hình thành nhanh như vậy.
-- **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trở lên trong vòng 220 đơn vị thì chạy về hướng thưa nhất (chấm 16 hướng theo mật độ quái, bỏ hướng có tường), bỏ qua nhặt đồ. Kết quả 1 trận: chết ở **5:35** (Gloomy Graveyard), sớm hơn 2 trận không có chế độ này. Lúc chạy, quái trong vòng 220 vẫn tăng từ 20 lên 55, và việc chạy làm hạ quái chậm hơn. Chưa đủ dữ liệu để kết luận (mỗi trận một biome khác nhau), nên chưa đưa vào. Nếu thử lại: chỉ bật khi máu thấp, hoặc cân nhắc tốc độ hạ quái thay vì chỉ chạy.
-- Sau khi thêm tiến hoá và cây theo biome: 2 trận sống tới 5:27 và **10:18** (hạ boss Thundurus và Lunala). Kết quả dao động nhiều theo biome và theo thẻ game đưa ra (trận 10:18 không hề được đưa thẻ Hyper Beam).
-- **Tiến hoá cho bản thường: đã có, lấy từ wiki.** `node crawl-moves.js --evo` lấy bảng tiến hoá ở pokesurvivor.wiki/moves (1 request, 97/103 move) và ghi vào trường `evo` trong `core/moves.js`. Profile nào không tự có `evolveNeeds` thì core dùng dữ liệu này. Đã thử trên trang giả lập; cần xác nhận trên trận thật (tên thẻ trên game phải khớp Power/Reflexes/Sprint/Synthesis/Armor/Magnet/Vigor). Khi game cập nhật move, chạy lại lệnh trên. Crawl đầy đủ (`node crawl-moves.js`) cũng tự lấy bảng này.
-- `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng cho doofcraft.
+---
 
-## Cách test nhanh trong console (khi không dùng extension)
+## 3. Checklist cho bản thường (làm theo thứ tự)
 
-Nạp theo thứ tự: `sites/<bản>/site.js` → `sites/<bản>/data.js` → `core/moves.js` → `core/bot.js` → `core/farmMoney.js`. Sau đó dùng `PSBot.state.debug = true` (overlay) và `PSBot.play(1)`.
+1. [ ] **Chạy thử bot như hiện tại** 1 trận. Bật F9, xem console. Ghi lại: bot có chạy không, có chọn skill không, có lỗi đỏ không.
+2. [ ] **Thu dữ liệu:** trong trận, dán script ở mục 7 vào console (gần tường/cây/rương, và một lần lúc boss ra chiêu). Giữ các file `psbot-probe-default-*.json`.
+3. [ ] **Máu trên HUD:** xem `PSBot.state.hpRatio` khi đang chơi. Nếu `undefined` thì chữ máu không vẽ trên canvas → cần cách đọc máu khác (DOM?) để bật chế độ thủ.
+4. [ ] **Tự nhận diện:** `PSBot.state.selfDex` phải là số pokémon đang chơi.
+5. [ ] **Vùng skill và đạn quái:** tìm màu/hình mà bản thường dùng (mục 2c), thêm vào `tags` của `sites/default/site.js` (`hazard` / `shot`). Hình đã có nhãn không bị bộ lọc "hạt bụi nhỏ" (< 150 px²) loại bỏ.
+6. [ ] **Địa hình:** xem bản thường vẽ nền thế nào (có mảng 256×256 không?). ⚠️ `sites/default/data.js` đang có nhãn `canvas:256x256#…` = `wall`. Nếu đó là mảng nền thì đang **chặn cả vùng lớn** trong A* → bỏ các nhãn đó và viết `terrain()` riêng.
+7. [ ] **Vật thể (cây, đá, rương, bẫy):** tìm kích thước sprite. Vì bản thường có `sizeTags: true`, có 2 cách: gắn key `canvas:WxH` thẳng vào `tags`/data.js, hoặc sửa `tagOf()` trong `core/bot.js` để đọc cả `bySize`. Kiểm tra lại 2 nhãn có sẵn `canvas:14x14` / `canvas:12x12` = `hazard` có đúng không.
+8. [ ] **Vali** (`case`) của bản thường là loại đứng lên trên, giữ `caseReach: 25`, **đừng chép 45 của doofcraft**.
+9. [ ] **Tiến hoá:** xác nhận trong console có lý do "điều kiện tiến hoá …" khi chọn Power/Magnet… Nếu game cập nhật move: `node crawl-moves.js --evo`.
+10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không.
+11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
+12. [ ] **Phát hành:** tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.0`) để người cài ZIP nhận thông báo.
 
-## Script thu dữ liệu (chạy trong console, khi đang trong trận và bot đang bật)
+---
+
+## 4. Vấn đề còn mở (doofcraft)
+
+- **Thời gian sống** (Mewtwo của tài khoản test):
+  - Trước khi sửa: 3:55–4:13 (3 trận). Nguyên nhân: lao vào bầy quái để nhặt kinh nghiệm, và tính nhầm chính mình là quái.
+  - Sau khi sửa: 7:34, 7:08. Có thêm tiến hoá và cây theo biome: 5:27, **10:18** (hạ boss Thundurus, Lunala).
+  - Kết quả dao động nhiều theo biome và theo thẻ game đưa ra.
+- **Đợt quái ập đến** (từ 25 lên 85 con trong 3 giây) vẫn là nguyên nhân chết chính.
+- **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trong vòng 220 đơn vị thì chạy về hướng thưa nhất. 1 trận chết ở 5:35, sớm hơn bản không có nó. Nếu thử lại: chỉ bật khi máu thấp, hoặc ưu tiên hạ quái nhanh thay vì chạy.
+- `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng.
+
+---
+
+## 5. Thử nghiệm đã dùng (không có trong repo)
+
+Các "trang giả lập" (bảng lên cấp, game mini có tường/vùng skill, đọc đường đi A*) chỉ là script tạm trong máy làm việc, không commit. Ở nhà cần test thì nhờ Claude dựng lại, hoặc test thẳng trên game thật.
+
+---
+
+## 6. Nạp bot bằng console (khi không dùng extension)
+
+Nạp theo thứ tự: `sites/<bản>/site.js` → `sites/<bản>/data.js` → `core/moves.js` → `core/bot.js` → `core/farmMoney.js`. Sau đó `PSBot.state.debug = true` (overlay) và `PSBot.play(1)`.
+
+---
+
+## 7. Script thu dữ liệu (chạy trong console, khi đang trong trận và bot đang bật)
 
 ```js
 (async () => {
