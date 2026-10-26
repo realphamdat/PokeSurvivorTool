@@ -77,6 +77,25 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 
 ## 3. Checklist cho bản thường (làm theo thứ tự)
 
+0. [ ] **LỖI ƯU TIÊN: bản thường trên điện thoại (Tampermonkey) không chạy bot.**
+   - **Người dùng báo** (2026-10-26):
+     - Không hiện panel PokeSurvivor Bot.
+     - Skill chỉ dùng ô đầu tiên (trên PC bot bấm E để đổi skill, nên đây là dấu hiệu bot **không chạy**, không phải bot spam).
+     - Doofcraft trên cùng điện thoại thì **chạy bình thường**.
+     - PC (extension) bản thường thì ổn.
+   - **Giả thuyết theo thứ tự:**
+     1. `SITE.ready()` của bản thường là `!!document.getElementById('game')`. Giao diện điện thoại có thể không có `#game` (canvas khác/tạo muộn) nên `start()` thử lại mãi.
+     2. CSP của pokesurvivor.com chặn script inline. Cả `psbot.user.js` lẫn `loader.js` đều chèn code bằng `<script>.textContent`. Extension trên PC chạy `world: "MAIN"` nên không bị ảnh hưởng.
+     3. Game vào chế độ toàn màn hình nên panel (gắn vào `body`) bị che. Ít khả năng, vì khi đó bot vẫn phải đổi skill.
+   - **Cách kiểm tra:** trên PC mở pokesurvivor.com, DevTools (F12) → bật giả lập điện thoại (Ctrl+Shift+M, chọn máy có cảm ứng) → tải lại. Rồi thử:
+     - **Nạp bằng loader như điện thoại:** dán vào console `fetch('https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/loader.js').then(r => r.text()).then(t => { const s = document.createElement('script'); s.textContent = t; document.body.append(s); })`. Xem console có lỗi CSP ("Refused to execute inline script") không.
+     - `document.getElementById('game')` và `[...document.querySelectorAll('canvas')].map(c => [c.id, c.className, c.width, c.height])`.
+     - `document.fullscreenElement` khi đang chơi.
+     - Nếu cần thì debug thẳng trên điện thoại: Android + USB → `chrome://inspect` (hoặc `edge://inspect`) trên PC.
+   - **Hướng sửa tương ứng:**
+     1. `ready()` / `canvas()` tìm canvas game theo cách khác (ví dụ canvas lớn nhất).
+     2. Không chèn `<script>` inline: chạy code trực tiếp trong userscript (Tampermonkey không bị CSP của trang chặn), ví dụ `@grant GM_xmlhttpRequest` + `@connect raw.githubusercontent.com` rồi `eval`/`new Function` trong ngữ cảnh userscript, hoặc `@require`.
+     3. Chuyển `dock`/`ov` vào `document.fullscreenElement` khi có sự kiện `fullscreenchange`.
 1. [ ] **Chạy thử bot như hiện tại** 1 trận. Bật F9, xem console. Ghi lại: bot có chạy không, có chọn skill không, có lỗi đỏ không.
 2. [ ] **Thu dữ liệu:** trong trận, dán script ở mục 7 vào console (gần tường/cây/rương, và một lần lúc boss ra chiêu). Giữ các file `psbot-probe-default-*.json`.
 3. [ ] **Máu trên HUD:** xem `PSBot.state.hpRatio` khi đang chơi. Nếu `undefined` thì chữ máu không vẽ trên canvas → cần cách đọc máu khác (DOM?) để bật chế độ thủ.
