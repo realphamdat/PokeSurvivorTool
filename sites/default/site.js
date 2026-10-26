@@ -150,8 +150,8 @@ window.PSBotSite = h => {
     tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard' },
     sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
     scene,
-    // Active move slots of the player (/dev.html only; else the core's CFG.maxSkills)
-    maxMoves: () => { const P = window.G && G.Game && G.Game.player; return P && P.maxMoves; },
+    // Move slots of the player, a bonded group being one (/dev.html only; else the core counts picks)
+    moveSlots: () => { const P = window.G && G.Game && G.Game.player; return P && P.slots ? { used: P.slots.length, max: P.maxMoves } : null; },
     // The big chest is solid (player + chest radius ~25 apart at best) and opens within ~48 of its centre
     cfg: { caseReach: 40 },
     levelUp() {

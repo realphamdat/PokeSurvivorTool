@@ -56,7 +56,7 @@ Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ đi�
 
 **Chưa có Moveset:** lấy skill mới cho tới khi đủ ô > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
 
-Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), doofcraft tính là 4.
+Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), doofcraft tính là 4. Các move đã **bond** chỉ chiếm chung 1 ô, nên sau khi bond bot lại lấy thêm move mới. Game chỉ đưa thẻ move mới khi còn ô trống, nên thấy thẻ đó là bot biết còn chỗ.
 
 Bot luôn kèm chế độ farm xu: được cộng thêm điểm cho nội tại hút đồ / kinh nghiệm / xu, nhưng điểm cộng này không bao giờ vượt qua thứ tự build ở trên.
 

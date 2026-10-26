@@ -56,7 +56,7 @@ On every level-up the bot scores each card and takes the best one. The reason fo
 
 **Without a Moveset:** take new skills until the slots are full > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
 
-Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), doofcraft counts 4.
+Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), doofcraft counts 4. **Bonded** moves share one slot, so after a bond the bot takes more new moves. The game only offers a new move while a slot is free, so such a card tells the bot there is room.
 
 The coin-farming preset is always on: pickup / XP / coin passives get a few extra points, never enough to override the build order above.
 

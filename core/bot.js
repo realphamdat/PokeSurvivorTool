@@ -94,7 +94,7 @@
     },
     // Card text that marks "this pick unlocks the evolution of a maxed skill" (adjust once the real wording is known)
     evoRe: /evol|evoluc|awaken|despert|unlock|desbloq|tiến hoá|★|⭐/i,
-    // Active move slots (incl. the starting move), unless the site reads the game's own (SITE.maxMoves). Moves are
+    // Active move slots (incl. the starting move), unless the site reads the game's own (SITE.moveSlots). Moves are
     // cycled (swapSkills), so every slot is filled before anything is upgraded; with a build, slots its missing moves
     // still need are kept free
     maxSkills: 4,
@@ -673,8 +673,12 @@
     const needFor = !state.picks[name]
       ? [...evolveNeeds].filter(([m, p]) => p.toLowerCase() === name.toLowerCase() && ownedMoves.has(m) && (!build || build.some(b => b.toLowerCase() === m))).map(([m]) => m)
       : [];
-    // Active move slots: the starting move + new ones taken this run
-    const slots = (SITE.maxMoves && SITE.maxMoves()) || CFG.maxSkills, used = 1 + state.newSkills;
+    // Move slots in use: read from the game when the site can (SITE.moveSlots), else the starting move + new ones taken
+    // this run. Bonded moves share one slot, so that count runs high; but both games only offer a new move while a
+    // slot is free, so a new-move card on offer means at least one is
+    const ms = SITE.moveSlots && SITE.moveSlots();
+    const slots = ms ? ms.max : CFG.maxSkills;
+    const used = ms ? ms.used : isNew ? Math.min(1 + state.newSkills, slots - 1) : 1 + state.newSkills;
     if (build) {
       // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
       // > new move outside the build while a slot is left over (the build's missing moves keep theirs) > upgrade a
