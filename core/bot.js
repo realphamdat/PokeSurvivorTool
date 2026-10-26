@@ -647,10 +647,10 @@
     const noDmg = /no damage|sin daño|sem dano/i.test(t);
     const why = [];
     let score = 0;
-    // A passive card an owned move needs before it can evolve (site profile: move -> passive card), not taken yet
+    // A passive card an owned move needs before it can evolve (evolveNeeds: move -> passive card), not taken yet
     const ownedMoves = new Set([...Object.keys(state.picks), ...state.hudTexts].map(n => n.toLowerCase()));
-    const needFor = SITE.evolveNeeds && !state.picks[name]
-      ? [...SITE.evolveNeeds].filter(([m, p]) => p.toLowerCase() === name.toLowerCase() && ownedMoves.has(m) && (!build || build.some(b => b.toLowerCase() === m))).map(([m]) => m)
+    const needFor = !state.picks[name]
+      ? [...evolveNeeds].filter(([m, p]) => p.toLowerCase() === name.toLowerCase() && ownedMoves.has(m) && (!build || build.some(b => b.toLowerCase() === m))).map(([m]) => m)
       : [];
     if (build) {
       // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
@@ -1035,6 +1035,8 @@
   // ---------- moveset popup: pick up to 4 priority moves per pokémon from its learnable list (moves.js) ----------
   const MOVES = window.PSBotMoves || { moves: [], mons: {} };
   const moveByName = new Map(MOVES.moves.map(m => [m.name.toLowerCase(), m]));   // scoreCard: buff (cat "status") or attack
+  // Move -> stat card it needs to evolve: the site's own (doofcraft reads its game config), else the wiki's (moves.js evo)
+  const evolveNeeds = SITE.evolveNeeds || new Map(MOVES.moves.filter(m => m.evo).map(m => [m.name.toLowerCase(), m.evo]));
   const learnable = name => (MOVES.mons[name.toLowerCase()] || []).map(i => MOVES.moves[i]);
   const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t]) || '';
   const ms = document.createElement('div');
