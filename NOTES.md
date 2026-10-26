@@ -44,7 +44,7 @@ Cập nhật: 2026-10-26. Bản thường (pokesurvivor.com) chưa test được
 5. [ ] **Vali** (`case`) của bản thường là loại đứng lên trên, nên giữ `caseReach: 25`, đừng chép số 45 của doofcraft.
 6. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không.
 7. [ ] **Kiểm tra trên trận thật:** bật F9 xem overlay (vòng xanh tím = tường, đoạn cam = đạn, chấm trắng = đường A*), đếm log "không có đường tới mục tiêu" (mong đợi: vài lần mỗi phút, không ra cả loạt).
-8. [ ] **Version:** đang là `1.3.1`. Phát hành cho người cài ZIP thì tăng ở cả `manifest.json` lẫn `VERSION` trong `core/bot.js`.
+8. [ ] **Version:** đang là `1.4.0`. Lần phát hành sau cho người cài ZIP thì tăng tiếp ở cả `manifest.json` lẫn `VERSION` trong `core/bot.js`.
 
 ## Vấn đề còn mở (doofcraft)
 

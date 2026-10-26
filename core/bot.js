@@ -28,7 +28,7 @@
   if (!SITE.ready()) return void setTimeout(() => start(tries + 1), 500);
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.3.1';
+  const VERSION = '1.4.0';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
