@@ -10,9 +10,9 @@ Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com) và [pokesurvivor.do
 
 ## Cài trên điện thoại (Android)
 
-1. Cài **Kiwi Browser** (CH Play).
-2. Trong Kiwi, cài tiện ích **Tampermonkey**.
-3. Bấm nút copy ở góc khối dưới đây, dán vào **thanh địa chỉ** của Kiwi rồi mở:
+1. Cài một trình duyệt cài được tiện ích (extension), ví dụ **Kiwi Browser** hoặc **Firefox** (CH Play).
+2. Trong trình duyệt đó, cài tiện ích **Tampermonkey**.
+3. Bấm nút copy ở góc khối dưới đây, dán vào **thanh địa chỉ** của trình duyệt đó rồi mở:
 
 ```
 https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js
