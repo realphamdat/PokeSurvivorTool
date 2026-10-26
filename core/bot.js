@@ -866,6 +866,7 @@
 
   // ---------- overlay + HUD ----------
   const ov = document.createElement('canvas');
+  ov.dataset.psbotUi = '';                                           // never taken for the game canvas
   ov.style.cssText = 'position:fixed;pointer-events:none;z-index:99999';
   // Top-left dock (60px down: the pokémon's HP bar sits in that corner) stacking the control panel, the HUD line and the F6 catalog (CSS order keeps that order)
   const dock = document.createElement('div');
@@ -1189,6 +1190,17 @@
   panel.addEventListener('mouseover', e => { const r = e.target.closest('[data-row]'); state.highlight = r ? r.dataset.row : null; });
   panel.addEventListener('mouseleave', () => { state.highlight = null; });
 
+  // A fullscreen game (phones) shows only the fullscreen element: the overlay and the panels (dock, plus popups dragged
+  // out of it) move into it, and back to <body> afterwards. A fullscreen <canvas> can't hold them: they stay put
+  const onFullscreen = () => {
+    const fs = document.fullscreenElement || document.webkitFullscreenElement;
+    const host = fs && fs.tagName !== 'CANVAS' ? fs : document.body;
+    for (const el of [ov, dock, ...[ms, panel].filter(el => !dock.contains(el))]) if (el.parentNode !== host) host.append(el);
+  };
+  document.addEventListener('fullscreenchange', onFullscreen);
+  document.addEventListener('webkitfullscreenchange', onFullscreen);
+  onFullscreen();
+
   // ---------- keep running in a background tab / covered window ----------
   // 1) The game pauses on visibilitychange / blur: swallow those and report the page as visible.
   // 2) Chrome stops requestAnimationFrame when the tab is hidden or the window fully covered:
@@ -1351,7 +1363,9 @@
       XMLHttpRequest.prototype.open = XO; XMLHttpRequest.prototype.send = XS; WebSocket.prototype.send = WS;
       window.removeEventListener('keydown', onKey, true);
       window.removeEventListener('pointerdown', onClick, true);
-      ov.remove(); dock.remove();
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      document.removeEventListener('webkitfullscreenchange', onFullscreen);
+      ov.remove(); dock.remove(); ms.remove(); panel.remove();
       delete window.PSBot;
       log('unloaded');
     },

@@ -92,7 +92,12 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
      - `document.getElementById('game')` và `[...document.querySelectorAll('canvas')].map(c => [c.id, c.className, c.width, c.height])`.
      - `document.fullscreenElement` khi đang chơi.
      - Nếu cần thì debug thẳng trên điện thoại: Android + USB → `chrome://inspect` (hoặc `edge://inspect`) trên PC.
-   - **Hướng sửa tương ứng:**
+   - **ĐÃ SỬA "MÒ" (chưa xác nhận trên điện thoại thật)**, cả 3 hướng:
+     1. `sites/default/site.js`: `ready()` / `canvas()` dùng `#game`, không có thì lấy canvas lớn nhất đang hiển thị (trừ overlay của bot, có `data-psbot-ui`).
+     2. `psbot.user.js` v1.2.0: Tampermonkey tải file bằng `GM_xmlhttpRequest` và chèn bằng `GM_addElement` (không bị CSP chặn). Trình quản lý khác vẫn dùng loader như cũ. **Người dùng phải cài lại userscript** (hoặc chờ Tampermonkey tự cập nhật) mới có cách nạp mới.
+     3. `core/bot.js`: chuyển overlay + panel vào `document.fullscreenElement` khi có sự kiện `fullscreenchange`.
+     - Nếu vẫn lỗi: làm theo "Cách kiểm tra" ở trên để biết giả thuyết nào đúng.
+   - **Hướng sửa tương ứng (đã làm như trên):**
      1. `ready()` / `canvas()` tìm canvas game theo cách khác (ví dụ canvas lớn nhất).
      2. Không chèn `<script>` inline: chạy code trực tiếp trong userscript (Tampermonkey không bị CSP của trang chặn), ví dụ `@grant GM_xmlhttpRequest` + `@connect raw.githubusercontent.com` rồi `eval`/`new Function` trong ngữ cảnh userscript, hoặc `@require`.
      3. Chuyển `dock`/`ov` vào `document.fullscreenElement` khi có sự kiện `fullscreenchange`.

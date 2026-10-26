@@ -42,11 +42,14 @@ window.PSBotSite = h => {
       fitLow: !!card.querySelector('.fit-low'), fitHigh: !!card.querySelector('.fit-high'),
     }), el };
   }
+  // The game canvas: #game on desktop; if a layout (phones?) has none, the biggest visible canvas that isn't the bot's own
+  const gameCanvas = () => document.getElementById('game') || [...document.querySelectorAll('canvas:not([data-psbot-ui])')]
+    .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
 
   return {
     id: 'default', label: 'Mặc định · pokesurvivor.com',
-    ready: () => !!document.getElementById('game'),
-    canvas: () => document.getElementById('game'),
+    ready: () => !!gameCanvas(),
+    canvas: gameCanvas,
     // World sprites are drawn scaled by the camera zoom, the HUD untransformed
     isWorld: d => d.s !== 1,
     camera: world => world[0],
