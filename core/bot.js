@@ -35,6 +35,7 @@
     // Each frame one target is chosen: rift > good item (within goodRange) > nearest enemy.
     contact: 80,          // world units (from enemy edge): only this close do enemies push the player away
     engage: 120,          // world units: distance kept from the targeted enemy while fighting it
+    lowHp: 0.5,           // HP share under which the bot only survives: no xp / breakables, enemies avoided harder
     huntWeight: 3,
     goodRange: 1500,      // world units: good items within this become the target
     goodWeight: 5,
@@ -356,10 +357,21 @@
     const cam = SITE.camera(world, pokes);
     const s = cam.s;
     const me = { x: canvas.width / 2, y: canvas.height / 2 };
-    // The sprite closest to the camera centre is the player itself
-    const self = pokes.reduce((b, d) => { const r = Math.hypot(d.x - me.x, d.y - me.y); return r < 40 * s && (!b || r < b.r) ? { d, r } : b; }, null);
+    // The player is the sprite of its own pokémon (dex number in the sprite path) nearest the camera centre, else the
+    // sprite closest to the centre. Its own dex is the one picked most often this run, so an enemy that once stood
+    // nearer the centre doesn't take its place
+    const dexOf = src => (src.match(/\/(\d+)\//) || [])[1];
+    const centre = d => Math.hypot(d.x - me.x, d.y - me.y);
+    const closest = (list, max) => list.reduce((b, d) => { const r = centre(d); return r < max && (!b || r < b.r) ? { d, r } : b; }, null);
+    const self = (state.selfDex && closest(pokes.filter(d => dexOf(d.src) === state.selfDex), 120 * s)) || closest(pokes, 40 * s);
+    if (self && dexOf(self.d.src)) {
+      const v = state.selfVotes = state.selfVotes || {};
+      v[dexOf(self.d.src)] = (v[dexOf(self.d.src)] || 0) + 1;
+      state.selfDex = Object.keys(v).reduce((a, b) => (v[b] > v[a] ? b : a));
+    }
+    // Its attack frames (Shoot / Attack sprites are bigger and drawn off-centre) are the player too, not an enemy on top
+    const enemies = pokes.filter(d => d !== (self && self.d) && !(state.selfDex && dexOf(d.src) === state.selfDex && centre(d) < 120 * s));
     if (self) { me.x = self.d.x; me.y = self.d.y; }
-    const enemies = pokes.filter(d => !self || d !== self.d);
     const byTag = t => world.filter(d => tagOf(d.src) === t);
     const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp'), cases = byTag('case');
     const hazards = world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
@@ -438,7 +450,11 @@
     // Pickups inside a telegraph / a shot's path wait until it is over; items that got us stuck (behind a wall) are
     // ignored for a while
     const inHazard = d => hazards.some(h => (h.shape ? shapeDist(h, d) : Math.hypot(d.x - h.x, d.y - h.y) - Math.max(Math.abs(h.w), Math.abs(h.h)) / 2) < 0);
-    const reachable = list => list.filter(d => !inHazard(d) && !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
+    // Nor are pickups with an enemy right on them worth walking into a horde for
+    const crowded = d => enemies.some(e => dist(d, e) - Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s < CFG.contact * 0.75);
+    const reachable = list => list.filter(d => !inHazard(d) && !crowded(d) && !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
+    // Low HP: survive first (no xp / breakables, enemies pushed away twice as hard)
+    const low = (state.hpRatio ?? 1) < CFG.lowHp;
     // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
     // around its middle, a big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for
     // points we got stuck on
@@ -474,12 +490,12 @@
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
     // XP: only walk until the orb is inside the pickup radius; it flies in by itself from there
-    else if ((xp = nearestTo(xps.filter(d => dist(d, me) > state.magnet * 0.8 && !inHazard(d)))) && dist(xp, me) < CFG.xpRange) {
+    else if (!low && (xp = nearestTo(xps.filter(d => dist(d, me) > state.magnet * 0.8 && !inHazard(d) && !crowded(d)))) && dist(xp, me) < CFG.xpRange) {
       target = xp; weight = CFG.xpWeight; stop = state.magnet * 0.6;
     }
     // Breakable: stand next to it while fighting, so area moves / stray shots break it (drops xp, coins, heals). One
     // close by (a small detour) comes before xp, farther ones after it
-    if (rock && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
+    if (rock && !low && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
     else if (!target && foe) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
     state.view.target = target;
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
@@ -569,7 +585,7 @@
       let c = 0;
       for (const e of enemies) {
         const d = dist(p, e) - Math.max(e.w, e.h) / 2 / s;          // bigger sprites (bosses) count as closer
-        if (d < CFG.contact) c += 10 * ((CFG.contact - Math.max(d, 0)) / CFG.contact) ** 2;
+        if (d < CFG.contact) c += (low ? 20 : 10) * ((CFG.contact - Math.max(d, 0)) / CFG.contact) ** 2;
       }
       // Hazards are checked along the way (half and full step) so the path doesn't cross a telegraph
       for (const q of [at(0.5), p]) {
@@ -1208,7 +1224,9 @@
       const timer = [...state.hudTexts].find(x => /^\d+:\d\d$/.test(x));
       if (timer) state.lastTimer = t;                                                            // run timer on screen = in a run
       if (timer !== state.timerText) { state.timerText = timer; state.timerChangedAt = t; }      // frozen timer = game paused (menus)
-      if ([...state.hudTexts].some(t => /^0:0[0-2]$/.test(t))) { state.picks = {}; state.newSkills = 0; state.walls = []; state.path = null; }   // new run
+      const hp = [...state.hudTexts].map(x => x.match(/^(\d+) \/ (\d+)$/)).find(Boolean);      // "123 / 208" HP bar text
+      if (hp) state.hpRatio = hp[1] / Math.max(1, hp[2]);
+      if ([...state.hudTexts].some(t => /^0:0[0-2]$/.test(t))) { state.picks = {}; state.newSkills = 0; state.walls = []; state.path = null; state.selfVotes = {}; }   // new run (partner may differ)
       // Down in a multiplayer run: the HUD offers "Spectate" / shows "Spectating X's Y" and 0 HP. Keys then steer the
       // spectator camera (E / A / D switch the watched player), so the bot stops pressing them until revived
       state.dead = [...state.hudTexts].some(x => /^spectat/i.test(x) || /^0 \/ \d+$/.test(x));
