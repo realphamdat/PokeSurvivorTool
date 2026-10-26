@@ -36,7 +36,7 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
     - Chọn mục tiêu (rift > vali > buff > đồ tốt > kinh nghiệm > đá phá được > quái); bỏ mục tiêu có quái đứng sát (`crowded`), nằm trong vùng nguy hiểm (`inHazard`), hoặc khi máu thấp (`low`).
     - Nếu đường thẳng bị chặn: `planPath()` → A* (`makeGrid` / `findPath` / `lineClear`) → điểm đi tiếp `wp`.
     - `cost(dir)` chấm 16 hướng → `applyDir`.
-  - `scoreCard()`: chấm thẻ lên cấp. Có build (Moveset) thì xếp theo tầng: tiến hoá 500 > move build chưa có 400 > nâng move tấn công build 300 > nội tại để tiến hoá 250 > nâng buff build 200 > nội tại 150/146/140 > skill ngoài build. Không có build thì dùng logic cũ.
+  - `scoreCard()`: chấm thẻ lên cấp. Có build (Moveset) thì xếp theo tầng: tiến hoá 500 > move build chưa có 400 > move ngoài build khi còn ô (giữ ô cho move build chưa có; `SITE.maxMoves()` hoặc `CFG.maxSkills`) 350 > nâng move tấn công build 300 > nội tại để tiến hoá 250 > nâng buff build 200 > nội tại 150/146/140 > skill ngoài build. Không có build thì dùng logic cũ. **Sửa thứ tự này thì cập nhật luôn mục "Bot chọn thẻ lên cấp thế nào" trong README.md + README.en.md.**
   - `levelUp` / `dialogRows` / `pickRow` / `tapEl` (điện thoại: bấm vào thẻ thay vì gửi phím). `autoRestart` (`state.runEnded`: `null` = chưa biết).
   - Panel, popup Moveset, danh mục F6, chạy nền, vòng lặp chính (đọc HUD: đồng hồ, máu `state.hpRatio`), gắn nhãn F7, `window.PSBot`.
 - `sites/<id>/site.js` định nghĩa `window.PSBotSite = h => ({...profile})`. `h` là các helper của core (`CFG`, `state`, `visible`, `scoreCard`, `pickRow`…), được điền sau, nên chỉ dùng bên trong method. Các trường profile được giải thích trong NOTES.md mục 1.
@@ -58,6 +58,8 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 - **Mã nguồn bản thường** công khai tại <https://github.com/JPTER78/pokesurvivor> (phục vụ pokesurvivor.com). Đọc ở đó để tìm màu/kích thước/cấu hình thay vì đoán.
 - pokesurvivor.com có `<meta>` CSP chặn script chèn vào trang. Trên điện thoại (Kiwi + Tampermonkey) bot **không chạy được** và đây là giới hạn đã chấp nhận: **không tìm cách lách CSP của trang** (xem NOTES.md mục 3, bước 0). PC (Tampermonkey/extension) chạy bình thường.
 
+- Bản thường: bot tự chuyển `/` → `/dev.html`, nơi game để lộ `window.G`; `SITE.scene()` đọc cảnh từ `G`, không có `G` thì đọc canvas (NOTES.md mục 3).
+- Test bằng Chrome riêng (`--user-data-dir`): đặt profile ở **đường dẫn ngắn** (vd `C:\Users\<user>\.psbot-chrome`). Trong thư mục Temp dài, Cache Storage lỗi "Unexpected internal error" → Service Worker của game không tải được sprite → quái thành chấm tròn, bot không thấy quái. Thêm `--disable-backgrounding-occluded-windows --disable-renderer-backgrounding` kẻo cửa sổ bị che thì rAF dừng.
 - Chuỗi có `$` (regex `\$R\[`) trong lệnh shell bị hỏng → viết script ra file rồi chạy bằng `node`.
 - Bản thường dùng `sizeTags: true` → `tagOf()` **không** đọc `SITE.bySize`.
 - `sites/default/data.js` có nhãn `canvas:256x256#…` = `wall`. Nếu đó là mảng nền thì sẽ chặn cả vùng lớn trong A*.

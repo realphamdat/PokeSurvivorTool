@@ -38,6 +38,28 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 
 The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
 
+### How the bot picks level-up cards
+
+On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
+
+**With a Moveset for the pokémon being played** (the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name). Priority, a higher tier always wins:
+
+1. A card that **evolves** a skill.
+2. **A build move** not taken yet (#1 before #2…).
+3. **A new move outside the build while a slot is free**: the bot cycles through every move, so filling the slots (usually 4) means more attacks. Slots for the build moves not taken yet are always kept; e.g. a 2-move build gets 2 extra moves, a full 4-move build gets none.
+4. **Upgrade a build attack move** (#1 first).
+5. **A passive a build move needs to evolve** (e.g. Magnet for Psychic), once that move is owned and the passive isn't.
+6. **Upgrade a build buff move** (no damage).
+7. Other passives: attack (damage, cooldown, range…) > defence (HP, regen, armour, speed, pickup…) > the rest.
+8. Upgrade a skill outside the build (highest level first).
+9. A new skill outside the build with no slot left: only when nothing else is offered. If all three cards are like that and a **Reroll** is left, the bot rerolls (PC).
+
+**Without a Moveset:** take new skills until the slots are full > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
+
+Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), doofcraft counts 4.
+
+The coin-farming preset is always on: pickup / XP / coin passives get a few extra points, never enough to override the build order above.
+
 ## Updates
 
 - **PC:** when the panel shows the yellow line "⬆ Có bản mới" (new version available), download the ZIP from step 1 again and unzip it over the old folder.

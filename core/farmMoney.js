@@ -18,7 +18,6 @@
   Object.assign(CFG, {
     goodRange: 2500, goodWeight: 7,     // chase every pickup on screen (tag coin drops as "Tốt" in F6)
     xpRange: 1400,                      // more levels = longer runs = more kills/bosses
-    riftWeight: 10,                     // rifts lead to bosses
     autoRestart: true,
     // Level-up: prefer pickup radius / XP / coin passives
     bonusRe: /magnet|pickup|pick-up|attract|radius|coin|fortune|luck|experience|\bxp\b|exp\b|imán|monedas|suerte/i,

@@ -1,6 +1,19 @@
 // PokeSurvivor Bot — profile for pokesurvivor.com (damhieu2808 · https://github.com/damhieu2808/PokeSurvivorTool) — MIT License
 // Loaded before core/bot.js, which calls PSBotSite(h) at start. h = the core's helpers
 // (CFG, state, visible, fontSize, scoreCard, pickRow), filled in once they exist: only use them inside the methods.
+
+// The game's dev page (/dev.html) loads the same game unminified and leaves it on window.G: enemies, hazards, shots,
+// pickups and walls are then read from the game itself instead of guessed from the canvas (see scene() below).
+// Opening the site's home page goes there, if it still exists. localStorage['psbot.dev'] = '0' turns this off
+(() => {
+  let off = false;
+  try { off = localStorage.getItem('psbot.dev') === '0'; } catch {}
+  if (off || !/^\/(index\.html)?$/.test(location.pathname)) return;
+  fetch('/dev.html', { method: 'HEAD', cache: 'no-store' })
+    .then(r => { if (r.ok) location.replace('/dev.html' + location.search + location.hash); })
+    .catch(() => {});
+})();
+
 window.PSBotSite = h => {
   // Card = the block around one hotkey digit (div.key), widened while it holds no other digit
   const cardOf = k => {
@@ -29,10 +42,12 @@ window.PSBotSite = h => {
   function readCard(card, key, k, el) {
     const { state, CFG, fontSize } = h;
     const t = card.innerText;
-    // Card title = the largest text in the card that is not the hotkey digit
-    const leaves = [...card.querySelectorAll('*')].filter(e => !e.children.length && e !== k && /\D/.test(e.innerText || ''));
+    // Card title = the largest text in the card that is not the hotkey digit. Own text only: the title box
+    // also holds the tag chips ("Ember <span>New · Fire</span>")
+    const own = e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+    const leaves = [...card.querySelectorAll('*')].filter(e => e !== k && /\D/.test(own(e)));
     const title = leaves.reduce((b, e) => (!b || fontSize(e) > fontSize(b) ? e : b), null);
-    const name = title ? title.innerText.trim() : '';
+    const name = title ? own(title) : '';
     const shownLv = t.match(/\b(?:Lv|Nv|Niv)\.?\s*(\d+)/i);                 // "Lv. 3" chip on owned skills, if the game shows one
     return { ...h.scoreCard({
       key, name, t,
@@ -42,6 +57,84 @@ window.PSBotSite = h => {
       fitLow: !!card.querySelector('.fit-low'), fitHigh: !!card.querySelector('.fit-high'),
     }), el };
   }
+  // ---------- scene from the game's own state (window.G, /dev.html) ----------
+  // Prop types (js/world/world.js): trees block, rocks / small chests break (and block), the big chest opens while
+  // standing next to it, an altar gives a power, a trap springs when stepped on
+  const GOOD = new Set(['heal', 'magnet', 'bomb', 'coin', 'ticket', 'ticket10', 'item', 'sphere']);
+  const circle = (x, y, r) => Array.from({ length: 12 }, (_, i) => ({ x: x + r * Math.cos(i * Math.PI / 6), y: y + r * Math.sin(i * Math.PI / 6) }));
+  let tiles = null;                                                  // terrain around the player: { key, at, list } (world)
+  function terrainNear(px, py) {
+    const W = G.World, TS = W.TS, R = 40, tx = Math.floor(px / TS), ty = Math.floor(py / TS), now = performance.now();
+    if (tiles && tiles.key === `${tx},${ty}` && now - tiles.at < 1000) return tiles.list;
+    // Liquid that hurts (lava, poison) is as good as a wall: the game's own path finding treats it so
+    const deadly = !!W.liquidEffect([]).dmg, list = [];
+    for (let j = ty - R; j <= ty + R; j++) for (let i = tx - R; i <= tx + R; i++) {
+      const x = i * TS + TS / 2, y = j * TS + TS / 2;
+      const kind = W.isWall(x, y) ? 1 : W.isLiquid(x, y) ? (deadly ? 1 : 2) : 0;
+      if (kind) list.push({ x: i * TS, y: j * TS, kind });
+    }
+    tiles = { key: `${tx},${ty}`, at: now, list };
+    return list;
+  }
+  // cam = the canvas transform of a world sprite this frame (screen = world * s + e / f). Null outside a run, or
+  // without G (the home page: minified, nothing exposed), and the core then reads the sprites
+  function scene(cam) {
+    const G = window.G, P = G && G.Game && G.Game.player;
+    if (!P || !G.World || !/playing|levelup|choice/.test(G.Game.state)) return null;
+    const { s, e, f } = cam;
+    const X = x => x * s + e, Y = y => y * s + f;
+    const near = (o, r) => Math.abs(o.x - P.x) < r && Math.abs(o.y - P.y) < r;
+    const box = (o, size, src) => ({ src, x: X(o.x), y: Y(o.y), w: size * s, h: size * s, s, e, f });
+    h.state.selfDex = String(P.dex);
+    h.state.magnet = P.magnet;
+    const out = { me: { x: X(P.x), y: Y(P.y) }, enemies: [], hazard: [], xp: [], good: [], case: [], buff: [], rift: [], wall: [], break: [] };
+    // Enemies whose type hits ours super-effectively count as bigger (kept farther away); thieves never hit
+    for (const o of G.EnemyMgr.all()) {
+      if (o.dead || !near(o, 1400)) continue;
+      const k = o.behavior === 'thief' ? 0 : G.Types.mult(o.atkType, P.mon.types);
+      out.enemies.push(box(o, 2 * o.r + 16 + 24 * Math.max(0, Math.min(2, k - 1)), `G:enemy:${o.dex}`));
+    }
+    // Telegraphs: a circle (zone) or a straight beam from the enemy
+    for (const z of G.Hazards.all) {
+      let pts;
+      if (z.kind === 'zone') pts = circle(z.x, z.y, z.r);
+      else {
+        const c = Math.cos(z.angle), n = Math.sin(z.angle), hw = z.w / 2, x1 = z.x + c * z.len, y1 = z.y + n * z.len;
+        pts = [[z.x - n * hw, z.y + c * hw], [x1 - n * hw, y1 + c * hw], [x1 + n * hw, y1 - c * hw], [z.x + n * hw, z.y - c * hw]].map(([x, y]) => ({ x, y }));
+      }
+      out.hazard.push({ src: `G:hazard:${z.kind}`, shape: 'poly', lw: 0, pts: pts.map(p => ({ x: X(p.x), y: Y(p.y) })), x: X(z.x), y: Y(z.y), w: 0, h: 0 });
+    }
+    // Enemy shots: a line over where they fly in the next CFG.shotLookahead ms, as wide as shot + player
+    const ahead = h.CFG.shotLookahead / 1000;
+    for (const p of G.Projectiles.all()) {
+      if (p.friendly !== false || !near(p, 1400)) continue;
+      out.hazard.push({ src: 'G:shot', shape: 'line', lw: 2 * (p.r + P.r) * s, x: X(p.x), y: Y(p.y), w: 0, h: 0,
+        pts: [{ x: X(p.x), y: Y(p.y) }, { x: X(p.x + p.vx * ahead), y: Y(p.y + p.vy * ahead) }] });
+    }
+    // Pickups and props only on screen (plus a margin), as when read off the canvas: the core's ranges are tuned for that,
+    // and items across the map would pull the player away from the fight
+    for (const p of G.Pickups.all()) {
+      if (!G.Camera.sees(p.x, p.y, 60)) continue;
+      if (p.kind === 'xp' || p.kind === 'xpBig') out.xp.push(box(p, 12, `G:${p.kind}`));
+      else if (GOOD.has(p.kind)) out.good.push(box(p, 14, `G:${p.kind}`));
+    }
+    // Props: size 2.5 r, so the core's footprint (40 % of the width) blocks exactly the game's collision radius
+    for (const p of G.World.visibleProps(G.Camera)) {
+      const d = box(p, 2.5 * p.r, `G:${p.type}`);
+      // Rocks / small chests only block: walking up to break them cost runs (~half the time spent on them, into hordes)
+      if (p.type === 'tree' || ((p.type === 'rock' || p.type === 'chest') && p.hp > 0)) out.wall.push(d);
+      else if (p.type === 'bigchest' && p.hp > 0) out.case.push(d);
+      else if (p.type === 'altar' && !p.used) out.buff.push(d);
+      else if (p.type === 'trap' && p.hp > 0) out.hazard.push({ ...d, y: Y(p.y - 8), w: 26 * s, h: 26 * s });
+    }
+    const rift = G.Rift.rift;
+    // A rift is worth a long walk: seen even off screen. Entered within 30 of 10 above its base (js/systems/rift.js)
+    if (rift && !G.Rift.inArena && near(rift, 2500)) out.rift.push(box({ x: rift.x, y: rift.y - 10 }, 40, 'G:rift'));
+    const TS = G.World.TS;
+    out.terrain = terrainNear(P.x, P.y).map(t => ({ x: X(t.x), y: Y(t.y), w: TS * s, kind: t.kind }));
+    return out;
+  }
+
   // The game canvas: #game on desktop; if a layout (phones?) has none, the biggest visible canvas that isn't the bot's own
   const gameCanvas = () => document.getElementById('game') || [...document.querySelectorAll('canvas:not([data-psbot-ui])')]
     .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
@@ -56,7 +149,11 @@ window.PSBotSite = h => {
     enemyRe: /\/assets\/pokemon\/\d+\/(?!Faint)\w+\.png/,
     tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard' },
     sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
-    cfg: {},
+    scene,
+    // Active move slots of the player (/dev.html only; else the core's CFG.maxSkills)
+    maxMoves: () => { const P = window.G && G.Game && G.Game.player; return P && P.maxMoves; },
+    // The big chest is solid (player + chest radius ~25 apart at best) and opens within ~48 of its centre
+    cfg: { caseReach: 40 },
     levelUp() {
       const lvl = document.getElementById('lvl-num');
       if (!h.visible(lvl)) return null;

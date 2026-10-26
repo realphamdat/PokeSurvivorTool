@@ -10,7 +10,7 @@ Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa 
 2. **Tài khoản test:** `account_test.js` nằm trong `.gitignore` nên **không có trên GitHub**. Ở nhà phải tự tạo lại (cùng định dạng `module.exports = { normal: {…}, doofcraft: {…} }`) và tuyệt đối không commit file này.
 3. Nạp bot: `chrome://extensions` → Load unpacked thư mục repo, hoặc nạp trong console theo thứ tự ở mục 6.
 4. Nếu làm cùng Claude: Claude Code tự đọc `CLAUDE.md` (bản đồ code, quy ước, cách test). Bảo Claude **đọc file này** rồi đi lần lượt theo mục 3.
-5. **Mới (26/10):** ở mục 3 có hướng đọc dữ liệu game qua `window.G` trên `/dev.html`. Kiểm tra cái này **trước**, vì nếu được thì bỏ qua được phần lớn việc đoán màu và kích thước.
+5. **Mới (26/10):** ở mục 3 có hướng đọc dữ liệu game qua `window.G` trên `/dev.html`. **Đã làm xong tối 26/10**, xem mục 3.
 
 ---
 
@@ -31,7 +31,8 @@ Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa 
 | `bySize` | Nhãn theo kích thước sprite do profile tự khai | ❌ (và **bị bỏ qua** khi `sizeTags: true`, xem `tagOf()` trong core) | đá, bẫy, cây, vật Halloween |
 | `terrain(d)` | Mảng nền → 16×16 ô (0 nền, 1 tường, 2 chất lỏng) | ❌ | ✅ |
 | `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ❌ (core tự dùng `evo` trong `moves.js`, lấy từ wiki) | ✅ (đọc cấu hình game) |
-| `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `{}` | `caseReach: 45`, … |
+| `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `caseReach: 40` | `caseReach: 45`, … |
+| `scene(cam)` | Cả cảnh (quái, nguy hiểm, vật phẩm, tường, địa hình) theo nhãn, toạ độ màn hình; `null` = đọc canvas | ✅ (từ `window.G`, chỉ trên `/dev.html`) | ❌ |
 
 ---
 
@@ -100,22 +101,30 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
      - **Rift:** `G.Rift.rift`, `G.Rift.inArena`. **Camera:** `G.Camera`.
      - **Thẻ lên cấp:** bọc `G.LevelUp.offer` để lấy mảng thẻ. `card.key` là `'stat:<id>'` cho thẻ chỉ số, còn lại là move. Chọn thẻ bằng `G.RunUI.pick(index)`; họ chờ 1,5s trước khi gọi, có lẽ để giao diện kịp hiện.
      - **Move:** `G.Moves.BY_ID`, `G.Moves.evolve`, `G.Moves.levelUp`. **Pokédex:** `G.DEX`.
-   - **Việc cần làm tối nay:**
-     1. Mở `/dev.html` (đăng nhập tài khoản test), kiểm tra trong console có `window.G` không, và các hàm trên có đúng không. Mở cả `/` để biết trang thường có `G` không.
-     2. **Nếu có:** trong `sites/default/site.js`, khi có `G` thì lấy quái, vùng skill, đạn, vật phẩm, tường từ `G` (toạ độ world chính xác), không có thì dùng cách đọc canvas như bây giờ. Thẻ lên cấp lấy từ `G.LevelUp.offer` và chọn bằng `G.RunUI.pick` (vẫn chấm điểm bằng `scoreCard`). Bước này có thể thay luôn các mục 5–7 bên dưới.
-     3. **Quyết định cùng người dùng** có tự chuyển sang `/dev.html` như tool kia không. Rủi ro: đó là trang dev, chủ game gỡ là hỏng; khi đó phải quay về đọc canvas.
+   - **ĐÃ LÀM (26/10 tối, ở nhà):**
+     1. `/dev.html` có `window.G` đầy đủ (các tên ở trên đều đúng, thêm `G.World.isWall/isLiquid/visibleProps`, `G.Hazards.all/inside`, `G.Pickups.all`). Trang `/` nạp `app.min.js` bị obfuscate: **không có `G`**. Cả hai trang đều có CSP.
+     2. `sites/default/site.js` có `scene(cam)`: khi có `G` thì trả về quái, vùng skill (`zone` tròn / `beam` chữ nhật), đạn quái (đường bay theo `vx/vy`), bẫy, kinh nghiệm, vật phẩm, rương lớn (`case`), đền (`buff`), rift, cây + đá + rương nhỏ (`wall`), ô tường / chất lỏng (`terrain`, lava/độc tính là tường), toạ độ màn hình theo camera của bot. Core (`tick`) dùng `scene` thay cho phân loại sprite; không có `G` thì đọc canvas như cũ. Quái khắc hệ (`G.Types.mult` > 1) tính to hơn để né xa hơn; vật phẩm/đền/rương chỉ lấy trong khung camera (lấy cả bản đồ thì bot chạy khắp nơi).
+     3. **Người dùng chọn tự chuyển:** `site.js` chuyển `/` → `/dev.html` (HEAD kiểm tra trước, trang bị gỡ thì ở lại `/`). Tắt: `localStorage['psbot.dev'] = '0'`. Không `replaceState` giấu địa chỉ.
+     4. Thẻ lên cấp vẫn đọc DOM (đủ dùng), không dùng `G.LevelUp`.
+   - **Kết quả (Scorbunny cấp 1, tài khoản test chưa nâng cấp gì):** trước khi sửa 1:44 (canvas). Sau khi sửa: `G` 1:34 / 1:31 / 1:50, canvas 2:01. Chết chủ yếu do bị quái vây, quái nước gây 31–49/92 máu mỗi lần chạm. Chưa đủ trận để nói nhánh nào tốt hơn.
    - **Giấy phép:** script của họ là PolyForm Noncommercial, repo mình là MIT, nên **không chép code của họ**. Tên các object của game là sự thật về game, dùng được.
    - **Không làm** các chức năng cheat của họ: sửa save (`G.DB.save`, xu, vé, mở dex), godmode, xuyên tường.
 
-1. [ ] **Chạy thử bot như hiện tại** 1 trận. Bật F9, xem console. Ghi lại: bot có chạy không, có chọn skill không, có lỗi đỏ không.
-2. [ ] **Thu dữ liệu:** trong trận, dán script ở mục 7 vào console (gần tường/cây/rương, và một lần lúc boss ra chiêu). Giữ các file `psbot-probe-default-*.json`.
-3. [ ] **Máu trên HUD:** xem `PSBot.state.hpRatio` khi đang chơi. Nếu `undefined` thì chữ máu không vẽ trên canvas → cần cách đọc máu khác (DOM?) để bật chế độ thủ.
-4. [ ] **Tự nhận diện:** `PSBot.state.selfDex` phải là số pokémon đang chơi.
-5. [ ] **Vùng skill và đạn quái:** tìm màu/hình mà bản thường dùng (mục 2c), thêm vào `tags` của `sites/default/site.js` (`hazard` / `shot`). Hình đã có nhãn không bị bộ lọc "hạt bụi nhỏ" (< 150 px²) loại bỏ.
-6. [ ] **Địa hình:** xem bản thường vẽ nền thế nào (có mảng 256×256 không?). ⚠️ `sites/default/data.js` đang có nhãn `canvas:256x256#…` = `wall`. Nếu đó là mảng nền thì đang **chặn cả vùng lớn** trong A* → bỏ các nhãn đó và viết `terrain()` riêng.
-7. [ ] **Vật thể (cây, đá, rương, bẫy):** tìm kích thước sprite. Vì bản thường có `sizeTags: true`, có 2 cách: gắn key `canvas:WxH` thẳng vào `tags`/data.js, hoặc sửa `tagOf()` trong `core/bot.js` để đọc cả `bySize`. Kiểm tra lại 2 nhãn có sẵn `canvas:14x14` / `canvas:12x12` = `hazard` có đúng không.
-8. [ ] **Vali** (`case`) của bản thường là loại đứng lên trên, giữ `caseReach: 25`, **đừng chép 45 của doofcraft**.
-9. [ ] **Tiến hoá:** xác nhận trong console có lý do "điều kiện tiến hoá …" khi chọn Power/Magnet… Nếu game cập nhật move: `node crawl-moves.js --evo`.
+1. [x] **Chạy thử bot như hiện tại:** chạy, chọn skill, không lỗi đỏ. Đã sửa các lỗi tìm thấy:
+   - **Tên thẻ đọc nhầm thành mô tả:** tiêu đề nằm trong `.nm` cùng chip `<span class="tag-chip">`, nên `.nm` không phải phần tử "lá". `readCard` giờ lấy text riêng của phần tử. Build/tiến hoá trước đây không khớp tên nào.
+   - **Popup "Link my Gmail" / "Got it"** chặn tự chơi lại: thêm `not now|got it|…` vào `restartSteps`.
+   - **Chạy nền hỏng trên bản thường:** CSP chặn Worker `blob:` bằng sự kiện `error` (không ném lỗi), nên không rơi vào nhánh dự phòng. Đã bắt `onerror` → `setInterval`.
+   - **Core:** bỏ mục tiêu nhặt nếu đường thẳng tới nó đi sát quái (`inLane`); `cost()` xét quái ở cả nửa bước.
+   - **Rift ưu tiên tuyệt đối (cả 2 bản):** không bị loại vì vùng skill / quái quanh nó, `riftWeight` 8 → 40 (`farmMoney.js` từng ghi đè thành 10, đã bỏ), kẹt thì chỉ thoát chứ không bỏ rift, không có đường thì bỏ 3s (`riftIgnore`). Bản thường thấy rift trong bán kính 2500 (cả ngoài màn hình). Test bằng `G.Rift.onEvent(['rift', x, y, 60])` + 3 vùng skill vô hại chắn đường: logic cũ vào sau 12,3s (bỏ rift 5 lần), mới 5,6s / 6,2s (không bỏ lần nào).
+   - **Overlay F9:** dòng thông số chỉ hiện khi bật F9 / F7, xuống dòng theo bề ngang panel; đường bay của đạn vẽ nét mảnh (trước vẽ bằng bề rộng vùng né, che kín màn hình).
+2. [x] ~~Thu dữ liệu canvas~~: không cần, có `G`.
+3. [x] **Máu trên HUD:** `hpRatio` khớp `G.Game.player.hp/maxHp` 100%.
+4. [x] **Tự nhận diện:** `selfDex` đúng (813). Nhánh `G` lấy thẳng `player.dex`.
+5. [x] **Vùng skill và đạn quái:** lấy từ `G` (nhánh canvas vẫn chỉ có `autoTelegraph`).
+6. [x] **Địa hình:** lấy từ `G.World` (nhánh canvas vẫn chưa có; nhãn `canvas:256x256` trong data.js chưa kiểm tra).
+7. [x] **Vật thể:** lấy từ `G.World.visibleProps` (nhánh canvas chưa có).
+8. [x] **Vali:** rương lớn (`bigchest`) là vật rắn, mở trong ~48 đơn vị (`interact.js`), nên `caseReach: 40` (25 thì không bao giờ tới vì bị va chạm chặn ở ~25).
+9. [ ] **Tiến hoá:** chưa thấy thẻ tiến hoá trong các trận ngắn (chết trước khi max skill). Cần tài khoản có pokémon mạnh hơn hoặc trận dài hơn.
 10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không. **iOS** (Safari + app Userscripts, hướng dẫn đã có trong README) **chưa thử**. Ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline), vì Userscripts có thể không có `GM_xmlhttpRequest` / `GM_addElement`. Nếu pokesurvivor.com chặn inline (giả thuyết 2 ở mục 0) thì cần thêm nhánh dùng `GM.xmlHttpRequest` của Userscripts.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
 12. [ ] **Phát hành** (khi bản thường đã ổn, và người dùng bảo):

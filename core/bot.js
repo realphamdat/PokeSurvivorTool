@@ -44,7 +44,8 @@
     huntWeight: 3,
     goodRange: 1500,      // world units: good items within this become the target
     goodWeight: 5,
-    riftWeight: 8,
+    riftWeight: 40,       // outweighs hazard / enemy avoidance (up to ~35): a rift is worth walking through them for
+    riftIgnore: 3000,     // ms a rift is skipped after finding no path to it (other targets: 20 s); never for getting stuck
     magnet: 100,          // world units: initial XP pickup radius; re-learned while playing (state.magnet)
     xpRange: 900,         // world units: XP orbs within this (but outside the pickup radius) become the target
     xpWeight: 4,
@@ -93,7 +94,10 @@
     },
     // Card text that marks "this pick unlocks the evolution of a maxed skill" (adjust once the real wording is known)
     evoRe: /evol|evoluc|awaken|despert|unlock|desbloq|tiến hoá|★|⭐/i,
-    maxSkills: 2,         // total active skills (incl. the starting one) when the pokémon has no build
+    // Active move slots (incl. the starting move), unless the site reads the game's own (SITE.maxMoves). Moves are
+    // cycled (swapSkills), so every slot is filled before anything is upgraded; with a build, slots its missing moves
+    // still need are kept free
+    maxSkills: 4,
     // Pokémon name (as shown in the HUD, lower-case) -> moves in priority order. Build moves are always
     // taken/levelled first; moves outside the build are avoided. Set them in the "Moveset" popup (saved to data.js on export).
     builds: {},
@@ -104,7 +108,7 @@
       /^(back to menu|volver al men[uú]|về menu)/i,
       /^(play|jugar|chơi)/i,
       /^(start|go!?|let'?s go|comenzar|empezar|bắt đầu)/i,
-      /^(back|menu|volver|ok|aceptar|close|cerrar|đóng)$/i,
+      /^(back|menu|volver|ok|aceptar|close|cerrar|đóng|not now|ahora no|got it|entendido)$/i,
     ],
     restartAvoid: /together|juntos|friend|amigo|gacha|shop|tienda|log ?out|sign|link|delete|borrar|revive|revivir|gem|buy|comprar/i,
     background: true,     // keep the game running when the tab is hidden / window covered (see "keep running")
@@ -362,24 +366,27 @@
     const cam = SITE.camera(world, pokes);
     const s = cam.s;
     const me = { x: canvas.width / 2, y: canvas.height / 2 };
+    // A profile that can read the game's own state (pokesurvivor.com/dev.html: window.G) hands over the whole scene, in
+    // screen space and sorted by tag (enemy shots already turned into hazard lines); else it is read off the sprites
+    const sc = SITE.scene && SITE.scene(cam);
     // The player is the sprite of its own pokémon (dex number in the sprite path) nearest the camera centre, else the
     // sprite closest to the centre. Its own dex is the one picked most often this run, so an enemy that once stood
     // nearer the centre doesn't take its place
     const dexOf = src => (src.match(/\/(\d+)\//) || [])[1];
     const centre = d => Math.hypot(d.x - me.x, d.y - me.y);
     const closest = (list, max) => list.reduce((b, d) => { const r = centre(d); return r < max && (!b || r < b.r) ? { d, r } : b; }, null);
-    const self = (state.selfDex && closest(pokes.filter(d => dexOf(d.src) === state.selfDex), 120 * s)) || closest(pokes, 40 * s);
+    const self = !sc && ((state.selfDex && closest(pokes.filter(d => dexOf(d.src) === state.selfDex), 120 * s)) || closest(pokes, 40 * s));
     if (self && dexOf(self.d.src)) {
       const v = state.selfVotes = state.selfVotes || {};
       v[dexOf(self.d.src)] = (v[dexOf(self.d.src)] || 0) + 1;
       state.selfDex = Object.keys(v).reduce((a, b) => (v[b] > v[a] ? b : a));
     }
     // Its attack frames (Shoot / Attack sprites are bigger and drawn off-centre) are the player too, not an enemy on top
-    const enemies = pokes.filter(d => d !== (self && self.d) && !(state.selfDex && dexOf(d.src) === state.selfDex && centre(d) < 120 * s));
-    if (self) { me.x = self.d.x; me.y = self.d.y; }
-    const byTag = t => world.filter(d => tagOf(d.src) === t);
+    const enemies = sc ? sc.enemies : pokes.filter(d => d !== (self && self.d) && !(state.selfDex && dexOf(d.src) === state.selfDex && centre(d) < 120 * s));
+    if (sc) { me.x = sc.me.x; me.y = sc.me.y; } else if (self) { me.x = self.d.x; me.y = self.d.y; }
+    const byTag = t => sc ? sc[t] || [] : world.filter(d => tagOf(d.src) === t);
     const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp'), cases = byTag('case');
-    const hazards = world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
+    const hazards = sc ? sc.hazard.slice() : world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
     // Enemy shots: matched to last frame's (nearest within 80 world units) for their speed, then added as a hazard
     // line over where they fly in the next CFG.shotLookahead ms
     {
@@ -395,7 +402,7 @@
     }
     // Terrain tiles the site profile reads off the map (doofcraft: walls / liquid baked into the chunk images), in
     // screen space: kind 1 = wall (blocks), 2 = liquid (walkable, may hurt)
-    const terrain = SITE.terrain ? world.flatMap(d => {
+    const terrain = sc ? sc.terrain || [] : SITE.terrain ? world.flatMap(d => {
       const tiles = SITE.terrain(d);
       if (!tiles) return [];
       const tw = Math.abs(d.w) / 16, x0 = d.x - Math.abs(d.w) / 2, y0 = d.y - Math.abs(d.h) / 2, out = [];
@@ -438,7 +445,8 @@
         if (state.stuck.length >= 2) {
           // Stuck again with no path around (wall not tagged / not learnt yet): give the target up for a while. While
           // following an A* path, clipping a corner only adds the learnt wall and the path is planned again
-          if (state.prevTarget && !state.prevTarget.enemy && !(state.path && state.path.cells.length)) state.ignore.push({ ...state.prevTarget.w, until: now + 20000 });
+          // A rift is never given up for that: the escape run and the learnt wall are enough to get around
+          if (state.prevTarget && !state.prevTarget.enemy && !state.prevTarget.rift && !(state.path && state.path.cells.length)) state.ignore.push({ ...state.prevTarget.w, until: now + 20000 });
           const away = state.walls.filter(w => Math.hypot(meW.x - w.x, meW.y - w.y) < 200).reduce((a, w) => [a[0] + meW.x - w.x, a[1] + meW.y - w.y], [0, 0]);
           const ang = Math.atan2(away[1], away[0]) + (Math.random() - 0.5) * Math.PI / 1.5;
           state.escape = { dir: [Math.cos(ang), Math.sin(ang)], until: now + 900 };
@@ -457,7 +465,9 @@
     const inHazard = d => hazards.some(h => (h.shape ? shapeDist(h, d) : Math.hypot(d.x - h.x, d.y - h.y) - Math.max(Math.abs(h.w), Math.abs(h.h)) / 2) < 0);
     // Nor are pickups with an enemy right on them worth walking into a horde for
     const crowded = d => enemies.some(e => dist(d, e) - Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s < CFG.contact * 0.75);
-    const reachable = list => list.filter(d => !inHazard(d) && !crowded(d) && !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
+    // ... nor through one on the way there (an enemy close to the straight line, ourselves included: step away first)
+    const inLane = d => enemies.some(e => segDist(e, me, d) / s - Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s < CFG.contact * 0.5);
+    const reachable = list => list.filter(d => !inHazard(d) && !crowded(d) && !inLane(d) && !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
     // Low HP: survive first (no xp / breakables, enemies pushed away twice as hard)
     const low = (state.hpRatio ?? 1) < CFG.lowHp;
     // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
@@ -469,7 +479,9 @@
       return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4, of: d } : { x: d.x, y: d.y, rw: w * 0.4, of: d };
     };
     const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').map(footprint), byTag('break').map(footprint));
-    const rift = nearestTo(reachable(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
+    // A rift is always worth it: never put off by hazards / enemies around it, only by an unreachable spot
+    const unignored = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
+    const rift = nearestTo(unignored(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
     const buff = nearestTo(reachable(buffs));
     // Once next to a buff shrine the buff is granted; skip that shrine for buffCooldown
     if (buff && dist(buff, me) < CFG.buffReach) state.ignore.push({ x: (buff.x - e0) / s, y: (buff.y - f0) / s, until: now + CFG.buffCooldown });
@@ -495,7 +507,7 @@
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
     // XP: only walk until the orb is inside the pickup radius; it flies in by itself from there
-    else if (!low && (xp = nearestTo(xps.filter(d => dist(d, me) > state.magnet * 0.8 && !inHazard(d) && !crowded(d)))) && dist(xp, me) < CFG.xpRange) {
+    else if (!low && (xp = nearestTo(xps.filter(d => dist(d, me) > state.magnet * 0.8 && !inHazard(d) && !crowded(d) && !inLane(d)))) && dist(xp, me) < CFG.xpRange) {
       target = xp; weight = CFG.xpWeight; stop = state.magnet * 0.6;
     }
     // Breakable: stand next to it while fighting, so area moves / stray shots break it (drops xp, coins, heals). One
@@ -504,7 +516,7 @@
     else if (!target && foe) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
     state.view.target = target;
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
-    state.prevTarget = target && { enemy: target === foe, w: { x: (target.x - e0) / s, y: (target.y - f0) / s } };
+    state.prevTarget = target && { enemy: target === foe, rift: target === rift, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
     state.view.walls = walls;
     const escape = state.escape && state.escape.until > now ? state.escape.dir : null;
 
@@ -574,8 +586,9 @@
         const g = state.giveUps;
         state.giveUps = state.path.gaveUp ? { ...tW, n: (g && Math.hypot(g.x - tW.x, g.y - tW.y) <= CFG.cell ? g.n : 0) + 1 } : null;
         if ((state.path.none || (state.giveUps && state.giveUps.n >= 10)) && target !== foe) {
-          state.ignore.push({ ...tW, until: now + 20000 }); state.giveUps = null;
-          log('không có đường tới mục tiêu — bỏ qua 20s');
+          const skip = target === rift ? CFG.riftIgnore : 20000;
+          state.ignore.push({ ...tW, until: now + skip }); state.giveUps = null;
+          log(`không có đường tới ${target === rift ? 'rift' : 'mục tiêu'} — bỏ qua ${skip / 1000}s`);
         }
       }
       wp = state.path.wp;
@@ -588,8 +601,11 @@
       const at = k => ({ x: me.x + (dir ? dir[0] : 0) * CFG.lookahead * s * k, y: me.y + (dir ? dir[1] : 0) * CFG.lookahead * s * k });
       const p = at(1);
       let c = 0;
+      const half = at(0.5);
       for (const e of enemies) {
-        const d = dist(p, e) - Math.max(e.w, e.h) / 2 / s;          // bigger sprites (bosses) count as closer
+        // Closest along the step (half and full), so the step doesn't pass through an enemy; bigger sprites (bosses)
+        // count as closer
+        const d = Math.min(dist(half, e), dist(p, e)) - Math.max(e.w, e.h) / 2 / s;
         if (d < CFG.contact) c += (low ? 20 : 10) * ((CFG.contact - Math.max(d, 0)) / CFG.contact) ** 2;
       }
       // Hazards are checked along the way (half and full step) so the path doesn't cross a telegraph
@@ -634,8 +650,8 @@
   }
 
   // ---------- level-up ----------
-  // Priority: level up an owned skill (most-levelled first) > offensive passive > new skill
-  // (only while under CFG.maxSkills) > defensive passive. Status / no-damage moves are avoided.
+  // Without a build: new skill (while a move slot is free) > level up an owned skill (most-levelled first) > offensive
+  // passive > defensive passive. Status / no-damage moves rank lower. With a build: see scoreCard
   // getClientRects (not offsetParent, which is null for position:fixed menus) + not hidden
   const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const ATK_RE = /damage|dmg|power|attack|crit|cooldown|hit|area|projectile|range|pierce|burst|daño|dano|ataque|dégât/i;
@@ -657,17 +673,22 @@
     const needFor = !state.picks[name]
       ? [...evolveNeeds].filter(([m, p]) => p.toLowerCase() === name.toLowerCase() && ownedMoves.has(m) && (!build || build.some(b => b.toLowerCase() === m))).map(([m]) => m)
       : [];
+    // Active move slots: the starting move + new ones taken this run
+    const slots = (SITE.maxMoves && SITE.maxMoves()) || CFG.maxSkills, used = 1 + state.newSkills;
     if (build) {
       // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
-      // > upgrade a build attack move > passive a build move needs to evolve > upgrade a build buff > passive
-      // (attack > defence > other) > upgrade a skill outside the build > new skill outside it (score < 2: rerolled
-      // when possible)
+      // > new move outside the build while a slot is left over (the build's missing moves keep theirs) > upgrade a
+      // build attack move > passive a build move needs to evolve > upgrade a build buff > passive (attack > defence >
+      // other) > upgrade a skill outside the build > new skill outside it with no slot left (score < 2: rerolled when
+      // possible)
       const buildIdx = build.findIndex(m => m.toLowerCase() === name.toLowerCase());
       const move = moveByName.get(name.toLowerCase());
       const owned = level > 0 && !isNew;
       const buff = move ? move.cat === 'status' : noDmg;
+      const missing = build.filter(m => !ownedMoves.has(m.toLowerCase())).length;
       if (evo) { score = 500; why.push('mở tiến hoá skill'); }
       else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
+      else if (isNew && used + missing < slots) { score = buff ? 345 : 350; why.push(`thêm move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`); }
       else if (buildIdx >= 0 && !buff) { score = 300 - buildIdx; why.push(`nâng move tấn công build #${buildIdx + 1} (cấp ${level})`); }
       else if (needFor.length) { score = 250; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
       else if (buildIdx >= 0) { score = 200 - buildIdx; why.push(`nâng buff build #${buildIdx + 1} (cấp ${level})`); }
@@ -680,14 +701,16 @@
     } else {
       // A card that completes a maxed skill's evolution beats everything else
       if (evo) {
-        score += 40; why.push('mở tiến hoá skill');
+        score += 100; why.push('mở tiến hoá skill');
       }
-      if (noDmg) { score -= 6; why.push('không gây sát thương'); }
-      else if (level > 0 && !isNew) { score += 8 + 3 * level; why.push(`dồn skill đang có (cấp ${level})`); }
-      else if (isNew) {
-        const room = 1 + state.newSkills < CFG.maxSkills;
-        score += room ? 3 : -3; why.push(room ? 'skill mới (còn slot)' : 'skill mới (đủ skill rồi)');
-      } else if (needFor.length) { score += 10; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
+      // New moves first while a slot is free (all of them get cycled), then upgrades
+      if (isNew) {
+        const room = used < slots;
+        score += room ? 50 : -3; why.push(room ? `skill mới (${used}/${slots} ô)` : 'skill mới (hết ô)');
+        if (noDmg) { score -= 6; why.push('không gây sát thương'); }
+      } else if (noDmg) { score -= 6; why.push('không gây sát thương'); }
+      else if (level > 0) { score += 8 + 3 * level; why.push(`dồn skill đang có (cấp ${level})`); }
+      else if (needFor.length) { score += 10; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
       else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
       else if (DEF_RE.test(t)) { score += 1; why.push('nội tại phòng thủ'); }
     }
@@ -877,7 +900,8 @@
   const dock = document.createElement('div');
   dock.style.cssText = 'position:fixed;top:60px;left:0;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-height:calc(100vh - 44px);pointer-events:none';
   const hud = document.createElement('div');
-  hud.style.cssText = 'order:2;font:12px monospace;background:#1b202be6;color:#8fb4ff;border:1px solid #2e3646;padding:4px 8px;border-radius:8px;pointer-events:none';
+  // Debug counters: only with the F9 overlay (or while tagging), wrapped to the panel's width so it doesn't cover the game
+  hud.style.cssText = 'order:2;font:12px monospace;background:#1b202be6;color:#8fb4ff;border:1px solid #2e3646;padding:4px 8px;border-radius:8px;pointer-events:none;width:250px;max-width:calc(100vw - 8px);box-sizing:border-box';
   dock.append(hud);
   document.body.append(ov, dock);
   function draw() {
@@ -887,6 +911,7 @@
     const g = ov.getContext('2d');
     g.clearRect(0, 0, ov.width, ov.height);
     const v = state.view;
+    hud.style.display = tag.on || state.debug ? '' : 'none';
     hud.textContent = tag.on
       ? (tag.pending ? `${tag.pending}: 1=tốt 2=nguy hiểm 3=rift 4=vật cản 5=buff 6=kinh nghiệm 7=vali 8=phá được 0=xoá nhãn Esc=huỷ` : 'GẮN NHÃN (F7): click vào vật trên màn hình')
       : `bot ${state.on ? 'ON' : 'OFF'} (F8) · ván ${state.done + 1}${state.target ? `/${state.target}` : ''}${state.dwell ? ` · mở vali ${(state.dwell.t / 1000).toFixed(1)}/${CFG.caseTime / 1000}s` : ''} · địch ${v ? v.enemies.length : 0} · exp ${v ? v.xps.length : 0} (hút ${Math.round(state.magnet)}) · tốt ${v ? v.goods.length : 0} · buff ${v ? v.buffs.length : 0} · nguy hiểm ${v ? v.hazards.length : 0} · rift ${v ? v.rifts.length : 0} · chặn rank ${state.netBlocked}`;
@@ -902,11 +927,13 @@
     ring(v.enemies, '#f44', () => 10);
     ring(v.hazards.filter(d => !d.shape), '#f90', d => Math.max(d.w, d.h) / 2 + CFG.hazardMargin * v.s);
     g.strokeStyle = '#f90';
+    // Lines (shots' flight paths) as a thin line from the shot, not at their full avoidance width: that covered the screen
+    g.fillStyle = '#f90';
     v.hazards.filter(d => d.shape).forEach(d => {
-      g.lineWidth = d.shape === 'line' ? Math.max(2, d.lw) : 2;
       g.beginPath(); d.pts.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
       if (d.shape === 'poly') g.closePath();
       g.stroke();
+      if (d.shape === 'line') { g.beginPath(); g.arc(d.pts[0].x, d.pts[0].y, 3, 0, 7); g.fill(); }
     });
     g.lineWidth = 2;
     ring(v.goods, '#4f4', () => 8);
@@ -1267,13 +1294,16 @@
     };
     window.cancelAnimationFrame = id => { const p = pending.get(id); if (p) { nativeCAF.call(window, p.native); pending.delete(id); } };
     const fallback = () => { const now = performance.now(); for (const [id, p] of [...pending]) if (now - p.at > 40) run(id); };
+    const noWorker = err => {
+      log('không tạo được Worker (CSP?) — chạy nền sẽ bị Chrome giới hạn ~1 khung hình/giây', err);
+      bgWorker = { terminate: clearInterval.bind(null, setInterval(fallback, 16)) };
+    };
     try {
       bgWorker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 16)'], { type: 'text/javascript' })));
       bgWorker.onmessage = fallback;
-    } catch (err) {
-      log('không tạo được Worker (CSP?) — chạy nền sẽ bị Chrome giới hạn ~1 khung hình/giây', err);
-      bgWorker = { terminate: clearInterval.bind(null, setInterval(fallback, 16)) };
-    }
+      // pokesurvivor.com's CSP blocks blob: workers with an error event, not an exception
+      bgWorker.onerror = e => { bgWorker.terminate(); noWorker(e.message || 'blocked'); };
+    } catch (err) { noWorker(err); }
   }
 
   // ---------- main loop ----------
