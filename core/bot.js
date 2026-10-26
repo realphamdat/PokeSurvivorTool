@@ -436,24 +436,39 @@
   Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow });   // for the site profile's methods
   function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh }) {
     const build = currentBuild();
-    const buildIdx = build ? build.findIndex(m => m.toLowerCase() === name.toLowerCase()) : -1;
+    const noDmg = /no damage|sin daño|sem dano/i.test(t);
     const why = [];
     let score = 0;
-    // A card that completes a maxed skill's evolution beats everything else
-    if (evo) {
-      score += 40; why.push('mở tiến hoá skill');
+    if (build) {
+      // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
+      // > upgrade a build attack move > upgrade a build buff > passive (attack > defence > other)
+      // > upgrade a skill outside the build > new skill outside it (score < 2: rerolled when possible)
+      const buildIdx = build.findIndex(m => m.toLowerCase() === name.toLowerCase());
+      const move = moveByName.get(name.toLowerCase());
+      const owned = level > 0 && !isNew;
+      const buff = move ? move.cat === 'status' : noDmg;
+      if (evo) { score = 500; why.push('mở tiến hoá skill'); }
+      else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
+      else if (buildIdx >= 0) { score = (buff ? 200 : 300) - buildIdx; why.push(`nâng ${buff ? 'buff' : 'move tấn công'} build #${buildIdx + 1} (cấp ${level})`); }
+      else if (owned) { score = 100 + level; why.push(`nâng skill ngoài build (cấp ${level})`); }
+      else if (isNew || move) { score = buff ? 0 : 1; why.push('skill mới ngoài build'); }
+      else if (ATK_RE.test(t)) { score = 150; why.push('nội tại tấn công'); }
+      else if (DEF_RE.test(t)) { score = 146; why.push('nội tại phòng thủ'); }
+      else { score = 140; why.push('nội tại khác'); }
+      if (score >= 200) return { key, name, isNew, score, why: why.join(', '), text: t.replace(/\s+/g, ' ').slice(0, 100) };   // fit / preset bonuses below never reorder the build
+    } else {
+      // A card that completes a maxed skill's evolution beats everything else
+      if (evo) {
+        score += 40; why.push('mở tiến hoá skill');
+      }
+      if (noDmg) { score -= 6; why.push('không gây sát thương'); }
+      else if (level > 0 && !isNew) { score += 8 + 3 * level; why.push(`dồn skill đang có (cấp ${level})`); }
+      else if (isNew) {
+        const room = 1 + state.newSkills < CFG.maxSkills;
+        score += room ? 3 : -3; why.push(room ? 'skill mới (còn slot)' : 'skill mới (đủ skill rồi)');
+      } else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
+      else if (DEF_RE.test(t)) { score += 1; why.push('nội tại phòng thủ'); }
     }
-    if (buildIdx >= 0) {
-      // Build move: earlier in the build = higher; owned ones also get the stacking bonus
-      score += 20 - buildIdx * 2 + 3 * level;
-      why.push(`trong build #${buildIdx + 1}${level > 0 ? ` (cấp ${level})` : ''}`);
-    } else if (/no damage|sin daño|sem dano/i.test(t)) { score -= 6; why.push('không gây sát thương'); }
-    else if (level > 0 && !isNew) { score += 8 + 3 * level; why.push(`dồn skill đang có (cấp ${level})`); }
-    else if (isNew) {
-      const room = !build && 1 + state.newSkills < CFG.maxSkills;
-      score += room ? 3 : -3; why.push(build ? 'skill mới ngoài build' : room ? 'skill mới (còn slot)' : 'skill mới (đủ skill rồi)');
-    } else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
-    else if (DEF_RE.test(t)) { score += 1; why.push('nội tại phòng thủ'); }
     if (fitLow) { score -= 3; why.push('hợp kém với pokémon'); }
     if (fitHigh) { score += 2; why.push('hợp tốt'); }
     if (CFG.bonusRe && CFG.bonusRe.test(t)) { score += CFG.bonusScore || 0; why.push('ưu tiên preset'); }   // set by presets (farmMoney.js)
@@ -792,6 +807,7 @@
 
   // ---------- moveset popup: pick up to 4 priority moves per pokémon from its learnable list (moves.js) ----------
   const MOVES = window.PSBotMoves || { moves: [], mons: {} };
+  const moveByName = new Map(MOVES.moves.map(m => [m.name.toLowerCase(), m]));   // scoreCard: buff (cat "status") or attack
   const learnable = name => (MOVES.mons[name.toLowerCase()] || []).map(i => MOVES.moves[i]);
   const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t]) || '';
   const ms = document.createElement('div');
@@ -800,8 +816,8 @@
   const inCss = 'font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px';
   ms.innerHTML = `
     <div data-drag style="display:flex;justify-content:space-between;font-weight:bold;color:#7cf;${dragCss}" title="Kéo để di chuyển">Moveset (4 move ưu tiên)<span data-ms="close" style="cursor:pointer;color:#9ab">✕</span></div>
-    <div style="display:flex;gap:4px"><input data-ms="mon" list="psbot-mons" placeholder="Tên pokémon" style="${inCss};flex:1;min-width:0">
-      <button data-ms="cur" style="${btnCss};background:#9ab" title="Pokémon đang chơi">Hiện tại</button></div>
+    <div style="display:flex;gap:4px"><input data-ms="mon" list="psbot-mons" placeholder="Tên pokémon hoặc bấm 🎯 khi đang chơi" style="${inCss};flex:1;min-width:0">
+      <button data-ms="cur" style="${btnCss};background:#9ab" title="Bấm khi đang trong trận để lấy pokémon và danh sách move">🎯 Pokémon đang chơi</button></div>
     <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
     <div data-ms="slots" style="display:flex;flex-direction:column;gap:3px"></div>
     <div style="display:flex;gap:4px">
