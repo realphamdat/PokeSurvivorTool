@@ -9,7 +9,7 @@ Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa 
 1. `git pull` để lấy bản mới nhất (`main`, từ commit `2db121f` trở đi).
 2. **Tài khoản test:** `account_test.js` nằm trong `.gitignore` nên **không có trên GitHub**. Ở nhà phải tự tạo lại (cùng định dạng `module.exports = { normal: {…}, doofcraft: {…} }`) và tuyệt đối không commit file này.
 3. Nạp bot: `chrome://extensions` → Load unpacked thư mục repo, hoặc nạp trong console theo thứ tự ở mục 6.
-4. Nếu làm cùng Claude: bảo Claude **đọc file này trước**, rồi đi lần lượt theo mục 3.
+4. Nếu làm cùng Claude: Claude Code tự đọc `CLAUDE.md` (bản đồ code, quy ước, cách test). Bảo Claude **đọc file này** rồi đi lần lượt theo mục 3.
 
 ---
 
@@ -104,9 +104,9 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 
 ---
 
-## 5. Thử nghiệm đã dùng (không có trong repo)
+## 5. Trang giả lập để test
 
-Các "trang giả lập" (bảng lên cấp, game mini có tường/vùng skill, đọc đường đi A*) chỉ là script tạm trong máy làm việc, không commit. Ở nhà cần test thì nhờ Claude dựng lại, hoặc test thẳng trên game thật.
+`dev/harness/` có 4 trang giả lập đã dùng để test (bảng lên cấp máy tính/điện thoại cho cả 2 bản, chấm điểm Moveset, game mini có tường/vùng skill để thử A*). Cách dùng ghi trong `CLAUDE.md` (mục "Kiểm tra thay đổi").
 
 ---
 
