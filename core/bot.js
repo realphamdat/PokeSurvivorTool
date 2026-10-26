@@ -105,7 +105,7 @@
   let canvas = SITE.canvas() || document.createElement('canvas');
   const state = {
     // Idle until ▶ Chạy in the control panel (or F8); target = runs to play (0 = forever), done = runs finished
-    on: false, target: 0, done: 0, debug: true, keys: {}, dir: null, frame: [], lastFrame: [], texts: [], hudTexts: new Set(),
+    on: false, target: 0, done: 0, debug: false, keys: {}, dir: null, frame: [], lastFrame: [], texts: [], hudTexts: new Set(),
     posHist: [], walls: [], ignore: [], stuck: [], escape: null, pickAt: 0, netBlocked: 0, picks: {}, newSkills: 0,
     magnet: CFG.magnet, prevXp: [],
   };
@@ -730,14 +730,8 @@
       <input data-ctl="runs" type="number" min="0" step="1" style="width:60px;font:12px monospace;background:#223;color:#fff;border:1px solid #456;border-radius:3px;padding:2px 4px">
       <span style="color:#9ab">0 = vô hạn</span></label>
     <div style="display:flex;gap:4px">
-      <button data-ctl="play" style="${btnCss};background:#4c4">▶ Chạy</button>
-      <button data-ctl="pause" style="${btnCss};background:#fc3">⏸ Tạm dừng</button>
-      <button data-ctl="stop" style="${btnCss};background:#f66">■ Dừng</button>
-    </div>
-    <div style="display:flex;gap:4px">
+      <button data-ctl="play" style="${btnCss};background:#4c4;flex:1">▶ Chạy</button>
       <button data-ctl="moveset" style="${btnCss};background:#7cf;flex:1">⚔ Moveset</button>
-      <button data-ctl="overlay" style="${btnCss};background:#9ab" title="Lớp vẽ debug (F9)">Overlay</button>
-      <button data-ctl="catalog" style="${btnCss};background:#9ab" title="Danh mục sprite (F6)">Danh mục</button>
     </div>
     <div data-ctl="status" style="color:#9ab"></div>
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" style="order:1;border-top:1px solid #345;padding-top:4px;color:#9ab;text-decoration:none">⭐ Tác giả <b style="color:#7cf">damhieu2808</b> · github.com/damhieu2808/PokeSurvivorTool</a>
@@ -755,9 +749,6 @@
   };
   try { setMin(!!localStorage.getItem(MIN_KEY)); } catch {}
   $('min').onclick = () => setMin(!('min' in ctl.dataset));
-  // Buttons for the F-key toggles (no function keys on phones)
-  $('overlay').onclick = () => { state.debug = !state.debug; };
-  $('catalog').onclick = () => toggleCatalog();
   // Keep typing / clicks in the panel away from the game's keyboard and pointer handlers
   UI_EVENTS.forEach(t => ctl.addEventListener(t, e => e.stopPropagation()));
 
@@ -787,14 +778,13 @@
   checkUpdate();
   const updateTimer = setInterval(checkUpdate, 6 * 3600000);
 
-  $('play').onclick = () => control.play();
-  $('pause').onclick = () => (state.on ? control.pause() : control.resume());
-  $('stop').onclick = () => control.stop();
+  // One button: ▶ Chạy (counts runs from 0 again) <-> ■ Dừng
+  $('play').onclick = () => (state.on ? control.stop() : control.play());
 
   function renderCtl() {
     const finished = state.target && state.done >= state.target;
-    $('pause').textContent = state.on ? '⏸ Tạm dừng' : '▶ Tiếp tục';
-    $('pause').disabled = !state.on && (!state.started || finished);      // nothing to resume
+    $('play').textContent = state.on ? '■ Dừng' : '▶ Chạy';
+    $('play').style.background = state.on ? '#f66' : '#4c4';
     $('status').textContent = finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'
       : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`;
