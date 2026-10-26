@@ -10,6 +10,7 @@ Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa 
 2. **Tài khoản test:** `account_test.js` nằm trong `.gitignore` nên **không có trên GitHub**. Ở nhà phải tự tạo lại (cùng định dạng `module.exports = { normal: {…}, doofcraft: {…} }`) và tuyệt đối không commit file này.
 3. Nạp bot: `chrome://extensions` → Load unpacked thư mục repo, hoặc nạp trong console theo thứ tự ở mục 6.
 4. Nếu làm cùng Claude: Claude Code tự đọc `CLAUDE.md` (bản đồ code, quy ước, cách test). Bảo Claude **đọc file này** rồi đi lần lượt theo mục 3.
+5. **Mới (26/10):** ở mục 3 có hướng đọc dữ liệu game qua `window.G` trên `/dev.html`. Kiểm tra cái này **trước**, vì nếu được thì bỏ qua được phần lớn việc đoán màu và kích thước.
 
 ---
 
@@ -87,6 +88,25 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
    - **Còn có thể thử (người dùng tự thử):** Microsoft Edge + Tampermonkey, Firefox + Violentmonkey trên Android. iOS (Safari + Userscripts) chưa thử.
    - **Cũng đã thêm** (vẫn giữ, vô hại): `ready()`/`canvas()` của bản thường lấy canvas lớn nhất khi không có `#game`; panel chuyển vào phần tử toàn màn hình; panel ở `z-index` cao nhất; dòng trạng thái "PSBot: …" khi đang tải.
    - **Mã nguồn bản thường công khai:** <https://github.com/JPTER78/pokesurvivor> (repo phục vụ pokesurvivor.com, nhánh `main`, file `index.html` + `js/…`). **Dùng repo này cho checklist bên dưới** (màu vùng skill/đạn, kích thước sprite vật thể, cấu hình tiến hoá…), không cần vào được trang game.
+   **Hướng mới (thử trước mục 1): đọc dữ liệu game qua `window.G` thay vì đoán từ canvas.** Nguồn: userscript "PokéSurvivor Ultimate Trainer & HUD" (greasyfork.org/scripts/600697, tác giả Rekcheli, v2.6.3). Đây là tool cheat, chức năng không liên quan bot mình; chỉ học **cách truy cập game**.
+   - **Cách họ làm:** khi mở `pokesurvivor.com/`, script chuyển sang **`/dev.html`** (bản dev của game) rồi `history.replaceState` về `/` cho thanh địa chỉ trông bình thường. Trang dev để lộ cả game ra `window.G`. Trang thường (`/`) có lẽ không có `G`, cần kiểm tra lại.
+   - **Những gì họ đọc được (chưa kiểm chứng; đối chiếu với repo JPTER78/pokesurvivor):**
+     - **Người chơi:** `G.Game.player`, có `x`, `y`, `magnet`, máu, chỉ số. `G.Game.state` là trạng thái trận.
+     - **Quái:** `G.EnemyMgr.all()`, mỗi con có `x`, `y`, `boss`, `behavior` (`'thief'`…), `dead`.
+     - **Vùng skill:** họ bọc `G.Hazards.add`, mỗi vùng có `x`, `y`, `r`, `angle`.
+     - **Đạn:** `G.Projectiles.all()`.
+     - **Rương, đá, vật đặc biệt:** `G.World.specialsNear(x, y, tầm)`.
+     - **Va chạm, địa hình:** `G.World.collide(entity)`, `G.World.liquidEffect`.
+     - **Rift:** `G.Rift.rift`, `G.Rift.inArena`. **Camera:** `G.Camera`.
+     - **Thẻ lên cấp:** bọc `G.LevelUp.offer` để lấy mảng thẻ. `card.key` là `'stat:<id>'` cho thẻ chỉ số, còn lại là move. Chọn thẻ bằng `G.RunUI.pick(index)`; họ chờ 1,5s trước khi gọi, có lẽ để giao diện kịp hiện.
+     - **Move:** `G.Moves.BY_ID`, `G.Moves.evolve`, `G.Moves.levelUp`. **Pokédex:** `G.DEX`.
+   - **Việc cần làm tối nay:**
+     1. Mở `/dev.html` (đăng nhập tài khoản test), kiểm tra trong console có `window.G` không, và các hàm trên có đúng không. Mở cả `/` để biết trang thường có `G` không.
+     2. **Nếu có:** trong `sites/default/site.js`, khi có `G` thì lấy quái, vùng skill, đạn, vật phẩm, tường từ `G` (toạ độ world chính xác), không có thì dùng cách đọc canvas như bây giờ. Thẻ lên cấp lấy từ `G.LevelUp.offer` và chọn bằng `G.RunUI.pick` (vẫn chấm điểm bằng `scoreCard`). Bước này có thể thay luôn các mục 5–7 bên dưới.
+     3. **Quyết định cùng người dùng** có tự chuyển sang `/dev.html` như tool kia không. Rủi ro: đó là trang dev, chủ game gỡ là hỏng; khi đó phải quay về đọc canvas.
+   - **Giấy phép:** script của họ là PolyForm Noncommercial, repo mình là MIT, nên **không chép code của họ**. Tên các object của game là sự thật về game, dùng được.
+   - **Không làm** các chức năng cheat của họ: sửa save (`G.DB.save`, xu, vé, mở dex), godmode, xuyên tường.
+
 1. [ ] **Chạy thử bot như hiện tại** 1 trận. Bật F9, xem console. Ghi lại: bot có chạy không, có chọn skill không, có lỗi đỏ không.
 2. [ ] **Thu dữ liệu:** trong trận, dán script ở mục 7 vào console (gần tường/cây/rương, và một lần lúc boss ra chiêu). Giữ các file `psbot-probe-default-*.json`.
 3. [ ] **Máu trên HUD:** xem `PSBot.state.hpRatio` khi đang chơi. Nếu `undefined` thì chữ máu không vẽ trên canvas → cần cách đọc máu khác (DOM?) để bật chế độ thủ.
