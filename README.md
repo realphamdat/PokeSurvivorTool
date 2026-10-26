@@ -1,5 +1,7 @@
 # PokeSurvivor Bot
 
+**Tiếng Việt** · [English](README.en.md)
+
 Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com) và [pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/#play) (tự nhận bản game theo trang). Miễn phí · tác giả [damhieu2808](https://github.com/damhieu2808)
 
 ## Cài trên máy tính (Chrome)

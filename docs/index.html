@@ -26,9 +26,14 @@
   main { max-width: 600px; margin: 0 auto; padding: 24px 16px 48px; }
   header { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; }
   header img { width: 56px; height: 56px; border-radius: 14px; }
+  header > div { flex: 1; min-width: 0; }
   h1 { font-size: 24px; margin: 0; line-height: 1.2; }
   .by { color: var(--muted); font-size: 14px; }
   .by a { color: inherit; }
+  .lang { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; align-self: flex-start; }
+  .lang button { font: 700 13px system-ui, sans-serif; padding: 6px 10px; border: 0; background: var(--card); color: var(--muted); cursor: pointer; }
+  .lang button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  [data-lang][hidden] { display: none; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
   .card h2 { font-size: 17px; margin: 0 0 8px; }
   ol { padding-left: 22px; margin: 0; }
@@ -49,62 +54,132 @@
     <img src="https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/main/icons/icon128.png" alt="">
     <div>
       <h1>PokeSurvivor Bot</h1>
-      <div class="by">Miễn phí · tác giả <a href="https://github.com/damhieu2808/PokeSurvivorTool">damhieu2808</a></div>
+      <div class="by"><span data-lang="vi">Miễn phí · tác giả</span><span data-lang="en" hidden>Free · by</span> <a href="https://github.com/damhieu2808/PokeSurvivorTool">damhieu2808</a></div>
+    </div>
+    <div class="lang" role="group" aria-label="Ngôn ngữ / Language">
+      <button type="button" data-set-lang="vi" aria-pressed="true">VI</button>
+      <button type="button" data-set-lang="en" aria-pressed="false">EN</button>
     </div>
   </header>
 
-  <a class="btn" href="https://github.com/damhieu2808/PokeSurvivorTool/archive/refs/heads/release.zip">Tải bot cho máy tính (ZIP)</a>
+  <!-- Tiếng Việt -->
+  <div data-lang="vi">
+    <a class="btn" href="https://github.com/damhieu2808/PokeSurvivorTool/archive/refs/heads/release.zip">Tải bot cho máy tính (ZIP)</a>
 
-  <div class="card">
-    <h2>Cài đặt (Chrome trên máy tính)</h2>
-    <ol>
-      <li>Giải nén file ZIP vừa tải.</li>
-      <li>Mở <code>chrome://extensions</code>, bật <b>Developer mode</b>.</li>
-      <li>Bấm <b>Load unpacked</b>, chọn thư mục vừa giải nén.</li>
-      <li>Mở <a href="https://pokesurvivor.com">pokesurvivor.com</a> hoặc <a href="https://pokesurvivor.doofcraft.com/#play">pokesurvivor.doofcraft.com</a>, nhập số ván rồi bấm <b>▶ Chạy</b>.</li>
-    </ol>
+    <div class="card">
+      <h2>Cài đặt (Chrome trên máy tính)</h2>
+      <ol>
+        <li>Giải nén file ZIP vừa tải.</li>
+        <li>Mở <code>chrome://extensions</code>, bật <b>Developer mode</b>.</li>
+        <li>Bấm <b>Load unpacked</b>, chọn thư mục vừa giải nén.</li>
+        <li>Mở <a href="https://pokesurvivor.com">pokesurvivor.com</a> hoặc <a href="https://pokesurvivor.doofcraft.com/#play">pokesurvivor.doofcraft.com</a>, nhập số ván rồi bấm <b>▶ Chạy</b>.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Cài đặt (điện thoại Android)</h2>
+      <p class="muted">⚠️ pokesurvivor.com chặn script nên trên điện thoại bot có thể không chạy, tuỳ trình duyệt (Kiwi: không chạy). Gặp dòng "PSBot: trang này chặn script…" thì dùng PC hoặc thử trình duyệt khác. Doofcraft chạy bình thường.</p>
+      <ol>
+        <li>Cài một trình duyệt cài được tiện ích (extension), ví dụ <b>Kiwi Browser</b>, <b>Microsoft Edge</b> hoặc <b>Firefox</b> (CH Play).</li>
+        <li>Trong trình duyệt đó, cài tiện ích <b>Tampermonkey</b> (Firefox không có thì dùng <b>Violentmonkey</b>).</li>
+        <li>Bấm <b>Copy</b>, dán vào <b>thanh địa chỉ</b> của trình duyệt đó rồi mở:
+          <div class="copy"><code>https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js</code><button type="button" data-copy data-done="Đã copy" data-hold="Giữ để copy">Copy</button></div></li>
+        <li>Tampermonkey tự mở trang cài script → bấm <b>Install</b> (Cài đặt).</li>
+        <li>Vào game. Lần đầu, Tampermonkey hỏi quyền truy cập <code>raw.githubusercontent.com</code> (nơi bot tải code): chọn <b>Always allow</b> (luôn cho phép) rồi tải lại trang. Không cho phép thì bot không chạy.</li>
+        <li>Panel <b>PokeSurvivor Bot</b> hiện ở góc trên bên trái. Bot tự cập nhật, không cần cài lại.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Cài đặt (iPhone / iPad)</h2>
+      <ol>
+        <li>Cài app <b>Userscripts</b> (App Store, miễn phí).</li>
+        <li>Mở <b>Cài đặt → Safari → Tiện ích → Userscripts</b>: bật lên và cho phép trên mọi trang web.</li>
+        <li>Bấm <b>Copy</b> ở phần Android phía trên, dán vào thanh địa chỉ của <b>Safari</b> rồi mở.</li>
+        <li>Bấm biểu tượng tiện ích (hình mảnh ghép hoặc <b>aA</b>) trên thanh địa chỉ → <b>Userscripts</b> → <b>Cài đặt</b> (Install).</li>
+        <li>Vào game trong Safari: panel hiện ở góc trên bên trái. iOS chưa thử; pokesurvivor.com có thể bị chặn như trên Android. Nếu lỗi, báo qua liên hệ bên dưới.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Cần cài hộ?</h2>
+      <p class="muted">Liên hệ TikTok <a href="https://www.tiktok.com/@phuongnguyenconhat">@phuongnguyenconhat</a>.</p>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Cài đặt (điện thoại Android)</h2>
-    <p class="muted">⚠️ pokesurvivor.com chặn script nên trên điện thoại bot có thể không chạy, tuỳ trình duyệt (Kiwi: không chạy). Gặp dòng "PSBot: trang này chặn script…" thì dùng PC hoặc thử trình duyệt khác. Doofcraft chạy bình thường.</p>
-    <ol>
-      <li>Cài một trình duyệt cài được tiện ích (extension), ví dụ <b>Kiwi Browser</b>, <b>Microsoft Edge</b> hoặc <b>Firefox</b> (CH Play).</li>
-      <li>Trong trình duyệt đó, cài tiện ích <b>Tampermonkey</b> (Firefox không có thì dùng <b>Violentmonkey</b>).</li>
-      <li>Bấm <b>Copy</b>, dán vào <b>thanh địa chỉ</b> của trình duyệt đó rồi mở:
-        <div class="copy"><code id="us">https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js</code><button type="button" id="copy-us">Copy</button></div></li>
-      <li>Tampermonkey tự mở trang cài script → bấm <b>Install</b> (Cài đặt).</li>
-      <li>Vào game. Lần đầu, Tampermonkey hỏi quyền truy cập <code>raw.githubusercontent.com</code> (nơi bot tải code): chọn <b>Always allow</b> (luôn cho phép) rồi tải lại trang. Không cho phép thì bot không chạy.</li>
-      <li>Panel <b>PokeSurvivor Bot</b> hiện ở góc trên bên trái. Bot tự cập nhật, không cần cài lại.</li>
-    </ol>
-  </div>
+  <!-- English -->
+  <div data-lang="en" hidden>
+    <a class="btn" href="https://github.com/damhieu2808/PokeSurvivorTool/archive/refs/heads/release.zip">Download the bot for PC (ZIP)</a>
 
-  <div class="card">
-    <h2>Cài đặt (iPhone / iPad)</h2>
-    <ol>
-      <li>Cài app <b>Userscripts</b> (App Store, miễn phí).</li>
-      <li>Mở <b>Cài đặt → Safari → Tiện ích → Userscripts</b>: bật lên và cho phép trên mọi trang web.</li>
-      <li>Bấm <b>Copy</b> ở phần Android phía trên, dán vào thanh địa chỉ của <b>Safari</b> rồi mở.</li>
-      <li>Bấm biểu tượng tiện ích (hình mảnh ghép hoặc <b>aA</b>) trên thanh địa chỉ → <b>Userscripts</b> → <b>Cài đặt</b> (Install).</li>
-      <li>Vào game trong Safari: panel hiện ở góc trên bên trái. iOS chưa thử; pokesurvivor.com có thể bị chặn như trên Android. Nếu lỗi, báo qua liên hệ bên dưới.</li>
-    </ol>
-  </div>
+    <div class="card">
+      <h2>Install (Chrome on PC)</h2>
+      <ol>
+        <li>Unzip the downloaded file.</li>
+        <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
+        <li>Click <b>Load unpacked</b> and pick the unzipped folder.</li>
+        <li>Open <a href="https://pokesurvivor.com">pokesurvivor.com</a> or <a href="https://pokesurvivor.doofcraft.com/#play">pokesurvivor.doofcraft.com</a>, enter the number of runs and press <b>▶ Chạy</b> (Run).</li>
+      </ol>
+      <p class="muted">The bot's panel is in Vietnamese: <b>▶ Chạy</b> = Run, <b>■ Dừng</b> = Stop, <b>Số ván</b> = number of runs (0 = forever), <b>⚔ Moveset</b> = pick the 4 moves the bot prefers. Keys: <b>F8</b> toggles the bot, <b>F9</b> shows what it sees.</p>
+    </div>
 
-  <div class="card">
-    <h2>Cần cài hộ?</h2>
-    <p class="muted">Liên hệ TikTok <a href="https://www.tiktok.com/@phuongnguyenconhat">@phuongnguyenconhat</a>.</p>
+    <div class="card">
+      <h2>Install (Android phone)</h2>
+      <p class="muted">⚠️ pokesurvivor.com blocks injected scripts, so on phones the bot may not run depending on the browser (Kiwi: doesn't work). If you see "PSBot: trang này chặn script…" (this page blocks scripts), use a PC or try another browser. Doofcraft works fine.</p>
+      <ol>
+        <li>Install a browser that supports extensions, e.g. <b>Kiwi Browser</b>, <b>Microsoft Edge</b> or <b>Firefox</b> (Play Store).</li>
+        <li>In that browser, install the <b>Tampermonkey</b> extension (on Firefox, use <b>Violentmonkey</b> if Tampermonkey isn't available).</li>
+        <li>Tap <b>Copy</b>, paste into that browser's <b>address bar</b> and open it:
+          <div class="copy"><code>https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js</code><button type="button" data-copy data-done="Copied" data-hold="Hold to copy">Copy</button></div></li>
+        <li>Tampermonkey opens its install page → tap <b>Install</b>.</li>
+        <li>Open the game. The first time, Tampermonkey asks for access to <code>raw.githubusercontent.com</code> (where the bot downloads its code): choose <b>Always allow</b>, then reload the page. Without it the bot can't run.</li>
+        <li>The <b>PokeSurvivor Bot</b> panel appears in the top-left corner. The bot updates itself, no reinstall needed.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Install (iPhone / iPad)</h2>
+      <ol>
+        <li>Install the <b>Userscripts</b> app (App Store, free).</li>
+        <li>Open <b>Settings → Safari → Extensions → Userscripts</b>: turn it on and allow it on all websites.</li>
+        <li>Tap <b>Copy</b> in the Android section above, paste into <b>Safari</b>'s address bar and open it.</li>
+        <li>Tap the extensions icon (puzzle piece or <b>aA</b>) in the address bar → <b>Userscripts</b> → <b>Install</b>.</li>
+        <li>Open the game in Safari: the panel appears in the top-left corner. iOS is untested; pokesurvivor.com may be blocked as on Android. If something goes wrong, use the contact below.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Need help installing?</h2>
+      <p class="muted">Contact TikTok <a href="https://www.tiktok.com/@phuongnguyenconhat">@phuongnguyenconhat</a>.</p>
+    </div>
   </div>
 
   <footer>PokeSurvivor Bot © damhieu2808 · <a href="https://github.com/damhieu2808/PokeSurvivorTool">GitHub</a> · MIT License</footer>
 </main>
 <script>
+  // Vietnamese by default; ?lang=en or the last choice (kept in localStorage) switches
+  const TITLES = { vi: 'Cài PokeSurvivor Bot', en: 'Install PokeSurvivor Bot' };
+  const setLang = lang => {
+    document.documentElement.lang = lang;
+    document.title = TITLES[lang];
+    document.querySelectorAll('[data-lang]').forEach(el => { el.hidden = el.dataset.lang !== lang; });
+    document.querySelectorAll('[data-set-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.setLang === lang));
+  };
+  let saved = null;
+  try { saved = localStorage.getItem('psbot-lang'); } catch {}
+  const asked = new URLSearchParams(location.search).get('lang');
+  setLang(TITLES[asked] ? asked : TITLES[saved] ? saved : 'vi');
+  document.querySelectorAll('[data-set-lang]').forEach(b => b.addEventListener('click', () => {
+    setLang(b.dataset.setLang);
+    try { localStorage.setItem('psbot-lang', b.dataset.setLang); } catch {}
+  }));
+
   // Copy the userscript link; falls back to selecting it when the clipboard API is unavailable (http, old browsers)
-  document.getElementById('copy-us').addEventListener('click', async e => {
-    const text = document.getElementById('us').textContent;
-    try { await navigator.clipboard.writeText(text); e.target.textContent = 'Đã copy'; }
-    catch { getSelection().selectAllChildren(document.getElementById('us')); e.target.textContent = 'Giữ để copy'; }
-    setTimeout(() => { e.target.textContent = 'Copy'; }, 2000);
-  });
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    const code = btn.previousElementSibling;
+    try { await navigator.clipboard.writeText(code.textContent); btn.textContent = btn.dataset.done; }
+    catch { getSelection().selectAllChildren(code); btn.textContent = btn.dataset.hold; }
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  }));
 </script>
 </body>
 </html>
