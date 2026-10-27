@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PokeSurvivor Bot
 // @namespace    https://github.com/damhieu2808/PokeSurvivorTool
-// @version      1.5.9
+// @version      1.5.10
 // @description  Bot tự chơi pokesurvivor.com + pokesurvivor.doofcraft.com — luôn tải bản phát hành mới nhất từ repo gốc
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
@@ -19,7 +19,7 @@
 (() => {
   const BASE = 'https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/';
   // Shown on the status line so a stale install (old script still on the phone) is obvious at a glance
-  const V = '1.5.9';
+  const V = '1.5.10';
   // Same files, same order as manifest.json / loader.js
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
   const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];

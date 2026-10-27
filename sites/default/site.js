@@ -12,7 +12,20 @@
 })();
 // The game's Halloween (js/systems/halloween.js): 30-10 to 1-11, Spain time. No separate mode: every run started then
 // is a Halloween run (night map, ghosts, candy, the big Gengar at minute 30)
-const MADRID_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', month: 'numeric', day: 'numeric' });
+// Spain's date by hand instead of Intl: under a Firefox userscript sandbox (phones) the options object would be a
+// sandbox object handed to the page's Intl, which Firefox refuses ("Permission denied to access property
+// 'localeMatcher'"). Europe/Madrid is UTC+1, or UTC+2 while EU summer time runs: last Sunday of March 01:00 UTC
+// until the last Sunday of October 01:00 UTC.
+const madridDate = now => {
+  const y = new Date(now).getUTCFullYear();
+  const lastSunday = (month, hour) => {
+    const last = new Date(Date.UTC(y, month + 1, 0, hour));
+    return Date.UTC(y, month, last.getUTCDate() - last.getUTCDay(), hour);
+  };
+  const summer = now >= lastSunday(2, 1) && now < lastSunday(9, 1);
+  const d = new Date(now + (summer ? 2 : 1) * 3600e3);
+  return { month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+};
 
 window.PSBotSite = h => {
   // Card = the block around one hotkey digit (div.key), widened while it holds no other digit
@@ -154,8 +167,8 @@ window.PSBotSite = h => {
       available() {
         const now = Date.now();
         if (!(now - (this.at || 0) < 60000)) {
-          const p = Object.fromEntries(MADRID_DAY.formatToParts(now).map(x => [x.type, x.value]));
-          this.on = (+p.month === 10 && +p.day >= 30) || (+p.month === 11 && +p.day === 1);
+          const p = madridDate(now);
+          this.on = (p.month === 10 && p.day >= 30) || (p.month === 11 && p.day === 1);
           this.at = now;
         }
         return this.on;
