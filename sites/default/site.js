@@ -267,12 +267,21 @@ window.PSBotSite = h => {
     // Solid props collide as a circle at their base (js/world/world.js: tree r 13, rock 12, pumpkin 11), drawn with the
     // sprite's bottom 2 below it; the core's guess from the sprite shape put it 13-15 too high
     propFoot: { up: 2, r: 13 },
+    // The glow under a boss (js/entities/enemy.js draw: ellipse r*1.6 wide at its feet), #ff4a4a once enraged. Same
+    // colour as big XP gems (tagged xp in data.js), told apart by size in the core
+    bossAura: src => /^fill:#(ffd95e|ff4a4a)$/i.test(src),
+    // A zone telegraph is drawn as an ellipse 0.75 as tall as wide, but hits as a circle of the width
+    // (js/systems/hazards.js inside): stretched to that circle, else dodging up / down stopped ~30 short
+    hazardShape: d => d.src === 'dash:4,4/2' && d.pts && d.h > 0
+      ? { ...d, h: d.w, pts: d.pts.map(p => ({ x: p.x, y: d.y + (p.y - d.y) * d.w / d.h })) } : null,
     scene,
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding, when scene() is null
     // Move slots of the player, a bonded group being one (/dev.html only; else the core counts picks)
     moveSlots: () => { const P = window.G && G.Game && G.Game.player; return P && P.slots ? { used: P.slots.length, max: P.maxMoves } : null; },
-    // The big chest is solid (player + chest radius ~25 apart at best) and opens within ~48 of its centre
-    cfg: { caseReach: 40 },
+    // The big chest is solid (player + chest radius ~25 apart at best) and opens within ~48 of its centre.
+    // Telegraphs are known by their dash (tags above): red-ish shapes are hit sparks and weather particles here, often
+    // 100+ at once (a rift arena's forced weather), and as hazards they left no safe step
+    cfg: { caseReach: 40, autoTelegraph: false },
     levelUp() {
       const lvl = document.getElementById('lvl-num');
       if (!h.visible(lvl)) return null;

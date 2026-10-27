@@ -33,13 +33,17 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.5';
+  const VERSION = '1.6.6';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
     // Each frame one target is chosen: rift > good item (within goodRange) > nearest enemy.
     contact: 80,          // world units (from enemy edge): only this close do enemies push the player away
     engage: 120,          // world units: distance kept from the targeted enemy's edge while fighting it
+    // Bosses (profile's bossAura): pushed away within bossRange of their feet, fought from bossEngage. pokesurvivor.com:
+    // a boss stomps when the player is within 125 of it, a zone ~125 wide with 0.7-0.85 s warning (no time to run out)
+    bossRange: 170,
+    bossEngage: 210,
     lowHp: 0.5,           // HP share under which the bot only survives: no xp / breakables / hunting, enemies avoided harder
     hurtDrop: 0.25,       // ... and so does losing this share of HP within hurtWindow ms (a hard hitter: by 50 % it's too late),
     hurtWindow: 2000,     //     for hurtHold ms after
@@ -456,8 +460,17 @@
     const obj = !sc && SITE.objective ? SITE.objective(world, me, cam) : null;
     if (obj && obj.hide.size) { world = world.filter(d => !obj.hide.has(d)); enemies = enemies.filter(d => !obj.hide.has(d)); }
     const byTag = t => sc ? sc[t] || [] : world.filter(d => tagOf(d.src) === t);
-    const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp'), cases = byTag('case');
-    const hazards = sc ? sc.hazard.slice() : world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
+    // Bosses: the profile's bossAura is the glow drawn at a boss's feet (its position in the game). Such an enemy gets
+    // .boss = that glow, and is kept CFG.bossRange off; the glow is no pickup even if its colour is tagged one
+    const auras = !sc && SITE.bossAura ? world.filter(d => d.shape && SITE.bossAura(d.src) && Math.abs(d.w) / s >= 40) : [];
+    for (const a of auras) {
+      const e = enemies.reduce((b, e) => (!b || Math.hypot(e.x - a.x, e.y - a.y) < Math.hypot(b.x - a.x, b.y - a.y) ? e : b), null);
+      if (e && Math.hypot(e.x - a.x, e.y - a.y) < Math.max(Math.abs(e.h), Math.abs(a.w))) e.boss = a;
+    }
+    const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp').filter(d => !auras.includes(d)), cases = byTag('case');
+    // hazardShape: the profile's fix for a hazard drawn other than it hits (pokesurvivor.com zones)
+    const hazards = sc ? sc.hazard.slice() : world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)))
+      .map(d => (SITE.hazardShape && SITE.hazardShape(d)) || d);
     // Enemy shots: matched to last frame's (nearest within 80 world units) for their speed, then added as a hazard
     // line over where they fly in the next CFG.shotLookahead ms
     {
@@ -624,14 +637,16 @@
     // close by (a small detour) comes before xp, farther ones after it
     if (rock && !low && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
     // Kept at engage from its edge: big sprites (late rounds, bosses) were fought from inside their contact zone
-    else if (!target && foe && !low && hp >= CFG.huntHp && enemies.filter(e => edge(e) < 200).length < CFG.huntCrowd) { target = foe; weight = CFG.huntWeight; stop = CFG.engage + Math.max(Math.abs(foe.w), Math.abs(foe.h)) / 2 / s; }
+    else if (!target && foe && !low && hp >= CFG.huntHp && enemies.filter(e => edge(e) < 200).length < CFG.huntCrowd) { target = foe; weight = CFG.huntWeight; stop = foe.boss ? CFG.bossEngage : CFG.engage + Math.max(Math.abs(foe.w), Math.abs(foe.h)) / 2 / s; }
     state.view.target = target; state.view.quest = quest;
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
     state.prevTarget = target && { enemy: target === foe, rift: target === rift, quest: target === quest, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
     state.view.walls = walls;
     // Pinned in a corner (CFG.pinTime): run away from the walls within reach, hazards ignored (see cost)
+    // Not while already where it wants to be: shuffling at fighting range next to a wall is no corner
     state.pin = (state.pin || []).filter(p => now - p.t < CFG.pinTime);
-    if (paused || SITE.choiceOpen() || !state.dir || hold || (state.escape && state.escape.until > now)) state.pin.length = 0;
+    const atGoal = target && Math.abs(dist(target, me) - stop) < CFG.pinMove * 2;
+    if (paused || SITE.choiceOpen() || !state.dir || hold || atGoal || (state.escape && state.escape.until > now)) state.pin.length = 0;
     else state.pin.push({ t: now, ...meW });
     if (state.pin.length > 1 && now - state.pin[0].t > CFG.pinTime * 0.9 && state.pin.every(p => Math.hypot(p.x - meW.x, p.y - meW.y) < CFG.pinMove)) {
       const W = (x, y, r) => ({ x, y, r });
@@ -754,8 +769,9 @@
       const half = at(0.5);
       for (const e of stay ? [] : enemies) {
         // Closest along the step (half and full), so the step doesn't pass through an enemy; bigger sprites (bosses)
-        // count as closer
-        const d = Math.min(dist(half, e), dist(p, e)) - Math.max(e.w, e.h) / 2 / s;
+        // count as closer. A boss pushes from CFG.bossRange off its feet
+        const d = e.boss ? Math.min(dist(half, e.boss), dist(p, e.boss)) - CFG.bossRange + CFG.contact
+          : Math.min(dist(half, e), dist(p, e)) - Math.max(e.w, e.h) / 2 / s;
         if (d < CFG.contact) c += (low ? 20 : 10) * ((CFG.contact - Math.max(d, 0)) / CFG.contact) ** 2;
       }
       // Hazards are checked along the way (half and full step) so the path doesn't cross a telegraph. Not while getting

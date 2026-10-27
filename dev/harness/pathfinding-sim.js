@@ -83,6 +83,8 @@
       if (/^canvas:32x32/.test(d.src)) PSBot.CFG.tags[d.src] = 'wall';
       if (/^canvas:12x12/.test(d.src)) PSBot.CFG.tags[d.src] = 'good';
     }
+    // The red hazard box: pokesurvivor.com's profile turns off "red = telegraph" (autoTelegraph), so tag it
+    PSBot.CFG.tags['fill:#ff3030'] = 'hazard';
     PSBot.state.walls = []; PSBot.state.ignore = []; PSBot.state.path = null; PSBot.state.escape = null; PSBot.state.stuck = []; PSBot.state.giveUps = null;
     PSBot.play(0);
     const end = performance.now() + ms;
