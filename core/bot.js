@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.15';
+  const VERSION = '1.5.16';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -907,11 +907,14 @@
     if (SITE.choiceOpen()) return;
     const leaves = PSBotList(document.querySelectorAll('body *')).filter(e => !e.children.length && visible(e));
     if (leaves.some(e => /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''))) return;
-    // Only buttons actually on top at their centre (not faded out / covered by the game canvas);
-    // the bot's own top-left dock is looked through, so it can't hide the game's Play button
+    // Only buttons actually on top at their centre (not faded out / covered by the game canvas). The bot's own UI (the
+    // dock, panels dragged out of it) is looked through, so it can't hide the game's Play button. A button scrolled /
+    // zoomed off screen can't be hit-tested but is still clicked (click() needs no spot on screen)
+    const ours = e => dock.contains(e) || !!e.closest('[data-psbot-ui]');
     const onTop = b => {
-      const r = b.getBoundingClientRect();
-      const t = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2).find(e => !dock.contains(e));
+      const r = b.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return getComputedStyle(b).pointerEvents !== 'none';
+      const t = document.elementsFromPoint(x, y).find(e => !ours(e));
       return !!t && (t === b || b.contains(t));
     };
     const buttons = PSBotList(document.querySelectorAll('button, [role=button]')).filter(b => visible(b) && !dock.contains(b) && onTop(b));
