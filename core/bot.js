@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.17';
+  const VERSION = '1.6.0';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1386,7 +1386,7 @@
     const color = c.src.match(/^(?:fill|stroke):(.+)$/);
     if (color) {                                                      // path shapes: show their colour as a swatch
       const t = document.createElement('canvas'); t.width = t.height = 24;
-      const tc = t.getContext('2d'); tc.fillStyle = color[1] === 'gradient' ? '#888' : color[1];
+      const tc = t.getContext('2d'); tc.fillStyle = color[1].replace(/^gradient:?/, '') || '#888';   // a gradient: its first stop
       pathOrig.fillRect.call(tc, 0, 0, 24, 24); url = t.toDataURL();
     } else if (c.img) {
       try {
