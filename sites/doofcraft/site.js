@@ -136,6 +136,10 @@ window.PSBotSite = h => {
   // the screen edge points at the nearest one (#ffb347; lost pokémon / goal #7dffb0), labelled "<title> · N m" (1 m =
   // 32 world units). hold = how close to stand, in world units (the game's range around the prop, less some margin)
   const TITLES = { doors: 'Trick-or-treat', lanterns: 'Light the lanterns', cage: 'Free the caged Pokémon', escort: 'Escort the lost Pokémon' };
+  // A lost pokémon stands still until touched (within ~45 of it), then follows, which the game says ("<name> is following
+  // you! Take it to the green marker", 3 s). It only steps after us, so standing next to it shows no movement: the
+  // message decides, moving off where it was first seen (world units) is the fallback
+  let lostFrom = null, lostFollows = false;
   function objective(world, me, cam) {
     const s = cam.s, hide = new Set(), hud = h.state.hudTexts;
     const active = k => hud.has(TITLES[k]);
@@ -158,9 +162,17 @@ window.PSBotSite = h => {
     const caged = cages.filter(c => pokes.some(p => inCage(p, c)));
     for (const c of caged) pokes.filter(p => inCage(p, c)).forEach(p => hide.add(p));
     let target = null;
-    // Escort first (it has a time limit): the lost pokémon while it waits (one that follows stays next to us), then the goal
-    if (active('escort')) {
-      if (lost && gap(lost, me) > 70) target = at(lost, 0, 'escort', 0);
+    // Escort first (it has a time limit): walked into the lost pokémon until it follows, then to the goal. Telling them
+    // apart by distance failed: one still waiting ~70 away was taken for following, so the bot circled it
+    if (!active('escort')) { lostFrom = null; lostFollows = false; }
+    else {
+      if ([...hud].some(t => /is following you/i.test(t))) lostFollows = true;
+      if (lost) {
+        const w = { x: (lost.x - cam.e) / s, y: (lost.y - cam.f) / s };
+        if (!lostFrom) lostFrom = w;
+        else if (Math.hypot(w.x - lostFrom.x, w.y - lostFrom.y) > 24) lostFollows = true;
+      }
+      if (lost && !lostFollows) target = at(lost, 0, 'escort', 0);
       else if (goal) target = at(goal, 0, 'escort', 30);
     }
     if (!target && active('doors')) {
@@ -209,13 +221,15 @@ window.PSBotSite = h => {
     enemyRe: /\/sprites\/[\w-]+\/(?:s\/)?(?!Faint)\w+\.png/,
     // Colours from the game's source: xp / big xp diamonds, heal berry and magnet orbs, item / chest halo; every enemy
     // and boss attack zone / beam is filled with #ff2445, and each enemy shot has a rgba(255,60,80,.35) ring under it
+    // The Halloween fence's rail section is 16x14 like a chest, so it is tagged by its hash (one palette for every biome,
+    // "h/fence/0"): untagged, the bot walked into the rails between the posts and got stuck
     tags: { 'fill:#7fe0ff': 'xp', 'fill:#ffd95e': 'xp', 'fill:#5fe08a': 'good', 'fill:#ff9ed8': 'good', 'fill:#ffe14d': 'good',
-      'fill:#ff2445': 'hazard', 'fill:rgba(255,60,80,0.35)': 'shot' },
+      'fill:#ff2445': 'hazard', 'fill:rgba(255,60,80,0.35)': 'shot', 'canvas:16x14#12u4dbo': 'wall' },
     sizeTags: false,
     // Prop sprites by size, from the game's sprite generators: rock (solid, breaks into xp / coins / heals), trap
     // (hurts 10% max HP), the biome's tree (forest 30x40, crystal 26x40, dead 28x40: solid, never breaks), Halloween
     // lantern / cage / fence post (solid) and pumpkin (breaks), healing spring (heals while stood on, every biome). Not
-    // by size: the 16x14 fence (same size as a chest)
+    // by size: the 16x14 fence rail (same size as a chest), tagged by hash above
     bySize: { 'canvas:34x16': 'heal', 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
       'canvas:8x23': 'wall', 'canvas:24x28': 'wall', 'canvas:6x20': 'wall', 'canvas:14x11': 'break' },
     evolveNeeds,              // move name -> passive card it needs to evolve
