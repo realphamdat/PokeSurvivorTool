@@ -1026,10 +1026,12 @@
     [data-psbot-ui] .psb-row { display:flex; align-items:center; gap:6px }
     [data-psbot-ui] .psb-btn { flex:1; font:700 13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#e6eaf0; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:7px 10px; cursor:pointer; white-space:nowrap }
     [data-psbot-ui] .psb-btn:hover { filter:brightness(1.2) }
+    [data-psbot-ui] .psb-btn:disabled { opacity:.4; cursor:not-allowed; filter:none }
     [data-psbot-ui] .psb-btn.go { color:#7ee2a0; background:#1f4a33; border-color:#3fbf6e }
     [data-psbot-ui] .psb-btn.stop { color:#ff9a9a; background:#3a2228; border-color:#c94a4a }
     [data-psbot-ui] .psb-btn.acc { color:#f5c542; border-color:#c99a1e }
     [data-psbot-ui] .psb-btn.info { color:#6cc8ff; border-color:#2f8fd0 }
+    [data-psbot-ui] .psb-btn.evt { color:#ffa94d; background:#3a2a1c; border-color:#e8742a }
     [data-psbot-ui] .psb-icon { flex:0 0 auto; background:none; border:0; padding:0 4px; font:700 16px system-ui,sans-serif; color:#8fb4ff; cursor:pointer }
     [data-psbot-ui] .psb-in { box-sizing:border-box; font:13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#e6eaf0; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:6px 9px; outline:none }
     [data-psbot-ui] .psb-in:focus { border-color:#f5c542 }
@@ -1054,7 +1056,7 @@
       <button data-ctl="min" class="psb-icon" title="Thu gọn / mở rộng">–</button></div>
     <style>${PSB_CSS}</style>
     <div class="psb-tabs" role="tablist">
-      <button data-tab="ctl" class="psb-tab" role="tab" aria-selected="true">Điều khiển</button>
+      <button data-tab="ctl" class="psb-tab" role="tab" aria-selected="true">🎮 Điều khiển</button>
       <button data-tab="donate" class="psb-tab" role="tab" aria-selected="false">💛 Donate</button>
     </div>
     <div data-pane="ctl" class="psb-body">
@@ -1065,6 +1067,7 @@
         <button data-ctl="play" class="psb-btn go">▶ Chạy</button>
         <button data-ctl="moveset" class="psb-btn acc">⚔ Moveset</button>
       </div>
+      <button data-ctl="event" class="psb-btn evt" style="display:none" title="${SITE.event ? SITE.event.title : ''}"></button>
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
@@ -1143,11 +1146,28 @@
 
   // One button: ▶ Chạy (counts runs from 0 again) <-> ■ Dừng
   $('play').onclick = () => (state.on ? control.stop() : control.play());
+  // Event button (SITE.event, doofcraft's Halloween waves): the same runs in the event's mode; the site puts the
+  // player's own mode back once the bot is off (stopped, or done with its runs)
+  $('event').onclick = () => {
+    if (state.on) return control.stop();
+    SITE.event.start(); state.eventMode = true; control.play();
+  };
 
   function renderCtl() {
     const finished = state.target && state.done >= state.target;
-    $('play').textContent = state.on ? '■ Dừng' : '▶ Chạy';
-    $('play').className = `psb-btn ${state.on ? 'stop' : 'go'}`;
+    if (state.eventMode && !state.on) { SITE.event.stop(); state.eventMode = false; }
+    const ev = $('event'), evOn = !!SITE.event && SITE.event.available();
+    ev.style.display = evOn ? '' : 'none';
+    if (evOn) {
+      ev.textContent = state.on && state.eventMode ? '■ Dừng event' : SITE.event.label;
+      ev.className = `psb-btn ${state.on && state.eventMode ? 'stop' : 'evt'}`;
+      ev.disabled = state.on && !state.eventMode;
+    }
+    // Running the event: its own button stops it, ▶ Chạy stays as is but disabled (and the other way round)
+    const evRun = state.on && state.eventMode;
+    $('play').textContent = state.on && !evRun ? '■ Dừng' : '▶ Chạy';
+    $('play').className = `psb-btn ${state.on && !evRun ? 'stop' : 'go'}`;
+    $('play').disabled = evRun;
     $('dot').className = `psb-dot${state.on ? ' on' : ''}`;
     $('status').textContent = finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'

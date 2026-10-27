@@ -33,6 +33,7 @@ Cập nhật: 2026-10-27 (bot v1.5.4 đã phát hành). Doofcraft test ở nơi 
 | `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ❌ (core tự dùng `evo` trong `moves.js`, lấy từ wiki) | ✅ (đọc cấu hình game) |
 | `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `caseReach: 40` | `caseReach: 45`, … |
 | `scene(cam)` | Cả cảnh (quái, nguy hiểm, vật phẩm, tường, địa hình) theo nhãn, toạ độ màn hình; `null` = đọc canvas | ✅ (từ `window.G`, chỉ trên `/dev.html`) | ❌ |
+| `event` | Nút chạy event trong panel: `{ label, title, available(), start(), stop() }` (mục 4b) | ❌ | ✅ (Halloween Waves) |
 
 ---
 
@@ -149,6 +150,51 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 - Log "chọn đồ" / "bond" lặp 2–3 lần mỗi bảng (bảng còn hiện sau lần bấm đầu, `pickAt` chỉ chờ 800ms). Chọn vẫn đúng, chưa sửa.
 - **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trong vòng 220 đơn vị thì chạy về hướng thưa nhất. 1 trận chết ở 5:35, sớm hơn bản không có nó. Nếu thử lại: chỉ bật khi máu thấp, hoặc ưu tiên hạ quái nhanh thay vì chạy.
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng.
+
+### 4b. Event Halloween (doofcraft, chế độ Waves), bắt đầu 27/10, còn khoảng 6 ngày
+
+**Đã làm:**
+- **Nút "🎃 Event Halloween"** dưới hàng ▶ Chạy / ⚔ Moveset.
+  - Profile `sites/doofcraft/site.js` khai báo `event` (`label`, `title`, `available`, `start`, `stop`). Core (`renderCtl`) chỉ vẽ nút khi profile có `event`, nên bản thường không có nút.
+  - Nút chỉ hiện sau khi bot đã thấy thẻ event trên menu (`[data-testid="event-card-play"]`). Nạp bot giữa trận thì phải về menu một lần nút mới hiện.
+  - Bấm nút: lưu `localStorage['ps.runMode']` cũ, đặt thành `'waves'`, bấm thẻ event nếu đang ở menu, rồi chạy như ▶ Chạy. Chơi lại (Solo → Play) tự giữ chế độ waves.
+  - Bot tắt (bấm dừng, hoặc chạy đủ số ván) thì trả `ps.runMode` về như cũ; đã kiểm tra trên game thật.
+  - Đang chạy event thì ▶ Chạy bị khoá, và ngược lại.
+- **Rương giữa vòng** (tiêu đề "Chest"): ưu tiên Upgrade move trong build > Rare Candy > Upgrade khác > Tickets (`otherChoice`). **Chưa kiểm chứng:** trận thứ 2 không gặp rương. Trận 1 gặp 2 lần, khi đó bot vẫn chọn ô đầu (Rare Candy).
+
+**Luật (từ mã nguồn game và cấu hình server trả về ở `POST /api/runs/start`):**
+- **Vòng:** các vòng nối tiếp không có điểm dừng, mỗi vòng 50 giây, tối đa 45 quái cùng lúc.
+  - Số quái mỗi vòng: 20 (vòng 1) → 36 (vòng 5) → 55 (vòng 10) → 100 (vòng 25).
+  - Có rift legendary mỗi 5 vòng, boss mỗi 25 vòng (Mega Darkrai, hạ được 60 candy corn).
+  - Qua vòng thì thẻ lên cấp hiếm hơn. Từ vòng 10 có Z-move, từ vòng 20 có Mega.
+- **Vòng bầy ma** (cứ 4 vòng): số quái ×2,2, tốc độ ×1,45, máu ×0,3, sát thương ×0,6.
+- **Mục tiêu phụ** (1–2 cái mỗi vòng, từ vòng 4 có cái thứ 2). Phần thưởng: rương 45%, candy corn 35%, vé 20%.
+  - **Cage:** 1–2 lồng, đứng trong 56 đơn vị suốt 6 giây; có phục kích 4 quái.
+  - **Lanterns:** 4 đèn, đứng trong 48 đơn vị mỗi đèn 1,5 giây.
+  - **Doors:** 3 cửa, mỗi cửa 1 giây trong 44 đơn vị. 60% là treat (buff, candy corn hoặc rương), 40% là trick (phục kích hoặc debuff).
+  - **Escort:** dẫn pokémon lạc về nhà nguyện trong 120 giây.
+  - Tiến độ tụt dần khi rời khỏi vật.
+- **Candy corn:** quái rơi với tỉ lệ 2%, boss rơi 5. Dùng để đổi pokémon và nền thẻ trong Halloween Shop.
+
+**Cách game vẽ (để làm mục tiêu phụ sau này)**, theo `drawHalloweenProp` trong `route-tip-*.js`:
+- Cửa đang mở: quầng radial gradient `rgba(255,170,60,0.9)` bán kính 46, kèm chữ "?" màu `#ffb347` phía trên.
+- Đèn đang tắt (cần thắp): quầng `rgba(160,190,255,0.7)` bán kính 22. Đèn đã sáng: `rgba(255,200,90,0.85)` bán kính 34.
+- Lồng đang nhốt: vẽ sprite pokémon (`/sprites/<dex>/Idle.png`) bên trong rồi chồng song sắt lên. Bot đang coi con này là quái, phải loại ra.
+- Vòng tiến độ khi đứng cạnh: `arc` bán kính 26; màu `#ffd25a` cho đèn, `#7dffb0` cho lồng.
+- Bảng nhiệm vụ góc phải ("Free the caged Pokémon 0/2", "Light the lanterns 0/4", "Trick-or-treat 0/3") và mũi tên chỉ hướng kèm khoảng cách đều vẽ trên canvas, bot đọc được trong `hudTexts`.
+
+**Network / memory (trận waves):**
+- Cùng API với trận thường: `POST /api/runs/start` có thêm `{"waves": true}`, rồi khoảng 30 giây một lần `POST /api/runs/checkpoint`. Không thấy request bảng xếp hạng event trong trận.
+- Heap JS khoảng 44 MB lúc 8 phút, console không có lỗi (chỉ cảnh báo `getImageData`).
+
+**Kết quả (Mewtwo, tài khoản test):**
+- Trận 1 chết ở vòng 8 (8:59): bị 7–15 quái vây, máu tụt dần trong 18 giây.
+- Trận 2 chết ở vòng 4 (2:14), vòng bầy ma: 70 con, máu từ 100% về 0 trong 7 giây.
+
+**Việc tiếp theo:**
+1. Kiểm chứng chấm điểm rương.
+2. Mục tiêu phụ: nhận ra cửa / đèn / lồng đang hoạt động (theo màu ở trên), đứng cạnh đủ thời gian. Có thể dùng cơ chế `case` + `caseTime` sẵn có.
+3. Vòng bầy ma: né tốt hơn (quái nhanh, đông).
 
 ---
 

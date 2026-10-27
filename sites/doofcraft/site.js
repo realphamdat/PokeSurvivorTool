@@ -86,9 +86,9 @@ window.PSBotSite = h => {
     if (!terrainCache.has(img)) terrainCache.set(img, classify(img));
     return terrainCache.get(img);
   }
-  function readDcCard(c, i) {
+  function readDcCard(c, i, name = dcName(c)) {
     const { state, CFG } = h;
-    const t = c.innerText, name = dcName(c);
+    const t = c.innerText;
     const lv = t.match(/\bLv\.?\s*(\d+)\s*>/i);                          // upgrade chip: current level > next
     return { ...h.scoreCard({
       key: String(i + 1), name, t,
@@ -97,8 +97,32 @@ window.PSBotSite = h => {
     }), el: tapTarget(c) };
   }
 
+  // ---------- Halloween event: "Waves" run mode ----------
+  // The game keeps the run mode in localStorage['ps.runMode'] (normal / hyper / waves) and offers waves only while the
+  // event lasts, through the menu's event card (Play Waves). Solo -> Play then starts whatever mode is stored, so
+  // replays stay in waves. The mode the player had is put back when the bot stops
+  const MODE_KEY = 'ps.runMode';
+  let eventSeen = false, prevMode;
+  const event = {
+    label: '🎃 Event Halloween',
+    title: 'Chơi chế độ Waves của event Halloween (các vòng liên tiếp, rương giữa vòng, boss mỗi 25 vòng)',
+    available() {
+      if (document.querySelector('[data-testid="event-card-play"]')) eventSeen = true;
+      return eventSeen;
+    },
+    start() {
+      try { prevMode = localStorage.getItem(MODE_KEY); localStorage.setItem(MODE_KEY, 'waves'); } catch {}
+      const card = document.querySelector('[data-testid="event-card-play"]');
+      if (card && h.visible(card)) card.click();
+    },
+    stop() {
+      try { if (prevMode == null) localStorage.removeItem(MODE_KEY); else localStorage.setItem(MODE_KEY, prevMode); } catch {}
+    },
+  };
+
   return {
     id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
+    event,
     ready: () => !!document.getElementById('app'),
     canvas: () => document.querySelector('canvas.ps-canvas'),
     // The whole frame is scaled by devicePixelRatio; the world also gets the camera translation, the HUD doesn't
@@ -125,15 +149,25 @@ window.PSBotSite = h => {
       const box = dcBox();
       if (!box || !/^level|cleared/i.test(dcTitle(box))) return null;
       const rr = box.querySelector('[data-testid="reroll"]');
-      return { cards: [...box.querySelectorAll('button.ps-card')].map(readDcCard), rerolls: rr ? +((rr.innerText.match(/\((\d+)\)/) || [])[1] || 0) : 0 };
+      return { cards: [...box.querySelectorAll('button.ps-card')].map((c, i) => readDcCard(c, i)), rerolls: rr ? +((rr.innerText.match(/\((\d+)\)/) || [])[1] || 0) : 0 };
     },
     choiceOpen: () => !!document.querySelector('.ps-choice:not(.hidden) .ps-box'),
-    // Choice Band slot / waves chest: no scoring, take the first option so the run doesn't wait forever
+    // Waves chest (between rounds, "Pick one: this run, or currency"): upgrading a build move first, then Rare Candy (a
+    // level = a level-up pick), any other upgrade, gacha tickets last. Other choices (Choice Band slot…): the first option
     otherChoice() {
       const box = dcBox();
       if (!box || /^level|cleared|an item|bond/i.test(dcTitle(box))) return;
       const cards = [...box.querySelectorAll('button.ps-card')];
       if (!cards.length) return;
+      if (/^chest/i.test(dcTitle(box))) {
+        return h.pickRow('rương', cards.map((c, i) => {
+          const name = dcName(c), up = name.match(/^upgrade:\s*(.+)/i), o = { key: String(i + 1), name, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80), el: tapTarget(c) };
+          if (/^rare candy/i.test(name)) return { ...o, score: 2, why: 'lên 1 cấp' };
+          if (!up) return { ...o, score: 0, why: 'vé gacha' };
+          const s = readDcCard(c, i, up[1].trim());
+          return { ...o, score: s.score >= 200 ? 3 : 1, why: `nâng ${up[1].trim()} (${s.why || 'ngoài build'})` };
+        }));
+      }
       h.pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80), el: tapTarget(c) })));
     },
     menu: buttons => buttons.some(b => b.matches('[data-testid="menu-solo"], [data-testid="solo-start"]')),
