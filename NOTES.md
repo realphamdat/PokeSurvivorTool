@@ -1,12 +1,12 @@
-# Ghi chú: doofcraft đã làm, bản thường còn phải làm
+# Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa test được vì mạng nơi làm việc chặn trang, chỉ vào được doofcraft. Mọi thứ ghi "đã test" là test trên **doofcraft thật** (tài khoản test) hoặc trên trang giả lập trong trình duyệt.
+Cập nhật: 2026-10-27 (bot v1.5.4 đã phát hành). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 4.
 
 ---
 
-## 0. Bắt đầu buổi tối (bản thường)
+## 0. Bắt đầu một buổi làm việc
 
-1. `git pull` để lấy bản mới nhất (`main`, từ commit `2db121f` trở đi).
+1. `git pull` để lấy bản mới nhất của `main`.
 2. **Tài khoản test:** `account_test.js` nằm trong `.gitignore` nên **không có trên GitHub**. Ở nhà phải tự tạo lại (cùng định dạng `module.exports = { normal: {…}, doofcraft: {…} }`) và tuyệt đối không commit file này.
 3. Nạp bot: `chrome://extensions` → Load unpacked thư mục repo, hoặc nạp trong console theo thứ tự ở mục 6.
 4. Nếu làm cùng Claude: Claude Code tự đọc `CLAUDE.md` (bản đồ code, quy ước, cách test). Bảo Claude **đọc file này** rồi đi lần lượt theo mục 3.
@@ -38,7 +38,7 @@ Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa 
 
 ## 2. Đã xong
 
-### 2a. Trong core: chạy cho cả 2 bản, nhưng mới test thật trên doofcraft
+### 2a. Trong core: chạy cho cả 2 bản (bảng dưới viết trước khi bản thường có `G`; phần lớn đã kiểm tra ở mục 3)
 
 | Tính năng | Bản thường cần kiểm tra gì |
 |---|---|
@@ -53,7 +53,7 @@ Cập nhật: 2026-10-26 (bot v1.4.0). Bản thường (pokesurvivor.com) chưa 
 | Nhận diện chính mình theo số dex trong đường dẫn sprite (không tính sprite ra đòn của mình là quái) | Regex lấy dex: `/\/(\d+)\//`. Bản thường dùng `/assets/pokemon/<dex>/…` nên chắc khớp. Kiểm tra `PSBot.state.selfDex` đúng số pokémon. |
 | Đếm ván đúng khi bấm Chạy giữa trận / ở màn hình kết quả | Dựa vào chữ "You fell / run over / game over…". |
 
-### 2b. Chỉ có ở doofcraft (`sites/doofcraft/site.js`): bản thường CHƯA có
+### 2b. Chỉ có ở doofcraft (`sites/doofcraft/site.js`): bản thường lấy các thứ này từ `G` (`scene()`), nhánh canvas của bản thường vẫn chưa có
 
 - **Địa hình:** đọc 22 bảng màu biome từ mã nguồn game, phân loại từng ô của mảng nền 256×256 thành tường (chặn) / chất lỏng (tốn điểm) / nền.
 - **Nhãn theo màu của game:** `fill:#ff2445` là mọi vùng skill quái/boss (`hazard`), `fill:rgba(255,60,80,0.35)` là vòng đỏ dưới mỗi viên đạn quái (`shot`).
@@ -126,10 +126,10 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 7. [x] **Vật thể:** lấy từ `G.World.visibleProps` (nhánh canvas chưa có).
 8. [x] **Vali:** rương lớn (`bigchest`) là vật rắn, mở trong ~48 đơn vị (`interact.js`), nên `caseReach: 40` (25 thì không bao giờ tới vì bị va chạm chặn ở ~25).
 9. [ ] **Tiến hoá:** chưa thấy thẻ tiến hoá trong các trận ngắn (chết trước khi max skill). Cần tài khoản có pokémon mạnh hơn hoặc trận dài hơn.
-10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không. **iOS** (Safari + app Userscripts, hướng dẫn đã có trong README) **chưa thử**. Ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline), vì Userscripts có thể không có `GM_xmlhttpRequest` / `GM_addElement`. Nếu pokesurvivor.com chặn inline (giả thuyết 2 ở mục 0) thì cần thêm nhánh dùng `GM.xmlHttpRequest` của Userscripts.
+10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không. **iOS** (Safari + app Userscripts, hướng dẫn đã có trong README) **chưa thử**. Ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline), vì Userscripts có thể không có `GM_xmlhttpRequest` / `GM_addElement`. pokesurvivor.com có CSP (mục 0) nên trên iOS bản thường nhiều khả năng cũng bị chặn; doofcraft thì có thể chạy.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
-12. [ ] **Phát hành** (khi bản thường đã ổn, và người dùng bảo):
-    1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js` (đang `1.4.2`).
+12. [x] **Phát hành:** đã phát hành 1.5.0 → 1.5.4 (26/10). Lần sau (chỉ khi người dùng bảo):
+    1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js`.
     2. Commit trên `main`.
     3. `git tag vX.Y.Z && git push origin main main:release --tags`.
 

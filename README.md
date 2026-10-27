@@ -38,6 +38,8 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 
 Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
 
+Trên pokesurvivor.com, bot tự chuyển trang sang **`/dev.html`** (bản dev của chính game, cùng tài khoản và dữ liệu): ở đó bot đọc thẳng vị trí quái, vùng skill, vật phẩm nên né và nhặt chính xác hơn. Muốn tắt: gõ `localStorage['psbot.dev'] = '0'` trong console (F12).
+
 ### Bot chọn thẻ lên cấp thế nào
 
 Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ điểm cao nhất. Lý do mỗi lần chọn hiện trong console (F12), ví dụ `chọn 2 Psychic — lấy move build #2`.

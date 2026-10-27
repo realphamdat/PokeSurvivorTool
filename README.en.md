@@ -38,6 +38,8 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 
 The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
 
+On pokesurvivor.com the bot switches to **`/dev.html`** (the game's own dev build, same account and save): there it reads enemy, skill-zone and item positions straight from the game, so it dodges and picks up more accurately. To turn this off, run `localStorage['psbot.dev'] = '0'` in the console (F12).
+
 ### How the bot picks level-up cards
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
