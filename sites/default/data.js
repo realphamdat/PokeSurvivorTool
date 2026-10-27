@@ -12,7 +12,7 @@ window.PSBotData = {
     "canvas:12x12#vzq2jt": "good",
     "canvas:18x27#7g5qft": "good",
     "canvas:12x12#f4e03h": "safe",
-    "canvas:34x16#b7rvrb": "good",
+    "canvas:34x16#b7rvrb": "heal",
     "canvas:18x27#55vk03": "good",
     "canvas:30x46#19t7965": "rift",
     "canvas:30x46#3z2atg": "rift",

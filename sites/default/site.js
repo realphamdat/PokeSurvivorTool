@@ -108,7 +108,7 @@ window.PSBotSite = h => {
     const box = (o, size, src) => ({ src, x: X(o.x), y: Y(o.y), w: size * s, h: size * s, s, e, f });
     h.state.selfDex = String(P.dex);
     h.state.magnet = P.magnet;
-    const out = { me: { x: X(P.x), y: Y(P.y) }, enemies: [], hazard: [], xp: [], good: [], case: [], buff: [], rift: [], wall: [], break: [], prize: [] };
+    const out = { me: { x: X(P.x), y: Y(P.y) }, enemies: [], hazard: [], xp: [], good: [], case: [], buff: [], heal: [], rift: [], wall: [], break: [], prize: [] };
     // Enemies whose type hits ours super-effectively count as bigger (kept farther away). Prizes: the coin thief (never
     // hits, flees, gone after 15 s: 100 coins or a ×10 ticket) is only chased; a shiny (caught when beaten) is fought
     for (const o of G.EnemyMgr.all()) {
@@ -152,6 +152,8 @@ window.PSBotSite = h => {
       if (p.type === 'tree' || ((p.type === 'rock' || p.type === 'chest') && p.hp > 0)) out.wall.push(d);
       else if (p.type === 'bigchest' && p.hp > 0) out.case.push(d);
       else if (p.type === 'altar' && !p.used) out.buff.push(d);
+      // Healing spring: drawn and healing around 8 above its base (js/systems/interact.js); dried below 0.02 charge
+      else if (p.type === 'spring' && p.charge > 0.1) out.heal.push({ ...d, y: Y(p.y - 8) });
       else if (p.type === 'trap' && p.hp > 0) out.hazard.push({ ...d, y: Y(p.y - 8), w: 26 * s, h: 26 * s });
     }
     const rift = G.Rift.rift;
@@ -189,7 +191,8 @@ window.PSBotSite = h => {
     isWorld: d => d.s !== 1,
     camera: world => world[0],
     enemyRe: /\/assets\/pokemon\/\d+\/(?!Faint)\w+\.png/,
-    tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard' },
+    // 34x16 = healing spring (js/world/tiles.js), every biome; a dried one is skipped by the core when HP stops rising
+    tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard', 'canvas:34x16': 'heal' },
     sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
     scene,
     // Move slots of the player, a bonded group being one (/dev.html only; else the core counts picks)

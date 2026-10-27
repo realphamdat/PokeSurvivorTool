@@ -13,7 +13,7 @@
 //
 // Load the repo folder as a Chrome extension (manifest.json), or run loader.js / psbot.user.js. Pasting into the Console:
 // sites/<bản game>/site.js + data.js and core/moves.js first, then this file. Per-version code lives in sites/<id>/.
-// F6 = danh mục mọi sprite (ảnh + chỉ số + nút gắn nhãn) · F7 = gắn nhãn bằng click (1 tốt / 2 nguy hiểm / 3 rift / 4 vật cản / 5 buff / 6 kinh nghiệm / 7 vali / 8 phá được / 0 xoá)
+// F6 = danh mục mọi sprite (ảnh + chỉ số + nút gắn nhãn) · F7 = gắn nhãn bằng click (1 tốt / 2 nguy hiểm / 3 rift / 4 vật cản / 5 buff / 6 kinh nghiệm / 7 vali / 8 phá được / 9 hồi máu / 0 xoá)
 // F8 = bật/tắt bot · F9 = overlay · PSBot.catalog() = in + copy danh mục · PSBot.tags() = xem nhãn đã lưu
 // PSBot.exportConfig() / nút "Xuất data.js" (F6) = tải data.js chứa nhãn + build; chép đè vào sites/<bản game>/ để máy khác có sẵn
 // While loaded, Firestore/RTDB writes whose path matches CFG.rankRe are replaced by no-ops.
@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.13';
+  const VERSION = '1.5.14';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -60,6 +60,12 @@
     breakRange: 500,      // world units: breakables ("break" tag) farther than this are not worth the walk
     buffReach: 80,        // world units: this close to a buff shrine (gem pillar) counts as "visited"
     buffCooldown: 30000,  // ms before going back to the same shrine
+    // Healing spring ("heal" tag): heals while standing on it, only when HP isn't full. Walked to under healBelow HP, then
+    // stood on until full; skipped for healIgnore ms when HP stops rising on it for healIdle ms (dried up)
+    healBelow: 0.8,
+    healReach: 18,        // world units: the game heals within 26 of its centre
+    healIdle: 1500,
+    healIgnore: 45000,
     lookahead: 140,       // world units: how far ahead each candidate direction is evaluated
     // Path finding (A*) around "wall" sprites and walls we got stuck on, when the straight line to the target is blocked
     cell: 32,             // world units per grid cell
@@ -71,7 +77,7 @@
     shotLookahead: 600,   // ms: an enemy shot ("shot" tag) counts as a hazard along the path it flies in that time
     autoTelegraph: true,  // untagged red-ish path shapes (attack range previews) count as hazards
     enemyRe: SITE.enemyRe,
-    // src -> 'good' | 'hazard' | 'rift' | 'wall' | 'buff' | 'safe'; edit with F6/F7, saved in localStorage
+    // src -> 'good' | 'hazard' | 'rift' | 'wall' | 'buff' | 'heal' | 'safe'; edit with F6/F7, saved in localStorage
     tags: { ...SITE.tags },
     autoPick: true,
     // Consumable item slots (hotkeys 5-8): pressed blindly while a run is unpaused, so any item gets used at once
@@ -420,8 +426,8 @@
       for (let t = 0; t < 256; t++) if (tiles[t]) out.push({ x: x0 + (t % 16) * tw, y: y0 + Math.floor(t / 16) * tw, w: tw, kind: tiles[t] });
       return out;
     }) : [];
-    const prizes = byTag('prize');
-    state.view = { me, enemies, goods, hazards, rifts, buffs, xps, cases, prizes, s, terrain };
+    const prizes = byTag('prize'), heals = byTag('heal');
+    state.view = { me, enemies, goods, hazards, rifts, buffs, heals, xps, cases, prizes, s, terrain };
 
     // Stuck detection: player's world position barely changes while a key is held.
     // Each stuck event leaves a "wall" point ahead of the player, kept for the whole run (path finding goes around
@@ -520,11 +526,19 @@
       if (!paused) state.dwell.t += dt;
       if (state.dwell.t > CFG.caseTime) { state.ignore.push({ ...kw, until: now + 60000 }); state.dwell = null; log(dwellOn === kase ? 'mở vali xong' : 'đứng cạnh vật phá được xong'); }
     } else state.dwell = null;
+    // Healing spring: only when hurt; once standing on one, stay until full (state.healing: where, best HP, since when)
+    const heal = hp < (state.healing ? 0.99 : CFG.healBelow) ? nearestTo(reachable(heals)) : null;
+    if (heal && dist(heal, me) < CFG.healReach) {
+      const hw = { x: (heal.x - e0) / s, y: (heal.y - f0) / s };
+      if (!state.healing || Math.hypot(state.healing.x - hw.x, state.healing.y - hw.y) > 30 || paused || hp > state.healing.hp + 0.01) state.healing = { ...hw, hp, t: now };
+      else if (now - state.healing.t > CFG.healIdle) { state.ignore.push({ ...hw, until: now + CFG.healIgnore }); state.healing = null; log('hồ hồi máu đã cạn, bỏ qua'); }
+    } else if (!heal) state.healing = null;
 
     // hold = stand right on the target (suitcase) instead of walking through it
     let target = null, weight = 0, stop = 0, hold = false, xp;
     if (rift) { target = rift; weight = CFG.riftWeight; }
     else if (prize) { target = prize; weight = CFG.prizeWeight; stop = prize.engage ? CFG.engage : 0; }
+    else if (heal && dist(heal, me) < CFG.goodRange) { target = heal; weight = CFG.goodWeight; hold = dist(heal, me) < CFG.healReach; }
     else if (kase && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
@@ -957,7 +971,7 @@
     const v = state.view;
     hud.style.display = tag.on || state.debug ? '' : 'none';
     hud.textContent = tag.on
-      ? (tag.pending ? `${tag.pending}: 1=tốt 2=nguy hiểm 3=rift 4=vật cản 5=buff 6=kinh nghiệm 7=vali 8=phá được 0=xoá nhãn Esc=huỷ` : 'GẮN NHÃN (F7): click vào vật trên màn hình')
+      ? (tag.pending ? `${tag.pending}: 1=tốt 2=nguy hiểm 3=rift 4=vật cản 5=buff 6=kinh nghiệm 7=vali 8=phá được 9=hồi máu 0=xoá nhãn Esc=huỷ` : 'GẮN NHÃN (F7): click vào vật trên màn hình')
       : `bot ${state.on ? 'ON' : 'OFF'} (F8) · ván ${state.done + 1}${state.target ? `/${state.target}` : ''}${state.dwell ? ` · mở vali ${(state.dwell.t / 1000).toFixed(1)}/${CFG.caseTime / 1000}s` : ''} · địch ${v ? v.enemies.length : 0} · exp ${v ? v.xps.length : 0} (hút ${Math.round(state.magnet)}) · tốt ${v ? v.goods.length : 0} · buff ${v ? v.buffs.length : 0} · nguy hiểm ${v ? v.hazards.length : 0} · rift ${v ? v.rifts.length : 0} · chặn rank ${state.netBlocked}`;
     if (tag.on && tag.box) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(tag.box.x - tag.box.w / 2, tag.box.y - tag.box.h / 2, tag.box.w, tag.box.h); }
     if (state.highlight) {
@@ -984,6 +998,7 @@
     ring(v.rifts, '#f4f', () => 16);
     ring(v.prizes || [], '#fd3', () => 22);
     ring(v.buffs, '#ff0', () => 14);
+    ring(v.heals || [], '#6fc', () => CFG.healReach * v.s);
     ring(v.xps, '#0fc', () => 4);
     ring(v.cases, '#fa0', () => Math.max(6, CFG.caseReach * v.s));
     g.strokeStyle = '#0fc6'; g.setLineDash([2, 6]); g.beginPath(); g.arc(v.me.x, v.me.y, state.magnet * v.s, 0, 7); g.stroke(); g.setLineDash([]);
@@ -1330,7 +1345,7 @@
   panel.style.cssText = 'order:3;pointer-events:auto;width:380px;max-width:calc(100vw - 8px);min-height:0;flex:0 1 auto;overflow:auto;font:11px monospace;background:#101418ee;color:#ddd;border:1px solid #345;border-radius:6px;display:none';
   dock.append(panel);
   draggable(panel, 'psbot.pos.catalog');
-  const TAG_LABEL = { good: ['Tốt', '#4f4'], hazard: ['Nguy hiểm', '#f90'], rift: ['Rift', '#f4f'], wall: ['Vật cản', '#88f'], buff: ['Buff', '#ff0'], xp: ['Kinh nghiệm', '#0fc'], case: ['Vali (đứng 5s)', '#fa0'], break: ['Phá được', '#c96'], safe: ['An toàn', '#9cf'] };
+  const TAG_LABEL = { good: ['Tốt', '#4f4'], hazard: ['Nguy hiểm', '#f90'], rift: ['Rift', '#f4f'], wall: ['Vật cản', '#88f'], buff: ['Buff', '#ff0'], xp: ['Kinh nghiệm', '#0fc'], case: ['Vali (đứng 5s)', '#fa0'], break: ['Phá được', '#c96'], heal: ['Hồi máu', '#6fc'], safe: ['An toàn', '#9cf'] };
   function renderPanel() {
     if (panel.style.display === 'none') return;
     const now = performance.now();
@@ -1454,7 +1469,7 @@
 
   // ---------- tag mode (F7): click an object, then press 1/2/3/0 ----------
   const tag = { on: false, pending: null, box: null };
-  const TAGS = { Digit1: 'good', Digit2: 'hazard', Digit3: 'rift', Digit4: 'wall', Digit5: 'buff', Digit6: 'xp', Digit7: 'case', Digit8: 'break' };
+  const TAGS = { Digit1: 'good', Digit2: 'hazard', Digit3: 'rift', Digit4: 'wall', Digit5: 'buff', Digit6: 'xp', Digit7: 'case', Digit8: 'break', Digit9: 'heal' };
   const onClick = e => {
     if (!tag.on || !e.isTrusted) return;
     const r = canvas.getBoundingClientRect();
