@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.2';
+  const VERSION = '1.6.3';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -488,7 +488,9 @@
     state.prevXp = xpNow; state.prevMe = meW;
     // While the game is paused (level-up / item dialogs) the player can't move: not "stuck". The frozen timer only
     // shows that after 1.5 s, so an open dialog counts at once (else each level-up could leave a wall in open ground)
-    if (now - (state.timerChangedAt || now) > 1500 || SITE.choiceOpen()) state.posHist.length = 0;
+    // Standing still on purpose (fighting from range, holding a spot) is not stuck either: only frames spent walking
+    // count, else the first step after a stop looked held in place and left a wall in open ground
+    if (now - (state.timerChangedAt || now) > 1500 || SITE.choiceOpen() || !state.dir) state.posHist.length = 0;
     else state.posHist.push(meW);
     if (state.posHist.length > 20) {
       const old = state.posHist.shift();
@@ -540,9 +542,14 @@
     const footprint = d => {
       const w = Math.abs(d.w) / s, h = Math.abs(d.h) / s;
       if (Math.max(w, h) >= 128) return { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d, of: d };
+      // The site knows where its props are solid: a circle of radius r, `up` above the sprite's bottom
+      const pf = SITE.propFoot;
+      if (pf) return { x: d.x, y: d.y + (h / 2 - pf.up) * s, rw: pf.r, of: d };
       return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4, of: d } : { x: d.x, y: d.y, rw: w * 0.4, of: d };
     };
-    const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').map(footprint), byTag('break').map(footprint));
+    // A map chunk once tagged "wall" with F7 (it blocked its whole 512 units) counts by its terrain tiles instead
+    const solid = d => !(!sc && SITE.terrain && SITE.terrain(d));
+    const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').filter(solid).map(footprint), byTag('break').map(footprint));
     // A rift is always worth it: never put off by hazards / enemies around it, only by an unreachable spot
     const unignored = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
     const rift = nearestTo(unignored(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);

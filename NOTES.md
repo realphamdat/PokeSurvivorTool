@@ -1,6 +1,6 @@
 # Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-27 (bot v1.5.13 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
+Cập nhật: 2026-10-27 (bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
 
 ---
 
@@ -36,7 +36,8 @@ Cập nhật: 2026-10-27 (bot v1.5.13 đã phát hành; thêm nhánh Firefox cho
 | `tags` | Nhãn theo key chính xác (`fill:#…`, `canvas:WxH#hash`, đường dẫn ảnh) | chỉ 2 nhãn `hazard` theo kích thước | màu vật phẩm, `hazard`, `shot` |
 | `sizeTags` | `true` = key dạng `canvas:WxH` (không có hash) trong `CFG.tags`/data.js áp cho mọi sprite cùng kích thước | **`true`** | `false` |
 | `bySize` | Nhãn theo kích thước sprite do profile tự khai | ❌ (và **bị bỏ qua** khi `sizeTags: true`, xem `tagOf()` trong core) | đá, bẫy, cây, vật Halloween |
-| `terrain(d)` | Mảng nền → 16×16 ô (0 nền, 1 tường, 2 chất lỏng) | ❌ | ✅ |
+| `terrain(d)` | Mảng nền → 16×16 ô (0 nền, 1 tường, 2 chất lỏng) | ✅ (bảng màu 25 biome chép từ `js/world/tiles.js`, dùng khi không có `G`) | ✅ |
+| `propFoot` | Vùng chặn của vật thể `wall`/`break`: hình tròn bán kính `r`, cách đáy sprite `up` (đơn vị world); không có thì core đoán theo hình | ✅ `{ up: 2, r: 13 }` | ❌ |
 | `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ❌ (core tự dùng `evo` trong `moves.js`, lấy từ wiki) | ✅ (đọc cấu hình game) |
 | `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `caseReach: 40` | `caseReach: 45`, … |
 | `scene(cam)` | Cả cảnh (quái, nguy hiểm, vật phẩm, tường, địa hình) theo nhãn, toạ độ màn hình; `null` = đọc canvas | ✅ (từ `window.G`, chỉ trên `/dev.html`) | ❌ |
@@ -55,7 +56,7 @@ Cập nhật: 2026-10-27 (bot v1.5.13 đã phát hành; thêm nhánh Firefox cho
 | Chọn skill theo Moveset theo tầng: tiến hoá > move build chưa có > nâng move tấn công build > **nội tại để tiến hoá** > nâng buff build > nội tại > skill ngoài build | Dựa vào tên pokémon game vẽ lên canvas (nút 🎯 trong popup Moveset lấy được tên thì ổn). |
 | Ưu tiên nội tại để tiến hoá (Power, Reflexes, Sprint, Synthesis, Armor, Magnet, Vigor) | Bản thường lấy từ `evo` trong `moves.js` (wiki, 97/103 move). Cần xác nhận **tên thẻ trên game khớp** các tên này: console phải hiện lý do "điều kiện tiến hoá …". |
 | Panel: Số ván, ▶ Chạy/■ Dừng, ⚔ Moveset, dòng "F8 bật/tắt bot · F9 hiển thị overlay" | F6 danh mục, F7 gắn nhãn vẫn còn. |
-| Tìm đường A* vòng qua vật cản, nhớ điểm kẹt cả trận, bỏ qua mục tiêu không tới được 20s | Bản thường chỉ biết vật cản qua nhãn `wall` (data.js/F6) và điểm đã kẹt (chưa có `terrain`). |
+| Tìm đường A* vòng qua vật cản, nhớ điểm kẹt cả trận, bỏ qua mục tiêu không tới được 20s | Bản thường: `terrain` đọc từ mảng nền + nhãn `wall` theo kích thước (cây 30x40/26x40/28x40, đá 22x17, bí ngô 22x20). |
 | Né đạn quái theo đường bay (`shot`), vùng skill (`hazard`), không nhặt đồ trong vùng nguy hiểm | Bản thường **chưa có nhãn đúng màu** cho đạn/vùng skill, chỉ có đoán "hình đỏ không nhãn = nguy hiểm" (`autoTelegraph`). |
 | Nhãn `break` (Phá được, phím 8 ở F7): đứng cạnh để skill phá, phá đá gần trước khi nhặt kinh nghiệm | Chưa gắn cho vật nào. |
 | Không nhặt đồ có quái đứng sát; **máu < 50% thì chế độ thủ** | Máu đọc từ chữ dạng `123 / 208` game vẽ lên canvas. **Phải kiểm tra bản thường có vẽ chữ này không**, nếu không thì chế độ thủ không bao giờ bật. |
@@ -206,6 +207,16 @@ Nếu bước 2 hỏng: thử đổi manager (Violentmonkey ↔ Tampermonkey) v�
     - Doofcraft Waves (Mewtwo), mỗi bên 1 trận: trước chết 6:31, 53 lần thoát kẹt, 57 điểm tường học được; sau chết 8:48, 13 lần thoát, 11 điểm.
 - Log "chọn đồ" / "bond" lặp 2–3 lần mỗi bảng (bảng còn hiện sau lần bấm đầu, `pickAt` chỉ chờ 800ms). Chọn vẫn đúng, chưa sửa.
 - **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trong vòng 220 đơn vị thì chạy về hướng thưa nhất. 1 trận chết ở 5:35, sớm hơn bản không có nó. Nếu thử lại: chỉ bật khi máu thấp, hoặc ưu tiên hạ quái nhanh thay vì chạy.
+- **Kẹt tường bản thường (27/10, sau 1.6.2).** Từ khi bỏ `/dev.html`, trang `/` đọc canvas mà không có địa hình lẫn nhãn cây: A* không thấy tường, bot chỉ học được tường sau khi đã kẹt. Đã thêm:
+  - `terrain`: bảng màu chép tay từ `tiles.js`; lava, độc và điện tính là tường.
+  - Nhãn cây/đá/bí ngô theo kích thước.
+  - Bỏ 4 nhãn `canvas:256x256#… = wall` trong data.js (mỗi nhãn chặn cả mảng 512 đơn vị). Core bỏ qua nhãn `wall` trên mảng nền đọc được.
+  - **Kẹt giả (cả 2 bản):** `posHist` ghi cả lúc bot cố ý đứng yên (đánh từ xa, giữ chỗ), nên bước đầu tiên sau khi đứng bị tính là kẹt → để lại điểm tường ở chỗ trống, giữ cả trận. Giờ chỉ đếm frame đang bấm phím.
+  - **Chân vật thể lệch:** core đoán vùng chặn theo hình sprite, cao hơn chỗ va chạm thật 13–15 đơn vị (game: tâm ở đáy sprite − 2, bán kính tree 13 / rock 12 / pumpkin 11). Profile mới có trường `propFoot: { up, r }`; chỉ bản thường khai.
+  - Test:
+    - Vẽ chunk bằng `tiles.js` thật trong node: 25 biome, 0/25600 ô sai.
+    - Trang giả lập vẫn đạt; giờ 0 điểm tường giả. Chạy trang giả lập ở tab nền thì chậm gấp 2–3 lần, phải đưa tab lên trước.
+    - Game thật (Scorbunny, tài khoản test): trước khi sửa 4–7 lần kẹt trong 50 s đầu (phần lớn ở bãi trống), sau khi sửa 0 lần cả trận 1:38 và 1 lần trong 1:53.
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng.
 - **Sống lâu hơn (27/10, bản 1.5.17)**, đo trên Waves (Mewtwo) bằng bộ ghi 250 ms (máu, quái theo khoảng cách tới mép, mục tiêu):
   - Trận gốc chết 12:16 (vòng 11). Từ 3:26 tới lúc chết mất tổng 4,92 thanh máu: **49% lúc làm nhiệm vụ** (đứng ở lồng giữa phục kích, Escort dẫn qua bầy), 36% lúc đã máu thấp mà bị vây. 78% sát thương khi quái chồng lên người (mép < 0); 53% lúc đi đánh quái.

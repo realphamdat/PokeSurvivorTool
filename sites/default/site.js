@@ -164,6 +164,69 @@ window.PSBotSite = h => {
     return out;
   }
 
+  // ---------- terrain off the canvas (home page, no G) ----------
+  // The map is drawn as 256x256 chunk canvases of 16x16 tiles (16 px each, 32 world units), every pixel taken from the
+  // biome's palette (js/world/tiles.js: BIOMES, ARENA_THEMES via arenaBiome(), the Halloween night biomes). Counting
+  // a tile's wall / liquid colours tells what it is. Lava, poison and spark hurt: walls, as in the game's own pathing
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const shade = (c, t) => c.map(e => Math.round(t >= 0 ? e + (255 - e) * t : e * (1 + t)));
+  const blend = (a, b, t) => a.map((e, i) => Math.round(e + (b[i] - e) * t));
+  const ckey = c => (c[0] << 16) | (c[1] << 8) | c[2];
+  const DEADLY = new Set(['lava', 'poison', 'spark']);
+  // Full biomes: floor + dirt, wallTop + wallLight / wallEdge / wallFace / wallFaceDark, liq / liqDeep / foam, liquid
+  const BIOMES = [
+    ['#3e7a39 #44813d #397134 #7d6742 #735e3b #86704a', '#5d6e49 #677a50 #566544 #88a06e #26301f #3e4934 #363f2d #232a1d', '#3b7fc6 #2c64a6 #b3defa', 'water'],
+    ['#4d5778 #535e81 #47506f #3c4462 #424a69 #37405b', '#5f5089 #695996 #56497d #a08ddc #1f1934 #3f3463 #382e59 #221c3a', '#2a9cab #1d7c8a #aaf4f7', 'water'],
+    ['#5b4537 #644c3c #533f32 #403530 #473b34 #392f2b', '#3c3634 #443d3a #35302e #625752 #141110 #2b2624 #25201f #151211', '#e45a1f #b9401a #ffd46a', 'lava'],
+    ['#2f3a26 #34402a #2a3322 #4a3a2a #423426 #51402e', '#3d3446 #45394f #362e3e #6a5a7a #140f18 #2a2330 #241e2a #130f16', '#3e5a2a #2c4220 #9ac25a', 'swamp'],
+    ['#34303f #393446 #2f2b39 #2a2631 #26222c #2e2a36', '#4a4652 #524e5c #423e49 #7a7684 #121016 #2e2b34 #28252e #141217', '#3a3a6a #2a2a52 #a6a6ff', 'water'],
+    ['#1f2a2a #233030 #1b2525 #2e2622 #29221f #332a25', '#2e2838 #352e40 #282231 #584c66 #0e0b12 #211c28 #1c1823 #0f0d13', '#6a3a8a #4e2a6a #e0a6ff', 'poison'],
+  ].map(([floor, wall, liq, liquid]) => ({ floor: floor.split(' ').map(rgb), wall: wall.split(' ').map(rgb), liq: liq.split(' ').map(rgb), liquid }));
+  // Rift arenas: floor, wall, liquid colour, foam ('' = derived), liquid
+  for (const a of ('#6f8a4f #8a7f6a #4f8fd0 - water|#5b3a2e #3a2826 #e45a1f #ffd46a lava|#3c6a80 #2a4660 #2f86d6 #bfeaff water|' +
+    '#3a7a32 #4a6a36 #4f6b2a #9ac25a swamp|#4a4840 #3a3a48 #e8c020 #fff6c0 spark|#b8cfe0 #7f9fc0 #9fd8f0 #ffffff ice|' +
+    '#8a6a46 #5e4232 #4f8fd0 - water|#46384f #33263f #9a4fc0 #e0a6ff poison|#b08a52 #8a5e34 #9a7a48 #d6b98a swamp|' +
+    '#9fb8d8 #dfe8f4 #7fb8ff - water|#5e4470 #3e2a55 #8a5ad0 - water|#5a6a2a #5e4a26 #6a7a2a #c4d65a swamp|' +
+    '#7a6a58 #55473a #4f8fd0 - water|#383447 #24202e #3a3a6a - water|#363a5e #24264a #7b5cff #c9a6ff lava|' +
+    '#2c282e #1c181f #2a2a3a - water|#6d7888 #465060 #4f8fd0 - water|#4f7f5a #7a5a8a #8fd8ff #ffe0f4 water|' +
+    '#4a4240 #2e2829 #e8a82a #fff1b8 lava').split('|')) {
+    const [f, w, l, foam, liquid] = a.split(' '), F = rgb(f), W = rgb(w), L = rgb(l);
+    BIOMES.push({ floor: [F, shade(F, 0.05), shade(F, -0.06), shade(F, -0.16), shade(F, -0.12), shade(F, -0.2)],
+      wall: [W, shade(W, 0.07), shade(W, -0.07), shade(W, 0.32), shade(W, -0.7), shade(W, -0.3), shade(W, -0.38), shade(W, -0.55)],
+      liq: [L, shade(L, -0.22), foam === '-' ? shade(L, 0.55) : rgb(foam)], liquid });
+  }
+  const palettes = BIOMES.map(b => ({ floor: new Set(b.floor.map(ckey)), wall: new Set(b.wall.map(ckey)),
+    liquid: new Set([...b.liq, blend(b.liq[0], b.liq[2], 0.28)].map(ckey)), deadly: DEADLY.has(b.liquid) }));
+  // Chunk canvas -> Uint8Array(256) of tiles (0 floor, 1 wall, 2 liquid), or null for any other canvas. The biome is the
+  // palette matching most pixels; a tile is wall / liquid when over half its pixels are
+  const terrainCache = new WeakMap();
+  function classify(img) {
+    let px;
+    try { px = img.getContext('2d').getImageData(0, 0, 256, 256).data; } catch { return null; }
+    const at = (x, y) => { const o = (y * 256 + x) * 4; return (px[o] << 16) | (px[o + 1] << 8) | px[o + 2]; };
+    let best = null, bestHits = 0;
+    for (const p of palettes) {
+      let hits = 0;
+      for (let y = 1; y < 256; y += 4) for (let x = 1; x < 256; x += 4) { const k = at(x, y); if (p.floor.has(k) || p.wall.has(k) || p.liquid.has(k)) hits++; }
+      if (hits > bestHits) { best = p; bestHits = hits; }
+    }
+    if (!best || bestHits < 4096 * 0.3) return null;
+    const tiles = new Uint8Array(256);
+    for (let t = 0; t < 256; t++) {
+      const tx = (t % 16) * 16, ty = Math.floor(t / 16) * 16;
+      let wall = 0, liquid = 0;
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const k = at(tx + x, ty + y); if (best.wall.has(k)) wall++; else if (best.liquid.has(k)) liquid++; }
+      tiles[t] = wall > 128 ? 1 : liquid > 128 ? (best.deadly ? 1 : 2) : 0;
+    }
+    return tiles;
+  }
+  function terrain(d) {
+    const img = d.img;
+    if (d.rect || !img || img.width !== 256 || img.height !== 256 || !img.getContext) return null;
+    if (!terrainCache.has(img)) terrainCache.set(img, classify(img));
+    return terrainCache.get(img);
+  }
+
   // The game canvas: #game on desktop; if a layout (phones?) has none, the biggest visible canvas that isn't the bot's own
   const gameCanvas = () => document.getElementById('game') || PSBotList(document.querySelectorAll('canvas:not([data-psbot-ui])'))
     .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
@@ -192,9 +255,16 @@ window.PSBotSite = h => {
     camera: world => world[0],
     enemyRe: /\/assets\/pokemon\/\d+\/(?!Faint)\w+\.png/,
     // 34x16 = healing spring (js/world/tiles.js), every biome; a dried one is skipped by the core when HP stops rising
-    tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard', 'canvas:34x16': 'heal' },
+    // Solid props (js/world/tiles.js PAINT, same size in every biome): tree 30x40 / crystal 26x40 / dead tree 28x40,
+    // rock 22x17, Halloween pumpkin 22x20. Rocks and pumpkins break, but only block here (as in scene())
+    tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard', 'canvas:34x16': 'heal',
+      'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall', 'canvas:22x17': 'wall', 'canvas:22x20': 'wall' },
     sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
+    // Solid props collide as a circle at their base (js/world/world.js: tree r 13, rock 12, pumpkin 11), drawn with the
+    // sprite's bottom 2 below it; the core's guess from the sprite shape put it 13-15 too high
+    propFoot: { up: 2, r: 13 },
     scene,
+    terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding, when scene() is null
     // Move slots of the player, a bonded group being one (/dev.html only; else the core counts picks)
     moveSlots: () => { const P = window.G && G.Game && G.Game.player; return P && P.slots ? { used: P.slots.length, max: P.maxMoves } : null; },
     // The big chest is solid (player + chest radius ~25 apart at best) and opens within ~48 of its centre

@@ -22,12 +22,8 @@ window.PSBotData = {
     "canvas:12x12#1eqc0pm": "good",
     "canvas:18x27#1jo3ilw": "good",
     "canvas:26x40#ezvds9": "wall",
-    "canvas:256x256#1clrdy8": "wall",
-    "canvas:256x256#n21pe9": "wall",
-    "canvas:256x256#tzu4st": "wall",
     "canvas:12x12#1hzeh1l": "safe",
     "canvas:30x40#tn4wsn": "wall",
-    "canvas:256x256#gw8sv": "wall",
     "canvas:18x27#1nzfd19": "safe",
     "canvas:12x12#1ko4idv": "buff",
     "fill:#ffd95e": "xp"
