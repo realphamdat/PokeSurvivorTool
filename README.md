@@ -12,10 +12,10 @@ Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com/) và [pokesurvivor.d
 
 ## Cài trên điện thoại (Android)
 
-> ⚠️ **pokesurvivor.com chặn script** nên trên điện thoại bot có thể không chạy, tuỳ trình duyệt (Kiwi: không chạy). Gặp dòng *"PSBot: trang này chặn script…"* thì dùng PC hoặc thử trình duyệt khác. **pokesurvivor.doofcraft.com chạy bình thường** trên điện thoại.
+> ℹ️ **pokesurvivor.com chặn script chèn vào trang** (CSP), nên trên Android phải dùng **Firefox**: bot chạy bằng quyền của userscript, không cần chèn script. **Kiwi / Chrome trên Android không chạy được** với bản thường (doofcraft vẫn chạy bình thường trên mọi trình duyệt).
 
-1. Cài một trình duyệt cài được tiện ích (extension), ví dụ **Kiwi Browser**, **Microsoft Edge** hoặc **Firefox** (CH Play).
-2. Trong trình duyệt đó, cài tiện ích **Tampermonkey** (Firefox không có thì dùng **Violentmonkey**).
+1. Cài **Firefox** (CH Play).
+2. Trong Firefox, cài tiện ích **Violentmonkey** hoặc **Tampermonkey** (menu ⋮ → Tiện ích / Add-ons).
 3. Bấm nút copy ở góc khối dưới đây, dán vào **thanh địa chỉ** của trình duyệt đó rồi mở:
 
 ```

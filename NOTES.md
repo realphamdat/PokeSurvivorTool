@@ -1,6 +1,6 @@
 # Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-27 (bot v1.5.4 đã phát hành). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 4.
+Cập nhật: 2026-10-27 (bot v1.5.8 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
 
 ---
 
@@ -87,14 +87,14 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 
 ## 3. Checklist cho bản thường (làm theo thứ tự)
 
-0. [x] **Bản thường trên điện thoại (Kiwi + Tampermonkey) không chạy bot: ĐÃ RÕ NGUYÊN NHÂN, chấp nhận giới hạn.**
+0. [x] **Bản thường trên điện thoại không chạy bot (CSP): ĐÃ RÕ NGUYÊN NHÂN — Android giờ chạy qua Firefox, xem mục 3b.**
    - **Nguyên nhân:** `index.html` của pokesurvivor.com có `<meta http-equiv="Content-Security-Policy" content="script-src 'self' file: https://www.gstatic.com https://apis.google.com https://*.firebaseio.com https://*.firebasedatabase.app; …">`, chặn mọi script chèn vào trang. Tampermonkey trên Chrome PC (userScripts API) vẫn chạy được, còn Tampermonkey trong Kiwi thì không. Dòng trạng thái báo "trang không chạy được code bot". Doofcraft không có CSP nên chạy được.
    - **Đã loại trừ:** thiếu canvas `#game` (có, 1001×563); quyền `raw.githubusercontent.com` (đã cho phép, file tải về được); toàn màn hình.
    - **Đã thử, không giúp:**
      - Userscript 1.4.0 chèn bản lưu sẵn ở `document-start` (trước khi đọc thẻ meta).
      - Bật Inject Mode "Tức thì" của Tampermonkey.
-   - **Quyết định:** **không tìm cách lách CSP của trang.** Userscript 1.5.0 quay về cách nạp của 1.3.0 (tải mới mỗi lần mở game), và khi bị chặn thì báo rõ "trang này chặn script trong trình duyệt hiện tại — dùng PC hoặc trình duyệt khác". README/trang cài đặt có cảnh báo.
-   - **Còn có thể thử (người dùng tự thử):** Microsoft Edge + Tampermonkey, Firefox + Violentmonkey trên Android. iOS (Safari + Userscripts) chưa thử.
+   - **Quyết định (đổi ngày 27/10):** **bỏ hẳn việc chèn `<script>`/inline script** (vô ích, CSP chặn). Trên Android chuyển sang **Firefox + Violentmonkey/Tampermonkey**: `psbot.user.js` lấy `window` của trang qua `unsafeWindow`/`wrappedJSObject` rồi bọc code trong `with (pageWindow)`. Code chạy bằng **quyền của extension**, CSP của trang không áp dụng cho nó — không phải lách CSP và không dựa vào lỗ hổng nào của trang. Chi tiết + cách test: **mục 3b**.
+   - **Đã thử và không dùng được:** Microsoft Edge / Kiwi + Tampermonkey trên Android (Chromium: isolated world, không có `chrome.userScripts`, buộc phải chèn `<script>` → CSP chặn). iOS (Safari + Userscripts) **chưa thử**; ở đó `psbot.user.js` đi nhánh dự phòng (`loader.js` + `<script>` inline) nên bản thường nhiều khả năng vẫn bị chặn, doofcraft thì có thể chạy.
    - **Cũng đã thêm** (vẫn giữ, vô hại): `ready()`/`canvas()` của bản thường lấy canvas lớn nhất khi không có `#game`; panel chuyển vào phần tử toàn màn hình; panel ở `z-index` cao nhất; dòng trạng thái "PSBot: …" khi đang tải.
    - **Mã nguồn bản thường công khai:** <https://github.com/JPTER78/pokesurvivor> (repo phục vụ pokesurvivor.com, nhánh `main`, file `index.html` + `js/…`). **Dùng repo này cho checklist bên dưới** (màu vùng skill/đạn, kích thước sprite vật thể, cấu hình tiến hoá…), không cần vào được trang game.
    **Hướng mới (thử trước mục 1): đọc dữ liệu game qua `window.G` thay vì đoán từ canvas.** Nguồn: userscript "PokéSurvivor Ultimate Trainer & HUD" (greasyfork.org/scripts/600697, tác giả Rekcheli, v2.6.3). Đây là tool cheat, chức năng không liên quan bot mình; chỉ học **cách truy cập game**.
@@ -134,14 +134,43 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 7. [x] **Vật thể:** lấy từ `G.World.visibleProps` (nhánh canvas chưa có).
 8. [x] **Vali:** rương lớn (`bigchest`) là vật rắn, mở trong ~48 đơn vị (`interact.js`), nên `caseReach: 40` (25 thì không bao giờ tới vì bị va chạm chặn ở ~25).
 9. [ ] **Tiến hoá:** chưa thấy thẻ tiến hoá trong các trận ngắn (chết trước khi max skill). Cần tài khoản có pokémon mạnh hơn hoặc trận dài hơn.
-10. [ ] **Điện thoại:** nhờ người có Android thử tự chọn skill. Nếu không chạy thì xem giao diện điện thoại có `#lvl-num` không. **iOS** (Safari + app Userscripts, hướng dẫn đã có trong README) **chưa thử**. Ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline), vì Userscripts có thể không có `GM_xmlhttpRequest` / `GM_addElement`. pokesurvivor.com có CSP (mục 0) nên trên iOS bản thường nhiều khả năng cũng bị chặn; doofcraft thì có thể chạy.
+10. [x] **Điện thoại (Android):** đã thêm nhánh Firefox trong `psbot.user.js` — **cần test trên máy thật**, xem mục 3b. Kiwi/Chromium không chạy được (CSP). **iOS** (Safari + app Userscripts) **chưa thử**; ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline) nên bản thường nhiều khả năng vẫn bị chặn; doofcraft thì có thể chạy.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
-12. [x] **Phát hành:** đã phát hành 1.5.0 → 1.5.4 (26/10). Lần sau (chỉ khi người dùng bảo):
+12. [x] **Phát hành:** đã phát hành 1.5.0 → 1.5.8 (26–27/10). Lần sau (chỉ khi người dùng bảo):
     1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js`.
     2. Commit trên `main`.
     3. `git tag vX.Y.Z && git push origin main main:release --tags`.
 
     Người dùng chỉ nhận code từ nhánh `release`, nên push `main` lúc đang làm không ảnh hưởng gì. Chi tiết trong `CLAUDE.md`.
+
+### 3b. Android: nhánh Firefox trong `psbot.user.js` (27/10, **chưa test trên máy thật**)
+
+**Vì sao trước đây không chạy:** Kiwi/Chrome trên Android là Chromium. Userscript chạy trong **isolated world**, muốn chạm vào JS của trang thì Tampermonkey buộc phải chèn `<script>` — đúng thứ CSP `script-src 'self'` chặn. Kiwi không có `chrome.userScripts` nên không có đường nào khác.
+
+**Cách chạy mới:** Firefox cho userscript lấy `window` thật của trang qua `unsafeWindow` / `wrappedJSObject`. `psbot.user.js` giờ có 3 nhánh:
+
+1. **Firefox (Gecko)** — nhận ra bằng `navigator.userAgent` có `Gecko/` và không có `Chrome/`:
+   - tải 5 file như cũ (`GM_xmlhttpRequest`, không qua CORS/CSP);
+   - chạy **một lần** `new Function('W', 'with (W) { …code… }')(pageWindow)`;
+   - nhờ `with (W)`, mọi global trong code (`window`, `document`, `CanvasRenderingContext2D`, `XMLHttpRequest`, `KeyboardEvent`, `firebase`…) là object của **chính trang**, nên hook canvas + gửi phím chạy y như extension trên PC. `new Function` tạo hàm non-strict nên `with` hợp lệ;
+   - code chạy bằng **quyền của userscript**, không phải script của trang → CSP không áp dụng. Không sửa CSP, không khai thác lỗi của trang;
+   - `PSBotSite` không lên sau khi chạy → hiện dòng "trình duyệt này chặn script chèn vào trang…".
+2. **Chromium desktop** — giữ nguyên `GM_addElement` (API của extension, không qua CSP).
+3. **Còn lại** — `loader.js` + `<script>` inline, chỉ dùng được khi trang không có CSP (doofcraft).
+
+**Cài trên Android:** Firefox (CH Play) → Violentmonkey hoặc Tampermonkey → mở `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js` → **Install** → cho phép `raw.githubusercontent.com` → mở game. Doofcraft chạy được ở cả Kiwi và Firefox.
+
+**Giới hạn:**
+- **Kiwi / Chrome Android vẫn không chạy** (CSP). Muốn thì phải cài extension `.crx` có `world: "MAIN"` — chưa làm, và Android không có "Load unpacked".
+- `Worker` tạo từ `blob:` vẫn bị CSP chặn → chế độ chạy nền rơi về `setInterval` (điện thoại đang mở tab thì không ảnh hưởng).
+- Panel/log của bot là tiếng Việt; điện thoại không có F8/F9, dùng nút ▶ Chạy trên panel.
+
+**Cần kiểm tra trên máy thật:**
+1. Panel hiện ở góc trên trái (không còn dòng "chặn script").
+2. Vào trận: `PSBot.state.lastFrame.length` > 0 (nếu 0 → hook không vào được prototype; xem console có `Permission denied`/`Xray`).
+3. Bot tự đi, tự nhặt đồ, tự chọn thẻ (bấm vào thẻ — nhánh điện thoại của `site.js`).
+4. Chơi lại tự động sau khi chết.
+Nếu bước 2 hỏng: thử đổi manager (Violentmonkey ↔ Tampermonkey) và gửi log console.
 
 ---
 

@@ -43,6 +43,7 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 - `sites/<id>/data.js`: nhãn sprite + build xuất từ nút "Xuất data.js" (F6). Thứ tự ưu tiên: mặc định < data.js < localStorage.
 - `core/moves.js`: sinh bởi `node crawl-moves.js` (pokesurvivor.wiki). `node crawl-moves.js --evo` chỉ làm mới bảng tiến hoá (`evo`).
 - Thứ tự nạp (manifest/loader): `site.js` → `data.js` → `moves.js` → `bot.js` → `farmMoney.js`. `loader.js` phải ở gốc repo.
+- `psbot.user.js` có 3 nhánh: Firefox/Gecko (`unsafeWindow`/`wrappedJSObject` + `with (pageWindow)` → chạy bằng quyền userscript, dùng được trên pokesurvivor.com), Chromium desktop (`GM_addElement` → thẻ `<script>`), còn lại (`loader.js` inline, chỉ dùng được khi trang không có CSP như doofcraft). Sửa nhánh Firefox thì test trên Firefox Android thật.
 
 ## Kiểm tra thay đổi
 
@@ -56,7 +57,10 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 ## Bẫy đã gặp
 
 - **Mã nguồn bản thường** công khai tại <https://github.com/JPTER78/pokesurvivor> (phục vụ pokesurvivor.com). Đọc ở đó để tìm màu/kích thước/cấu hình thay vì đoán.
-- pokesurvivor.com có `<meta>` CSP chặn script chèn vào trang. Trên điện thoại (Kiwi + Tampermonkey) bot **không chạy được** và đây là giới hạn đã chấp nhận: **không tìm cách lách CSP của trang** (xem NOTES.md mục 3, bước 0). PC (Tampermonkey/extension) chạy bình thường.
+- pokesurvivor.com có `<meta>` CSP chặn `<script>` chèn vào trang → **đừng chèn thẻ script / inline script, vô ích**. Đường chạy:
+  - PC: extension (`world: "MAIN"`) hoặc Tampermonkey desktop (`GM_addElement` qua API của extension).
+  - Android: **Firefox + Violentmonkey/Tampermonkey** — `psbot.user.js` chạy code trong sandbox của userscript với `with (pageWindow)`, tức là dùng **quyền của extension** (CSP của trang không áp dụng cho code của extension, không phải lách CSP). Xem NOTES.md mục 3b.
+  - Kiwi / Chrome trên Android: **không chạy** (isolated world, không có `chrome.userScripts`, buộc phải chèn `<script>` → bị CSP chặn).
 - Bản thường: `/dev.html` để lộ `window.G` (`SITE.scene()` đọc được), nhưng **từ 26/10 trên web nó chạy offline**: không tài khoản, không cloud, không bảng xếp hạng (`js/core/db.js`, `localReason = 'dev'`). **Đừng chuyển người chơi sang đó.** `site.js` đưa `/dev.html` về `/` (trừ `localStorage['psbot.dev'] = '1'`). Trên `/` không có `G` → bot đọc canvas.
 - Test bằng Chrome riêng (`--user-data-dir`): đặt profile ở **đường dẫn ngắn** (vd `C:\Users\<user>\.psbot-chrome`). Trong thư mục Temp dài, Cache Storage lỗi "Unexpected internal error" → Service Worker của game không tải được sprite → quái thành chấm tròn, bot không thấy quái. Thêm `--disable-backgrounding-occluded-windows --disable-renderer-backgrounding` kẻo cửa sổ bị che thì rAF dừng.
 - Chuỗi có `$` (regex `\$R\[`) trong lệnh shell bị hỏng → viết script ra file rồi chạy bằng `node`.

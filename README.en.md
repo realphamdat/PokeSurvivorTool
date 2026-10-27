@@ -12,10 +12,10 @@ Auto-play bot for [pokesurvivor.com](https://pokesurvivor.com/) and [pokesurvivo
 
 ## Install on a phone (Android)
 
-> ⚠️ **pokesurvivor.com blocks injected scripts**, so on phones the bot may not run depending on the browser (Kiwi: doesn't work). If you see *"PSBot: trang này chặn script…"* (this page blocks scripts), use a PC or try another browser. **pokesurvivor.doofcraft.com works fine** on phones.
+> ℹ️ **pokesurvivor.com blocks scripts added to the page** (CSP), so on Android use **Firefox**: the bot runs with the userscript manager's own privileges and never adds a script. **Kiwi / Chrome on Android cannot run the normal version** (doofcraft still works in any browser).
 
-1. Install a browser that supports extensions, e.g. **Kiwi Browser**, **Microsoft Edge** or **Firefox** (Play Store).
-2. In that browser, install the **Tampermonkey** extension (on Firefox, use **Violentmonkey** if Tampermonkey isn't available).
+1. Install **Firefox** (Play Store).
+2. In Firefox, install the **Violentmonkey** or **Tampermonkey** add-on (menu ⋮ → Add-ons).
 3. Tap the copy button on the block below, paste into that browser's **address bar** and open it:
 
 ```
