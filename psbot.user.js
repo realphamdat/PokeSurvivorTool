@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PokeSurvivor Bot
 // @namespace    https://github.com/damhieu2808/PokeSurvivorTool
-// @version      1.5.10
+// @version      1.5.11
 // @description  Bot tự chơi pokesurvivor.com + pokesurvivor.doofcraft.com — luôn tải bản phát hành mới nhất từ repo gốc
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
@@ -19,7 +19,7 @@
 (() => {
   const BASE = 'https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/';
   // Shown on the status line so a stale install (old script still on the phone) is obvious at a glance
-  const V = '1.5.10';
+  const V = '1.5.11';
   // Same files, same order as manifest.json / loader.js
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
   const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
@@ -69,9 +69,32 @@
   })();
   if (pageWindow) {
     Promise.all(FILES.map(get)).then(code => {
-      // new Function bodies are non-strict, so `with` is allowed. The files are concatenated in the same order and
-      // scope as separate <script> tags; one sourceURL keeps Firefox's console readable
-      new Function('W', `with (W) {\n${code.join('\n;\n')}\n}\n//# sourceURL=psbot/page.js`)(pageWindow);
+      const body = code.join('\n;\n');
+      // The stack says "psbot/page.js:1234"; turn that line into a file name so a phone screenshot is enough.
+      // base = the line the first file starts on (1 when run in the page, 2 under the sandbox's `with (W) {` line)
+      const lineStarts = base => code.map((_, i) => base + code.slice(0, i).reduce((n, c) => n + c.split('\n').length + 2, 0));
+      const report = (e, base) => {
+        const m = /psbot\/page\.js:(\d+)/.exec(String((e && e.stack) || ''));
+        const starts = lineStarts(base);
+        const at = m ? FILES.reduce((f, _, i) => (starts[i] <= +m[1] ? FILES[i] : f), '') : '';
+        return `${(e && e.message) || e}${at ? ` (${at})` : ''}`;
+      };
+      // Preferred: run inside the page's own realm, exactly like the extension does on a PC. No object crosses the
+      // sandbox/page boundary, so none of the realm errors (Intl options / sequence<> arguments: "Permission denied
+      // to access property …") can happen. Firefox keys the CSP eval check on the caller's principal, and a userscript
+      // is privileged, so the page's own script-src does not apply — if a build does refuse it, we fall back below.
+      let inPage = false;
+      if (typeof pageWindow.eval === 'function') {
+        try { pageWindow.eval(`${body}\n//# sourceURL=psbot/page.js`); inPage = true; }
+        // site.js already ran → the failure is in the bot itself, not the CSP: report it instead of running twice
+        catch (e) { if (pageWindow.PSBotSite) return status(`lỗi — ${report(e, 1)}`); }
+      }
+      if (!inPage) {
+        // Sandbox: `with (pageWindow)` gives the fetched files the page's own globals (document, canvas prototypes,
+        // keys, firebase). new Function bodies are non-strict, so `with` is allowed
+        try { new Function('W', `with (W) {\n${body}\n}\n//# sourceURL=psbot/page.js`)(pageWindow); }
+        catch (e) { return status(`lỗi — ${report(e, 2)}`); }
+      }
       // site.js sets PSBotSite; when that fails the page really is blocking us (or the manager hides the page window)
       if (!pageWindow.PSBotSite) return status(BLOCKED);
       status('đã tải, chờ game…');
