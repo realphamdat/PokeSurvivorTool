@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.3';
+  const VERSION = '1.6.4';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1293,8 +1293,30 @@
   const moveByName = new Map(MOVES.moves.map(m => [m.name.toLowerCase(), m]));   // scoreCard: buff (cat "status") or attack
   // Move -> stat card it needs to evolve: the site's own (doofcraft reads its game config), else the wiki's (moves.js evo)
   const evolveNeeds = SITE.evolveNeeds || new Map(MOVES.moves.filter(m => m.evo).map(m => [m.name.toLowerCase(), m.evo]));
-  const learnable = name => (MOVES.mons[name.toLowerCase()] || []).map(i => MOVES.moves[i]);
-  const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t]) || '';
+  // TMs (pokesurvivor.com's Kecleon Shop): moves taught outside the natural list. The game's save, cached in
+  // localStorage (ps.cloud.<uid>, or ps.save.<name> offline), keeps the partner and the taught TMs (ptm) by dex
+  const tmMoves = name => (SITE.id === 'default' && MOVES.tm && MOVES.tm[name.toLowerCase()] || []).map(i => MOVES.moves[i]);
+  const monByDex = Object.fromEntries(Object.entries(MOVES.dex || {}).map(([n, d]) => [d, n]));
+  function gameSave() {
+    let best = null;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!/^ps\.(cloud|save)\./.test(k)) continue;
+        const s = JSON.parse(localStorage.getItem(k));
+        if (s && typeof s === 'object' && (!best || (s.updated || 0) > (best.updated || 0))) best = s;
+      }
+    } catch {}
+    return SITE.id === 'default' ? best : null;
+  }
+  const taughtTms = name => {
+    const s = gameSave(), ids = (s && s.ptm && s.ptm[(MOVES.dex || {})[name.toLowerCase()]]) || [];
+    return new Set(MOVES.moves.filter(m => ids.includes(m.id)).map(m => m.name));
+  };
+  const learnable = name => [...(MOVES.mons[name.toLowerCase()] || []).map(i => MOVES.moves[i]), ...tmMoves(name)];
+  // In a run: the name on the HUD; at the menu: the save's partner
+  const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t])
+    || monByDex[(gameSave() || {}).partner] || '';
   const ms = document.createElement('div');
   ms.dataset.psbotUi = '';
   ms.className = 'psb';
@@ -1320,10 +1342,14 @@
   const $m = k => ms.querySelector(`[data-ms="${k}"]`);
   const moveLabel = m => `${m.name} · ${m.cat === 'status' ? 'buff' : `${m.kind} ${m.dmg ?? '?'}dmg/${m.cd ?? '?'}s`}`;
   function renderMoveset() {
-    const name = $m('mon').value.trim().toLowerCase(), list = learnable(name), build = CFG.builds[name] || [];
-    $m('slots').innerHTML = list.length ? [0, 1, 2, 3].map(i => `<label class="psb-row"><span class="psb-muted" style="width:18px">#${i + 1}</span>
-      <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${list.map((m, j) =>
-        `<option value="${m.name}" ${build[i] === m.name ? 'selected' : ''}>${j ? '' : '★ '}${moveLabel(m)}</option>`).join('')}</select></label>`).join('')
+    const name = $m('mon').value.trim().toLowerCase(), build = CFG.builds[name] || [];
+    const natural = (MOVES.mons[name] || []).map(i => MOVES.moves[i]), tms = tmMoves(name), taught = taughtTms(name);
+    const opt = (m, i, mark) => `<option value="${m.name}" ${build[i] === m.name ? 'selected' : ''}>${mark}${moveLabel(m)}</option>`;
+    // Taught TMs first: the game only offers a TM's card once it was taught to this pokémon
+    const tmGroups = i => [[tms.filter(m => taught.has(m.name)), 'TM đã dạy', 'TM ✓ '], [tms.filter(m => !taught.has(m.name)), 'TM chưa dạy (mua ở Kecleon Shop)', 'TM ']]
+      .filter(([l]) => l.length).map(([l, label, mark]) => `<optgroup label="${label}">${l.map(m => opt(m, i, mark)).join('')}</optgroup>`).join('');
+    $m('slots').innerHTML = natural.length ? [0, 1, 2, 3].map(i => `<label class="psb-row"><span class="psb-muted" style="width:18px">#${i + 1}</span>
+      <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${natural.map((m, j) => opt(m, i, j ? '' : '★ ')).join('')}${tmGroups(i)}</select></label>`).join('')
       : `<div style="color:#ff9a9a">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
     const saved = Object.entries(CFG.builds).filter(([n, b]) => !isDefaultBuild(n, b));
     const note = build.length && isDefaultBuild(name, build) ? 'Đang dùng build mặc định (SurvivorTiers). ' : '';
@@ -1337,13 +1363,14 @@
   $('moveset').onclick = openMoveset;
   $m('close').onclick = openMoveset;
   $m('mon').oninput = renderMoveset;
-  $m('cur').onclick = () => { $m('mon').value = currentMon(); $m('msg').textContent = currentMon() ? '' : 'Chưa thấy tên pokémon trên màn (vào trận trước)'; renderMoveset(); };
+  $m('cur').onclick = () => { $m('mon').value = currentMon(); $m('msg').textContent = currentMon() ? '' : 'Chưa thấy tên pokémon (vào trận trước)'; renderMoveset(); };
   $m('save').onclick = () => {
     const name = $m('mon').value.trim();
     const moves = [...new Set(PSBotList(ms.querySelectorAll('select[data-slot]')).map(s => s.value).filter(Boolean))];
     if (!learnable(name).length || !moves.length) return void ($m('msg').textContent = 'Chọn pokémon và ít nhất 1 move');
     window.PSBot.setBuild(name, moves);
-    $m('msg').textContent = `Đã lưu ${name}: ${moves.join(' > ')}`; renderMoveset();
+    const taught = taughtTms(name), untaught = tmMoves(name).filter(m => moves.includes(m.name) && !taught.has(m.name)).map(m => m.name);
+    $m('msg').textContent = `Đã lưu ${name}: ${moves.join(' > ')}` + (untaught.length ? ` · chưa dạy TM ${untaught.join(', ')}: game chưa đưa thẻ này` : ''); renderMoveset();
   };
   $m('del').onclick = () => {
     const name = $m('mon').value.trim();

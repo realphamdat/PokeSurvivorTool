@@ -41,7 +41,7 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
   - Panel, popup Moveset, danh mục F6, chạy nền, vòng lặp chính (đọc HUD: đồng hồ, máu `state.hpRatio`), gắn nhãn F7, `window.PSBot`.
 - `sites/<id>/site.js` định nghĩa `window.PSBotSite = h => ({...profile})`. `h` là các helper của core (`CFG`, `state`, `visible`, `scoreCard`, `pickRow`…), được điền sau, nên chỉ dùng bên trong method. Các trường profile được giải thích trong NOTES.md mục 1.
 - `sites/<id>/data.js`: nhãn sprite + build xuất từ nút "Xuất data.js" (F6). Thứ tự ưu tiên: mặc định < data.js < localStorage.
-- `core/moves.js`: sinh bởi `node crawl-moves.js` (pokesurvivor.wiki). `node crawl-moves.js --evo` chỉ làm mới bảng tiến hoá (`evo`).
+- `core/moves.js`: sinh bởi `node crawl-moves.js` (pokesurvivor.wiki). `node crawl-moves.js --evo` chỉ làm mới bảng tiến hoá (`evo`). `--tm` chỉ làm mới bảng TM (`tm`, `dex`, `id` của move; lấy từ `js/data/tms.js` của repo game). Popup Moveset đọc TM đã dạy từ save game trong localStorage (`ps.cloud.*` / `ps.save.*`, trường `ptm[dex]`, `partner`).
 - Thứ tự nạp (manifest/loader): `site.js` → `data.js` → `moves.js` → `bot.js` → `farmMoney.js`. `loader.js` phải ở gốc repo.
 - `psbot.user.js` có 3 nhánh: Firefox/Gecko (`unsafeWindow`/`wrappedJSObject` + `with (pageWindow)` → chạy bằng quyền userscript, dùng được trên pokesurvivor.com), Chromium desktop (`GM_addElement` → thẻ `<script>`), còn lại (`loader.js` inline, chỉ dùng được khi trang không có CSP như doofcraft). Sửa nhánh Firefox thì test trên Firefox Android thật.
 

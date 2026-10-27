@@ -36,7 +36,7 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 
 ## Use
 
-The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
+The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. On pokesurvivor.com the list also has the TM moves that pokémon can learn (Kecleon Shop): "TM ✓" = already taught, "TM" = not yet (the game only offers taught TMs). PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
 
 **🎃 Event Halloween:** this button works while the game has an event on, otherwise it is disabled.
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** runs the event's Waves mode.
@@ -48,7 +48,7 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
 
-**With a Moveset for the pokémon being played** (the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name). A pokémon without a Moveset of your own uses a default build: the best one [SurvivorTiers](https://survivortiers.pages.dev/en/) found in simulated runs (refreshed with `node crawl-moves.js --builds`). Priority, a higher tier always wins:
+**With a Moveset for the pokémon being played** (the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name, or the partner in the save while at the menu). A pokémon without a Moveset of your own uses a default build: the best one [SurvivorTiers](https://survivortiers.pages.dev/en/) found in simulated runs (refreshed with `node crawl-moves.js --builds`). Priority, a higher tier always wins:
 
 1. A card that **evolves** a skill.
 2. **A build move** not taken yet (#1 before #2…).
