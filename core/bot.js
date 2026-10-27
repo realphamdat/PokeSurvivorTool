@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.14';
+  const VERSION = '1.5.15';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -48,10 +48,11 @@
     goodRange: 1500,      // world units: good items within this become the target
     goodWeight: 5,
     riftWeight: 40,       // outweighs hazard / enemy avoidance (up to ~35): a rift is worth walking through them for
-    riftIgnore: 3000,     // ms a rift is skipped after finding no path to it (other targets: 20 s); never for getting stuck
+    riftIgnore: 3000,     // ms a rift / event objective is skipped after finding no path to it (other targets: 20 s); never for getting stuck
     // Prizes ("prize" tag, from the site's scene): a fleeing coin thief, a shiny to catch. Chased right after rifts, unless
     // inside a hazard; an enemy one (engage: true) is fought at CFG.engage like any enemy, the others walked into
     prizeWeight: 10,
+    questWeight: 10,      // event objectives (profile's objective()): a cage takes 6 s stood next to, often in a horde
     magnet: 100,          // world units: initial XP pickup radius; re-learned while playing (state.magnet)
     xpRange: 900,         // world units: XP orbs within this (but outside the pickup radius) become the target
     xpWeight: 4,
@@ -143,9 +144,25 @@
   const DATA = window.PSBotData || {};
   Object.assign(CFG.tags, DATA.tags);
   const userBuilds = { ...DATA.builds };
-  const TAG_KEY = 'psbot.tags';
-  try { Object.assign(CFG.tags, JSON.parse(localStorage.getItem(TAG_KEY) || '{}')); } catch {}
-  const saveTags = () => { try { localStorage.setItem(TAG_KEY, JSON.stringify(CFG.tags)); } catch {} };
+  // Only what the user changed is saved (null = a default label removed), so a fixed default in data.js reaches them.
+  // Up to 1.5.14 the whole table was saved: that copy of the old data.js (the healing spring as "good") is dropped
+  // once, keeping only labels for sprites the defaults don't know
+  const TAG_KEY = 'psbot.tags', TAG_VER = 'psbot.tagsV', defaultTags = { ...CFG.tags };
+  try {
+    let saved = JSON.parse(localStorage.getItem(TAG_KEY) || '{}');
+    if (localStorage.getItem(TAG_VER) !== '2') {
+      const sizeTag = k => defaultTags[k.split('#')[0]] || (SITE.bySize && SITE.bySize[k.split('#')[0]]);
+      saved = Object.fromEntries(Object.entries(saved).filter(([k, v]) => !(k in defaultTags) && !(v === 'good' && sizeTag(k) === 'heal')));
+      localStorage.setItem(TAG_KEY, JSON.stringify(saved)); localStorage.setItem(TAG_VER, '2');
+    }
+    for (const [k, v] of Object.entries(saved)) if (v === null) delete CFG.tags[k]; else CFG.tags[k] = v;
+  } catch {}
+  const saveTags = () => {
+    const diff = {};
+    for (const k in CFG.tags) if (CFG.tags[k] !== defaultTags[k]) diff[k] = CFG.tags[k];
+    for (const k in defaultTags) if (!(k in CFG.tags)) diff[k] = null;
+    try { localStorage.setItem(TAG_KEY, JSON.stringify(diff)); } catch {}
+  };
   const BUILD_KEY = 'psbot.builds';
   try { Object.assign(userBuilds, JSON.parse(localStorage.getItem(BUILD_KEY) || '{}')); } catch {}
   Object.assign(CFG.builds, userBuilds);
@@ -216,7 +233,10 @@
       addPt(ctx, x + ex * Math.cos(rot) - ey * Math.sin(rot), y + ex * Math.sin(rot) + ey * Math.cos(rot));
     }
   };
-  const styleKey = s => typeof s === 'string' ? s.replace(/\s+/g, '') : 'gradient';
+  // A gradient keys by its first colour stop ("gradient:rgba(255,170,60,0.9)"): glows of different props differ
+  const G2 = CanvasGradient.prototype, origStop = G2.addColorStop, gradColor = new WeakMap();
+  G2.addColorStop = function (at, color) { if (!gradColor.has(this)) gradColor.set(this, String(color).replace(/\s+/g, '')); return origStop.call(this, at, color); };
+  const styleKey = s => typeof s === 'string' ? s.replace(/\s+/g, '') : gradColor.has(s) ? `gradient:${gradColor.get(s)}` : 'gradient';
   const recordShape = (ctx, kind, pts, style) => {
     const m = ctx.getTransform(), s = m.a;
     if (!SITE.isWorld({ s, e: m.e, f: m.f }) || pts.length < 2) return;   // HUD / UI
@@ -377,7 +397,7 @@
   }
 
   function tick(frame) {
-    const world = frame.filter(SITE.isWorld);
+    let world = frame.filter(SITE.isWorld);
     if (!world.length) return;
     const pokes = world.filter(d => CFG.enemyRe.test(d.src));
     const cam = SITE.camera(world, pokes);
@@ -399,8 +419,12 @@
       state.selfDex = Object.keys(v).reduce((a, b) => (v[b] > v[a] ? b : a));
     }
     // Its attack frames (Shoot / Attack sprites are bigger and drawn off-centre) are the player too, not an enemy on top
-    const enemies = sc ? sc.enemies : pokes.filter(d => d !== (self && self.d) && !(state.selfDex && dexOf(d.src) === state.selfDex && centre(d) < 120 * s));
+    let enemies = sc ? sc.enemies : pokes.filter(d => d !== (self && self.d) && !(state.selfDex && dexOf(d.src) === state.selfDex && centre(d) < 120 * s));
     if (sc) { me.x = sc.me.x; me.y = sc.me.y; } else if (self) { me.x = self.d.x; me.y = self.d.y; }
+    // Event objectives the profile reads off the frame (doofcraft Halloween): a target, and what only looks like an
+    // enemy / pickup (a lost or caged pokémon, its HP bar), left out of everything below
+    const obj = !sc && SITE.objective ? SITE.objective(world, me, cam) : null;
+    if (obj && obj.hide.size) { world = world.filter(d => !obj.hide.has(d)); enemies = enemies.filter(d => !obj.hide.has(d)); }
     const byTag = t => sc ? sc[t] || [] : world.filter(d => tagOf(d.src) === t);
     const goods = byTag('good'), rifts = byTag('rift'), buffs = byTag('buff'), xps = byTag('xp'), cases = byTag('case');
     const hazards = sc ? sc.hazard.slice() : world.filter(d => tagOf(d.src) === 'hazard' || (d.shape && !tagOf(d.src) && CFG.autoTelegraph && isTelegraph(d)));
@@ -467,8 +491,8 @@
         if (state.stuck.length >= 2) {
           // Stuck again with no path around (wall not tagged / not learnt yet): give the target up for a while. While
           // following an A* path, clipping a corner only adds the learnt wall and the path is planned again
-          // A rift is never given up for that: the escape run and the learnt wall are enough to get around
-          if (state.prevTarget && !state.prevTarget.enemy && !state.prevTarget.rift && !(state.path && state.path.cells.length)) state.ignore.push({ ...state.prevTarget.w, until: now + 20000 });
+          // A rift / event objective is never given up for that: the escape run and the learnt wall are enough to get around
+          if (state.prevTarget && !state.prevTarget.enemy && !state.prevTarget.rift && !state.prevTarget.quest && !(state.path && state.path.cells.length)) state.ignore.push({ ...state.prevTarget.w, until: now + 20000 });
           const away = state.walls.filter(w => Math.hypot(meW.x - w.x, meW.y - w.y) < 200).reduce((a, w) => [a[0] + meW.x - w.x, a[1] + meW.y - w.y], [0, 0]);
           const ang = Math.atan2(away[1], away[0]) + (Math.random() - 0.5) * Math.PI / 1.5;
           state.escape = { dir: [Math.cos(ang), Math.sin(ang)], until: now + 900 };
@@ -509,7 +533,7 @@
     const unignored = list => list.filter(d => !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
     const rift = nearestTo(unignored(rifts)), good = nearestTo(reachable(goods)), foe = nearestTo(enemies);
     const prize = nearestTo(unignored(prizes).filter(d => !inHazard(d) && !(low && d.engage)));
-    const buff = nearestTo(reachable(buffs));
+    const buff = nearestTo(reachable(buffs)), quest = obj && obj.target && unignored([obj.target])[0];
     // Once next to a buff shrine the buff is granted; skip that shrine for buffCooldown
     if (buff && dist(buff, me) < CFG.buffReach) state.ignore.push({ x: (buff.x - e0) / s, y: (buff.y - f0) / s, until: now + CFG.buffCooldown });
     // Suitcase / breakable ("break": rock, …): stay within caseReach for caseTime of game time (paused time doesn't
@@ -539,6 +563,9 @@
     if (rift) { target = rift; weight = CFG.riftWeight; }
     else if (prize) { target = prize; weight = CFG.prizeWeight; stop = prize.engage ? CFG.engage : 0; }
     else if (heal && dist(heal, me) < CFG.goodRange) { target = heal; weight = CFG.goodWeight; hold = dist(heal, me) < CFG.healReach; }
+    // Event objective: not when low, never put off by enemies around it (a cage brings an ambush), only by a spot found
+    // unreachable. Stood on within its hold radius (world units)
+    else if (quest && !low) { target = quest; weight = CFG.questWeight; hold = dist(quest, me) < quest.hold; }
     else if (kase && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
@@ -550,9 +577,9 @@
     // close by (a small detour) comes before xp, farther ones after it
     if (rock && !low && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
     else if (!target && foe && !low) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
-    state.view.target = target;
+    state.view.target = target; state.view.quest = quest;
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
-    state.prevTarget = target && { enemy: target === foe, rift: target === rift, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
+    state.prevTarget = target && { enemy: target === foe, rift: target === rift, quest: target === quest, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
     state.view.walls = walls;
     const escape = state.escape && state.escape.until > now ? state.escape.dir : null;
     // Terrain wall tiles by world tile index, for the per-frame step check (cost): walking into one only gets the
@@ -627,9 +654,9 @@
         const g = state.giveUps;
         state.giveUps = state.path.gaveUp ? { ...tW, n: (g && Math.hypot(g.x - tW.x, g.y - tW.y) <= CFG.cell ? g.n : 0) + 1 } : null;
         if ((state.path.none || (state.giveUps && state.giveUps.n >= 10)) && target !== foe) {
-          const skip = target === rift ? CFG.riftIgnore : 20000;
+          const skip = target === rift || target === quest ? CFG.riftIgnore : 20000;
           state.ignore.push({ ...tW, until: now + skip }); state.giveUps = null;
-          log(`không có đường tới ${target === rift ? 'rift' : 'mục tiêu'} — bỏ qua ${skip / 1000}s`);
+          log(`không có đường tới ${target === rift ? 'rift' : target === quest ? 'nhiệm vụ' : 'mục tiêu'} — bỏ qua ${skip / 1000}s`);
         }
       }
       wp = state.path.wp;
@@ -999,6 +1026,7 @@
     ring(v.prizes || [], '#fd3', () => 22);
     ring(v.buffs, '#ff0', () => 14);
     ring(v.heals || [], '#6fc', () => CFG.healReach * v.s);
+    ring(v.quest ? [v.quest] : [], '#fb4', d => d.hold * v.s);
     ring(v.xps, '#0fc', () => 4);
     ring(v.cases, '#fa0', () => Math.max(6, CFG.caseReach * v.s));
     g.strokeStyle = '#0fc6'; g.setLineDash([2, 6]); g.beginPath(); g.arc(v.me.x, v.me.y, state.magnet * v.s, 0, 7); g.stroke(); g.setLineDash([]);
@@ -1119,6 +1147,8 @@
       <div style="text-align:center;line-height:1.5"><b>Techcombank</b> · DAM XUAN HIEU<br>
         <b data-ctl="acct" style="color:#f5c542;font-size:15px;letter-spacing:.04em">19036427455012</b>
         <button data-ctl="copyacct" class="psb-btn" style="flex:0 0 auto;padding:2px 8px;font-size:12px;margin-left:4px">Copy</button></div>
+      <div class="psb-sec">Cần tool cho game khác?</div>
+      <div>Bạn cần làm tool cho web game nào khác thì liên hệ tác giả qua <b>TikTok</b> nhé 🎮</div>
     </div>
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" class="psb-foot">⭐ Tác giả <b>damhieu2808</b> · GitHub</a>
     <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="order:2;display:none;color:#1b202b;background:#f5c542;padding:6px 12px;text-decoration:none;font-weight:bold;font-size:12px"></a>`;
@@ -1547,7 +1577,7 @@
     unload() {
       running = false; applyDir(null); clearInterval(updateTimer);
       P.drawImage = origDraw; P.arc = origArc; P.fillText = origText;
-      Object.assign(P, pathOrig);
+      Object.assign(P, pathOrig); G2.addColorStop = origStop;
       if (bgWorker) {
         bgWorker.terminate();
         window.requestAnimationFrame = nativeRAF; window.cancelAnimationFrame = nativeCAF;

@@ -33,7 +33,7 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
     - Phân loại theo `tagOf(src)`: `good` / `xp` / `rift` / `buff` / `case` / `break` / `wall` / `hazard` / `shot` / `safe`.
     - Đạn (`shot`) thành đường bay; `terrain` từ profile.
     - Phát hiện kẹt → `state.walls`.
-    - Chọn mục tiêu (rift > prize (thief / shiny, chỉ có ở `scene` bản thường) > vali > buff > đồ tốt > kinh nghiệm > đá phá được > quái); bỏ mục tiêu có quái đứng sát (`crowded`), nằm trong vùng nguy hiểm (`inHazard`), hoặc khi máu thấp (`low`).
+    - Chọn mục tiêu (rift > prize (thief / shiny, chỉ có ở `scene` bản thường) > hồ hồi máu (`heal`, khi máu < 80%) > nhiệm vụ event (`SITE.objective`, doofcraft Halloween) > vali > buff > đồ tốt > kinh nghiệm > đá phá được > quái); bỏ mục tiêu có quái đứng sát (`crowded`), nằm trong vùng nguy hiểm (`inHazard`), hoặc khi máu thấp (`low`).
     - Nếu đường thẳng bị chặn: `planPath()` → A* (`makeGrid` / `findPath` / `lineClear`) → điểm đi tiếp `wp`.
     - `cost(dir)` chấm 16 hướng → `applyDir`.
   - `scoreCard()`: chấm thẻ lên cấp. Có build (Moveset) thì xếp theo tầng: tiến hoá 500 > move build chưa có 400 > move ngoài build khi còn ô (giữ ô cho move build chưa có; `SITE.moveSlots()` hoặc đếm thẻ "New"; bond gộp nhiều move vào 1 ô, game chỉ đưa thẻ move mới khi còn ô) 350 > Learning (tăng kinh nghiệm, `XP_RE`) 320 > nâng move tấn công build 300 > nội tại để tiến hoá 250 > nâng buff build 200 > nội tại 150/146/140 > skill ngoài build. Không có build thì dùng logic cũ. **Sửa thứ tự này thì cập nhật luôn mục "Bot chọn thẻ lên cấp thế nào" trong README.md + README.en.md.**

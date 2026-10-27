@@ -129,9 +129,77 @@ window.PSBotSite = h => {
     },
   };
 
+  // ---------- Halloween objectives (Haunted Hollow, 1-2 a round), drawn as the game's renderer does ----------
+  // Active ones are listed by title in the HUD panel (done / failed ones get a ✓ / ✗). On screen: an open door glows
+  // (radius 46, 30 above it), a lantern that went out glows blue above it, a caged pokémon is drawn inside its cage, a
+  // lost one stands on a #7dffb0 ellipse and its goal (the chapel door) is a #5fe08a ellipse. Off screen, an arrow on
+  // the screen edge points at the nearest one (#ffb347; lost pokémon / goal #7dffb0), labelled "<title> · N m" (1 m =
+  // 32 world units). hold = how close to stand, in world units (the game's range around the prop, less some margin)
+  const TITLES = { doors: 'Trick-or-treat', lanterns: 'Light the lanterns', cage: 'Free the caged Pokémon', escort: 'Escort the lost Pokémon' };
+  function objective(world, me, cam) {
+    const s = cam.s, hide = new Set(), hud = h.state.hudTexts;
+    const active = k => hud.has(TITLES[k]);
+    const gap = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) / s;
+    const nearest = list => list.reduce((b, d) => (!b || gap(d, me) < gap(b, me) ? d : b), null);
+    const at = (d, dy, kind, hold) => ({ src: `quest:${kind}`, x: d.x, y: d.y + dy * s, w: 0, h: 0, hold });
+    const pokes = world.filter(d => /\/sprites\//.test(d.src));
+    const onTop = (p, d) => Math.abs(p.x - d.x) < 12 * s && d.y > p.y - Math.abs(p.h) / 2 && d.y < p.y + Math.abs(p.h) / 2 + 12 * s;
+    // Not pickups: #5fe08a bigger than a heal berry (the lost pokémon's HP bar, the escort goal). Not enemies: the lost
+    // pokémon and caged ones. The arrows aren't telegraphs
+    const goal = world.find(d => d.src === 'fill:#5fe08a' && Math.abs(d.w) / s > 80);
+    for (const d of world) if (d.src === 'fill:#5fe08a' && Math.max(Math.abs(d.w), Math.abs(d.h)) / s > 20) hide.add(d);
+    const arrows = world.filter(d => /^fill:#(ffb347|7dffb0)$/.test(d.src) && d.pts && d.pts.length === 3);
+    arrows.forEach(d => hide.add(d));
+    const lost = world.find(d => d.src === 'fill:#7dffb0' && d.pts && d.pts.length > 8);
+    if (lost) pokes.filter(p => onTop(p, lost)).forEach(p => hide.add(p));
+    const cages = world.filter(d => /^canvas:24x28#/.test(d.src));
+    // A caged one idles centred in the cage, its sprite ~15 below the cage's centre
+    const inCage = (p, c) => /\/Idle\.png/.test(p.src) && Math.abs(p.x - c.x) < 3 * s && p.y - c.y > 5 * s && p.y - c.y < 25 * s;
+    const caged = cages.filter(c => pokes.some(p => inCage(p, c)));
+    for (const c of caged) pokes.filter(p => inCage(p, c)).forEach(p => hide.add(p));
+    let target = null;
+    // Escort first (it has a time limit): the lost pokémon while it waits (one that follows stays next to us), then the goal
+    if (active('escort')) {
+      if (lost && gap(lost, me) > 70) target = at(lost, 0, 'escort', 0);
+      else if (goal) target = at(goal, 0, 'escort', 30);
+    }
+    if (!target && active('doors')) {
+      const g = nearest(world.filter(d => d.src === 'fill:gradient:rgba(255,170,60,0.9)' && Math.abs(d.w) / s > 70));
+      if (g) target = at(g, 30, 'doors', 26);
+    }
+    if (!target && active('lanterns')) {
+      const g = nearest(world.filter(d => d.src === 'fill:gradient:rgba(160,190,255,0.7)'));
+      const lamp = g && nearest(world.filter(d => /^canvas:8x23#/.test(d.src) && gap(d, g) < 60));
+      if (lamp) target = at(lamp, Math.abs(lamp.h) / 2 / s, 'lanterns', 30);
+    }
+    if (!target && active('cage')) {
+      const c = nearest(caged);
+      if (c) target = at(c, Math.abs(c.h) / 2 / s, 'cage', 36);
+    }
+    // Off screen: along the arrow, at the labelled distance from the player. The lost pokémon's arrow first, then the
+    // objectives' (thieves / roaming legends have arrows of other colours)
+    if (!target) {
+      const texts = [...hud], titles = Object.values(TITLES);
+      const metres = d => {
+        const quest = d.src === 'fill:#ffb347';
+        const t = texts.find(t => / m$/.test(t) && titles.some(x => t.startsWith(x + ' ·')) === quest);
+        return t ? +(t.match(/(\d+) m$/) || [])[1] : 0;
+      };
+      const a = arrows.find(d => d.src === 'fill:#7dffb0' && active('escort')) || arrows.find(d => d.src === 'fill:#ffb347');
+      if (a) {
+        const ux = a.pts[0].x - a.e, uy = a.pts[0].y - a.f, l = Math.hypot(ux, uy) || 1;
+        const dx = ux / l, dy = uy / l, wx = a.e - me.x, wy = a.f - me.y, r = (metres(a) || 20) * 32 * s;
+        const b = wx * dx + wy * dy, t = -b + Math.sqrt(Math.max(0, b * b - (wx * wx + wy * wy) + r * r));
+        target = { src: `quest:arrow`, x: a.e + dx * t, y: a.f + dy * t, w: 0, h: 0, hold: 0 };
+      }
+    }
+    return { target, hide };
+  }
+
   return {
     id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
     event,
+    objective,                // Halloween objectives: target + sprites that aren't enemies / pickups
     ready: () => !!document.getElementById('app'),
     canvas: () => document.querySelector('canvas.ps-canvas'),
     // The whole frame is scaled by devicePixelRatio; the world also gets the camera translation, the HUD doesn't
@@ -146,8 +214,9 @@ window.PSBotSite = h => {
     sizeTags: false,
     // Prop sprites by size, from the game's sprite generators: rock (solid, breaks into xp / coins / heals), trap
     // (hurts 10% max HP), the biome's tree (forest 30x40, crystal 26x40, dead 28x40: solid, never breaks), Halloween
-    // lantern / cage / fence post (solid) and pumpkin (breaks). Not by size: the 16x14 fence (same size as a chest)
-    bySize: { 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
+    // lantern / cage / fence post (solid) and pumpkin (breaks), healing spring (heals while stood on, every biome). Not
+    // by size: the 16x14 fence (same size as a chest)
+    bySize: { 'canvas:34x16': 'heal', 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
       'canvas:8x23': 'wall', 'canvas:24x28': 'wall', 'canvas:6x20': 'wall', 'canvas:14x11': 'break' },
     evolveNeeds,              // move name -> passive card it needs to evolve
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding

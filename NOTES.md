@@ -41,6 +41,7 @@ Cập nhật: 2026-10-27 (bot v1.5.13 đã phát hành; thêm nhánh Firefox cho
 | `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `caseReach: 40` | `caseReach: 45`, … |
 | `scene(cam)` | Cả cảnh (quái, nguy hiểm, vật phẩm, tường, địa hình) theo nhãn, toạ độ màn hình; `null` = đọc canvas | ✅ (từ `window.G`, chỉ trên `/dev.html`) | ❌ |
 | `event` | Nút chạy event trong panel: `{ label, title, available(), start(), stop() }` (mục 4b) | ❌ | ✅ (Halloween Waves) |
+| `objective(world, me, cam)` | Mục tiêu nhiệm vụ event `{ target: {x, y, src, hold}, hide: Set }`: `hide` = vật bỏ khỏi mọi danh sách (pokémon lạc / trong lồng, thanh máu) | ❌ | ✅ (mục 4b) |
 
 ---
 
@@ -249,8 +250,15 @@ Nếu bước 2 hỏng: thử đổi manager (Violentmonkey ↔ Tampermonkey) v�
 
 **Việc tiếp theo:**
 1. Kiểm chứng chấm điểm rương.
-2. Mục tiêu phụ: nhận ra cửa / đèn / lồng đang hoạt động (theo màu ở trên), đứng cạnh đủ thời gian. Có thể dùng cơ chế `case` + `caseTime` sẵn có.
+2. ~~Mục tiêu phụ~~: **đã làm (27/10, chưa phát hành)**, xem "Mục tiêu phụ (bot)" bên dưới.
 3. Vòng bầy ma: né tốt hơn (quái nhanh, đông).
+
+**Mục tiêu phụ (bot), `objective()` trong `sites/doofcraft/site.js`:**
+- Người dùng báo: nhận nhiệm vụ xong bot đứng quay quay ở vòng con pokémon lạc, và xoay trước cửa nhà nguyện. Nguyên nhân: thanh máu con lạc và vòng đích (`drawLostGoal`) đều màu `#5fe08a` = quả hồi máu (`good`); con lạc còn bị tính là quái. Giờ `hide` bỏ các thứ đó (cả pokémon trong lồng: sprite `Idle` ở giữa lồng, thấp hơn tâm ~15).
+- Nhiệm vụ đang mở = tiêu đề có trong HUD (không có ✓/✗). Trên màn hình: cửa = `fill:gradient:rgba(255,170,60,0.9)` rộng > 70 (cửa ở dưới 30), đèn tắt = `fill:gradient:rgba(160,190,255,0.7)` (đứng ở chân sprite 8x23 gần nhất), lồng = 24x28 có pokémon bên trong, con lạc = elip `fill:#7dffb0` (xa > 70 thì nó đang chờ), đích = elip `#5fe08a` rộng > 80. Core giờ gắn key gradient theo màu stop đầu (`addColorStop`).
+- Ngoài màn hình: mũi tên tam giác `fill:#ffb347` (nhiệm vụ) / `#7dffb0` (con lạc / đích, nhãn "Marker · N m"), gốc = `e,f` của item, đỉnh = `pts[0]`; điểm đích trên tia đó cách người chơi N×32.
+- Core: sau rift / prize / hồ máu, không làm khi máu thấp, `CFG.questWeight` 10, không bỏ vì quái đông; không có đường thì bỏ 3s như rift (trước là 20s: đích cách ~1800, ngoài lưới A*, bị bỏ liên tục → Escort thất bại).
+- Kết quả (Mewtwo): trước khi sửa 0 nhiệm vụ. Sau: trận 1 từ vòng 7: Escort ✓, Lanterns ✓, Cage ✗ (bị bầy quái đẩy ra, khi đó trọng số còn 5); trận 2 vòng 2–5 (trọng số 10): Trick-or-treat ✓, Escort ✓ ×3, Cage ✓. Trận 1 chết vòng 9 (~9:40).
 
 ---
 
