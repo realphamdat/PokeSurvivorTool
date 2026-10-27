@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PokeSurvivor Bot
 // @namespace    https://github.com/damhieu2808/PokeSurvivorTool
-// @version      1.5.8
+// @version      1.5.9
 // @description  Bot tự chơi pokesurvivor.com + pokesurvivor.doofcraft.com — luôn tải bản phát hành mới nhất từ repo gốc
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
@@ -18,6 +18,8 @@
 // "release" branch, so released updates to the bot never need a reinstall.
 (() => {
   const BASE = 'https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/';
+  // Shown on the status line so a stale install (old script still on the phone) is obvious at a glance
+  const V = '1.5.9';
   // Same files, same order as manifest.json / loader.js
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
   const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
@@ -30,7 +32,7 @@
       el.style.cssText = 'position:fixed;left:4px;top:4px;z-index:2147483647;max-width:90vw;font:12px monospace;background:#000c;color:#fc3;padding:3px 6px;border-radius:4px;pointer-events:none';
       document.documentElement.append(el);
     }
-    el.textContent = `PSBot: ${msg}`;
+    el.textContent = `PSBot v${V}: ${msg}`;
   };
   // pokesurvivor.com's Content-Security-Policy refuses scripts added to the page, so a Chromium phone (Kiwi) can never
   // inject one. Firefox userscripts do not inject a script at all: see the "Firefox" branch below

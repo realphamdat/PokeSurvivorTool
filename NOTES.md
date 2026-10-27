@@ -160,13 +160,15 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 
 **Cài trên Android:** Firefox (CH Play) → Violentmonkey hoặc Tampermonkey → mở `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js` → **Install** → cho phép `raw.githubusercontent.com` → mở game. Doofcraft chạy được ở cả Kiwi và Firefox.
 
+**Đọc dòng trạng thái để biết đang chạy bản nào:** dòng góc trên trái luôn có `PSBot v1.5.9: …`. Không có số `v…` → **điện thoại vẫn đang chạy userscript cũ**, phải cập nhật (mở lại link trên → *Update/Reinstall*; nếu manager vẫn giữ bản cũ thì xoá script rồi cài lại). Lỗi 27/10 gặp đúng trường hợp này: bản 1.5.7 cũ đi vào nhánh dự phòng, chèn `<script>` bị CSP chặn, đợi 8 giây rồi báo "trang này chặn script…".
+
 **Giới hạn:**
 - **Kiwi / Chrome Android vẫn không chạy** (CSP). Muốn thì phải cài extension `.crx` có `world: "MAIN"` — chưa làm, và Android không có "Load unpacked".
 - `Worker` tạo từ `blob:` vẫn bị CSP chặn → chế độ chạy nền rơi về `setInterval` (điện thoại đang mở tab thì không ảnh hưởng).
 - Panel/log của bot là tiếng Việt; điện thoại không có F8/F9, dùng nút ▶ Chạy trên panel.
 
 **Cần kiểm tra trên máy thật:**
-1. Panel hiện ở góc trên trái (không còn dòng "chặn script").
+1. Panel hiện ở góc trên trái, dòng trạng thái có `v1.5.9` và không còn chữ "chặn script".
 2. Vào trận: `PSBot.state.lastFrame.length` > 0 (nếu 0 → hook không vào được prototype; xem console có `Permission denied`/`Xray`).
 3. Bot tự đi, tự nhặt đồ, tự chọn thẻ (bấm vào thẻ — nhánh điện thoại của `site.js`).
 4. Chơi lại tự động sau khi chết.
