@@ -207,6 +207,17 @@ Nếu bước 2 hỏng: thử đổi manager (Violentmonkey ↔ Tampermonkey) v�
 - Log "chọn đồ" / "bond" lặp 2–3 lần mỗi bảng (bảng còn hiện sau lần bấm đầu, `pickAt` chỉ chờ 800ms). Chọn vẫn đúng, chưa sửa.
 - **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trong vòng 220 đơn vị thì chạy về hướng thưa nhất. 1 trận chết ở 5:35, sớm hơn bản không có nó. Nếu thử lại: chỉ bật khi máu thấp, hoặc ưu tiên hạ quái nhanh thay vì chạy.
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng.
+- **Sống lâu hơn (27/10, bản 1.5.17)**, đo trên Waves (Mewtwo) bằng bộ ghi 250 ms (máu, quái theo khoảng cách tới mép, mục tiêu):
+  - Trận gốc chết 12:16 (vòng 11). Từ 3:26 tới lúc chết mất tổng 4,92 thanh máu: **49% lúc làm nhiệm vụ** (đứng ở lồng giữa phục kích, Escort dẫn qua bầy), 36% lúc đã máu thấp mà bị vây. 78% sát thương khi quái chồng lên người (mép < 0); 53% lúc đi đánh quái.
+  - Đã sửa:
+    - Nhiệm vụ chỉ làm khi máu > `questHp` 0,7 và dưới `questCrowd` 3 quái có mép trong `contact`. Trọng số 10 chỉ khi đang đứng giữ chỗ, lúc đi tới dùng 5.
+    - Đánh quái giữ `engage` tính **từ mép** quái (trước tính từ tâm: quái to vòng sau có bán kính 45–60, nên bot đứng trong vùng né 80 của chính nó). Chỉ đi đánh khi máu ≥ `huntHp` 0,75 và dưới `huntCrowd` 8 quái trong 200.
+    - Không đi mở vali khi máu thấp.
+    - Bị quái chặn (mép trong 100 phía trước) không tính là kẹt: trước đây bật thoát kẹt hướng ngẫu nhiên, lực 40 đè cả lực né, đâm vào bầy.
+    - Né cả bầy: hướng ngược trọng tâm quái trong 400 (trọng số 1/khoảng cách mép), `fleeWeight` 15 khi máu thấp, `fleeCrowdWeight` 8 khi ≥ `crowdFlee` 10 quái trong 250.
+  - Kết quả từng trận (mỗi trận một phiên bản, dao động rất lớn): gốc 12:16; + chặn nhiệm vụ 13:40 (vòng 11, có Revive); + đánh từ mép / vali / né khi máu thấp 6:58 (vòng 9); + không thoát kẹt giữa bầy / giới hạn đánh 2:55 (vòng 4, bầy ma 8 → 30 con trong 5 s, Lv 15); + né cả bầy 10:46 (vòng 9). **Chưa đủ để kết luận.** Né cả bầy làm giết chậm hơn: 8:03 mới vòng 7 / Lv 23, trận trước cùng lúc đã vòng 9 / Lv 31.
+  - Cách chết còn lại: bị vây kín 13–17 con trong 100 suốt > 10 s (không hướng nào trống), và vòng bầy ma lúc cấp còn thấp. Né cả bầy khi đông **mặc định tắt** ở 1.5.17 (`crowdFlee: Infinity`, bật thử: `PSBot.CFG.crowdFlee = 10`); né cả bầy khi máu thấp vẫn bật.
+  - **Đo tiếp:** `farmMoney.js` giờ lưu phiên bản bot (`v`) cho mỗi trận và panel hiện "sống (N trận gần nhất, vX): TB · dài nhất" của bản đang chạy; `PSFarm.stats()` có cột `v`. Cần ~10 trận mỗi bản để so.
 
 ### 4b. Event Halloween (doofcraft, chế độ Waves), bắt đầu 27/10, còn khoảng 6 ngày
 

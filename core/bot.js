@@ -33,18 +33,25 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.16';
+  const VERSION = '1.5.17';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
     // Each frame one target is chosen: rift > good item (within goodRange) > nearest enemy.
     contact: 80,          // world units (from enemy edge): only this close do enemies push the player away
-    engage: 120,          // world units: distance kept from the targeted enemy while fighting it
+    engage: 120,          // world units: distance kept from the targeted enemy's edge while fighting it
     lowHp: 0.5,           // HP share under which the bot only survives: no xp / breakables / hunting, enemies avoided harder
     hurtDrop: 0.25,       // ... and so does losing this share of HP within hurtWindow ms (a hard hitter: by 50 % it's too late),
     hurtWindow: 2000,     //     for hurtHold ms after
     hurtHold: 4000,
+    fleeWeight: 15,       // low: steps away from the crowd as a whole too (enemies within 400, nearer ones count more)
+    // Same with fleeCrowdWeight once crowdFlee enemies' edges are within 250, at any HP. Off (Infinity): it slowed the
+    // kills (fewer levels later on) and one run can't tell whether it helps; try with PSBot.CFG.crowdFlee = 10
+    crowdFlee: Infinity,
+    fleeCrowdWeight: 8,
     huntWeight: 3,
+    huntHp: 0.75,         // enemies are only walked up to above this HP, and with fewer than huntCrowd enemies' edges within
+    huntCrowd: 8,         // 200; else the player holds back and lets moves fire (walking up to one dragged it into the horde)
     goodRange: 1500,      // world units: good items within this become the target
     goodWeight: 5,
     riftWeight: 40,       // outweighs hazard / enemy avoidance (up to ~35): a rift is worth walking through them for
@@ -52,7 +59,9 @@
     // Prizes ("prize" tag, from the site's scene): a fleeing coin thief, a shiny to catch. Chased right after rifts, unless
     // inside a hazard; an enemy one (engage: true) is fought at CFG.engage like any enemy, the others walked into
     prizeWeight: 10,
-    questWeight: 10,      // event objectives (profile's objective()): a cage takes 6 s stood next to, often in a horde
+    questWeight: 10,      // event objectives (profile's objective()) while stood on: a cage takes 6 s, often in a horde
+    questHp: 0.7,         // ... only while HP is above this and fewer than questCrowd enemies' edges are within contact: a
+    questCrowd: 3,        //     cage's ambush and the round's horde killed runs that kept at it
     magnet: 100,          // world units: initial XP pickup radius; re-learned while playing (state.magnet)
     xpRange: 900,         // world units: XP orbs within this (but outside the pickup radius) become the target
     xpWeight: 4,
@@ -485,10 +494,11 @@
       const travel = state.posHist.reduce((a, p, i) => a + (i ? Math.hypot(p.x - state.posHist[i - 1].x, p.y - state.posHist[i - 1].y) : 0), 0);
       if (state.on && state.dir && Math.hypot(meW.x - old.x, meW.y - old.y) < 3 && travel < 12) {
         const ahead = { x: meW.x + state.dir[0] * 40, y: meW.y + state.dir[1] * 40 };
-        // Held back by a crowd of enemies is not a wall
-        if (!enemies.some(e => Math.hypot((e.x - e0) / s - ahead.x, (e.y - f0) / s - ahead.y) < CFG.contact + 20)) state.walls = state.walls.concat({ ...ahead, until: Infinity }).slice(-300);
-        state.stuck = state.stuck.filter(t => t > now - 3000).concat(now);
-        if (state.stuck.length >= 2) {
+        // Held back by a crowd of enemies is not a wall, nor a reason for a random escape run (it went into them)
+        const crowd = enemies.some(e => Math.hypot((e.x - e0) / s - ahead.x, (e.y - f0) / s - ahead.y) - Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s < CFG.contact + 20);
+        if (!crowd) state.walls = state.walls.concat({ ...ahead, until: Infinity }).slice(-300);
+        if (!crowd) state.stuck = state.stuck.filter(t => t > now - 3000).concat(now);
+        if (!crowd && state.stuck.length >= 2) {
           // Stuck again with no path around (wall not tagged / not learnt yet): give the target up for a while. While
           // following an A* path, clipping a corner only adds the learnt wall and the path is planned again
           // A rift / event objective is never given up for that: the escape run and the learnt wall are enough to get around
@@ -505,6 +515,7 @@
     if (state.dead) return void applyDir(null);
 
     const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) / s;
+    const edge = e => dist(e, me) - Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s;   // to an enemy's edge, world units
     const nearestTo = list => list.reduce((b, d) => (!b || dist(d, me) < dist(b, me) ? d : b), null);
     // Pickups inside a telegraph / a shot's path wait until it is over; items that got us stuck (behind a wall) are
     // ignored for a while
@@ -563,10 +574,12 @@
     if (rift) { target = rift; weight = CFG.riftWeight; }
     else if (prize) { target = prize; weight = CFG.prizeWeight; stop = prize.engage ? CFG.engage : 0; }
     else if (heal && dist(heal, me) < CFG.goodRange) { target = heal; weight = CFG.goodWeight; hold = dist(heal, me) < CFG.healReach; }
-    // Event objective: not when low, never put off by enemies around it (a cage brings an ambush), only by a spot found
-    // unreachable. Stood on within its hold radius (world units)
-    else if (quest && !low) { target = quest; weight = CFG.questWeight; hold = dist(quest, me) < quest.hold; }
-    else if (kase && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
+    // Event objective: not when hurt or pressed (questHp / questCrowd), not put off by a few enemies right at it (a cage
+    // brings an ambush), only by a spot found unreachable. Stood on within its hold radius (world units)
+    else if (quest && !low && hp > CFG.questHp && enemies.filter(e => edge(e) < CFG.contact).length < CFG.questCrowd) {
+      target = quest; hold = dist(quest, me) < quest.hold; weight = hold ? CFG.questWeight : CFG.goodWeight;
+    }
+    else if (kase && !low && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
     // XP: only walk until the orb is inside the pickup radius; it flies in by itself from there
@@ -576,7 +589,8 @@
     // Breakable: stand next to it while fighting, so area moves / stray shots break it (drops xp, coins, heals). One
     // close by (a small detour) comes before xp, farther ones after it
     if (rock && !low && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
-    else if (!target && foe && !low) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
+    // Kept at engage from its edge: big sprites (late rounds, bosses) were fought from inside their contact zone
+    else if (!target && foe && !low && hp >= CFG.huntHp && enemies.filter(e => edge(e) < 200).length < CFG.huntCrowd) { target = foe; weight = CFG.huntWeight; stop = CFG.engage + Math.max(Math.abs(foe.w), Math.abs(foe.h)) / 2 / s; }
     state.view.target = target; state.view.quest = quest;
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
     state.prevTarget = target && { enemy: target === foe, rift: target === rift, quest: target === quest, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
@@ -665,6 +679,20 @@
     state.view.path = state.path && state.path.cells.map(toScreen);
     state.view.wp = wpS;
 
+    // Unit vector away from the enemies within 400 (weight 1 / distance to their edge), when low or a horde gathers
+    let flee = null;
+    const fleeW = low ? CFG.fleeWeight : enemies.filter(e => edge(e) < 250).length >= CFG.crowdFlee ? CFG.fleeCrowdWeight : 0;
+    if (fleeW) {
+      let fx = 0, fy = 0;
+      for (const e of enemies) {
+        const d = edge(e);
+        if (d > 400) continue;
+        const r = dist(e, me) || 1, k = 1 / Math.max(d, 20);
+        fx += (me.x - e.x) / s / r * k; fy += (me.y - e.y) / s / r * k;
+      }
+      const l = Math.hypot(fx, fy);
+      if (l > 0) flee = [fx / l, fy / l];
+    }
     const cost = dir => {
       const at = k => ({ x: me.x + (dir ? dir[0] : 0) * CFG.lookahead * s * k, y: me.y + (dir ? dir[1] : 0) * CFG.lookahead * s * k });
       const p = at(1);
@@ -700,6 +728,8 @@
         else if (hit(CFG.lookahead / 2)) c += 20;
         else if (hit(CFG.lookahead)) c += 6;
       }
+      // Away from the crowd as a whole, not just the enemies touching us (a horde closes in from every side)
+      if (dir && flee) c -= fleeW * (dir[0] * flee[0] + dir[1] * flee[1]);
       // Getting unstuck outweighs hazards: better take a hit than stay pinned against a wall
       if (escape) c -= dir ? 40 * (dir[0] * escape[0] + dir[1] * escape[1]) : 0;
       else if (target && hold) c += weight * dist(p, target) / CFG.lookahead;     // already on top: stay put
@@ -1538,6 +1568,7 @@
 
   window.PSBot = {
     CFG, state, ctl, SITE, // ctl = control panel (top-left); presets append their own lines to it · SITE = game version profile
+    version: VERSION,
     // PSBot.play(5) = chơi 5 ván (0 = vô hạn) · PSBot.pause() / resume() / stop()
     play(n) { if (n !== undefined) $('runs').value = n; control.play(); },
     pause: () => control.pause(), resume: () => control.resume(), stop: () => control.stop(),
