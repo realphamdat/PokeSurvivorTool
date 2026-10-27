@@ -47,13 +47,22 @@
     // pocket open at the bottom, the item is behind its back wall, and a telegraph blinks across the opening
     pocket: { walls: [...row(-96, 64, -96), ...col(-96, -64, 64), ...col(64, -64, 64)], item: [0, -260], terrain: true,
       hazard: [-150, 70, 300, 70], blink: 1200, start: [0, -40] },
+    // Terrain corner (walls above and to the left), the item out in the open; telegraphs keep landing alternately along
+    // the corner's two open sides, so dodging them shuffles the player back and forth inside it (pinned)
+    corner: { walls: [...row(-128, 192, -128), ...col(-128, -96, 192)], item: [260, 260], terrain: true,
+      hazards: [[-96, -20, 230, 90], [-20, -96, 90, 230]], blink: 700, start: [-60, -60] },
+    // Same corner, one telegraph over it and the player: every way out runs through it
+    cornerZone: { walls: [...row(-128, 192, -128), ...col(-128, -96, 192)], item: [260, 260], terrain: true,
+      hazards: [[-96, -96, 170, 170]], start: [-80, -80] },
   };
   // Scene for terrain runs: everything in screen space, like the default profile's scene() on /dev.html
   const scene = cam => {
     if (!sim || !sim.terrain) return null;
     const { s, e, f } = cam, X = x => x * s + e, Y = y => y * s + f;
-    const on = sim.hazard && Math.floor((performance.now() - sim.t0) / sim.blink) % 2 === 0;
-    const [hx, hy, hw, hh] = sim.hazard || [0, 0, 0, 0];
+    // hazards: several, shown one at a time in turn; hazard: one, blinking
+    const phase = sim.blink ? Math.floor((performance.now() - sim.t0) / sim.blink) : 0;
+    const on = sim.hazards || (sim.hazard && phase % 2 === 0);
+    const [hx, hy, hw, hh] = sim.hazards ? sim.hazards[phase % sim.hazards.length] : sim.hazard || [0, 0, 0, 0];
     return {
       me: { x: X(sim.x), y: Y(sim.y) }, enemies: [], xp: [], case: [], buff: [], rift: [], wall: [], break: [], prize: [],
       good: sim.item ? [{ src: 'sim:item', x: X(sim.item[0]), y: Y(sim.item[1]), w: 12 * s, h: 12 * s, s, e, f }] : [],
@@ -65,7 +74,7 @@
   window.__run = async (name, ms) => {
     const sc = scenes[name];
     const [x0, y0] = sc.start || [0, 0];
-    sim = { x: x0, y: y0, walls: sc.walls, item: sc.item, hazard: sc.hazard, terrain: !!sc.terrain, blink: sc.blink, blocked: 0, trail: [], reachedAt: null, t0: performance.now() };
+    sim = { x: x0, y: y0, walls: sc.walls, item: sc.item, hazard: sc.hazard, hazards: sc.hazards, terrain: !!sc.terrain, blink: sc.blink, blocked: 0, trail: [], reachedAt: null, t0: performance.now() };
     if (sc.terrain && PSBot.SITE.scene !== scene) PSBot.SITE.scene = scene;
     for (const k in keys) keys[k] = false;
     await new Promise(r => setTimeout(r, 300));

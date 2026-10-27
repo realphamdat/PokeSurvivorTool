@@ -257,7 +257,11 @@ window.PSBotSite = h => {
     // 34x16 = healing spring (js/world/tiles.js), every biome; a dried one is skipped by the core when HP stops rising
     // Solid props (js/world/tiles.js PAINT, same size in every biome): tree 30x40 / crystal 26x40 / dead tree 28x40,
     // rock 22x17, Halloween pumpkin 22x20. Rocks and pumpkins break, but only block here (as in scene())
-    tags: { 'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard', 'canvas:34x16': 'heal',
+    // Enemy telegraphs (js/systems/hazards.js) are outlined dashed in the attacker's type colour: a zone [4,4], a beam
+    // [6,4], width 2 (the player's own meteor zone is [4,4] at 1.5). Each enemy shot has a red ring under it
+    // (js/entities/projectile.js), as on doofcraft
+    tags: { 'dash:4,4/2': 'hazard', 'dash:6,4/2': 'hazard', 'fill:rgba(255,60,80,0.35)': 'shot',
+      'canvas:14x14': 'hazard', 'canvas:12x12': 'hazard', 'canvas:34x16': 'heal',
       'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall', 'canvas:22x17': 'wall', 'canvas:22x20': 'wall' },
     sizeTags: true,           // a size-only tag ("canvas:14x14") also matches every hash of that size
     // Solid props collide as a circle at their base (js/world/world.js: tree r 13, rock 12, pumpkin 11), drawn with the

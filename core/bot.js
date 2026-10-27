@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.4';
+  const VERSION = '1.6.5';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -67,6 +67,13 @@
     xpWeight: 4,
     caseReach: 25,        // world units: player must stand on top of a suitcase ("case" tag) to open it
     caseTime: 5500,       // ms of (unpaused) game time to stay next to a suitcase
+    // Once stood on something that takes time (suitcase, healing spring, event objective), stay until it's done: hazards,
+    // enemies and low HP no longer move the player off it (the heals it drops make up for the hits), unless HP < holdHp
+    holdHp: 0.25,
+    // Pinned in a corner: walking for pinTime ms with all positions within pinMove world units, a wall nearby -> escape run
+    // away from the walls (dodging back and forth there travels, so the stuck check never fires)
+    pinTime: 2000,
+    pinMove: 30,
     breakRange: 500,      // world units: breakables ("break" tag) farther than this are not worth the walk
     buffReach: 80,        // world units: this close to a buff shrine (gem pillar) counts as "visited"
     buffCooldown: 30000,  // ms before going back to the same shrine
@@ -229,7 +236,7 @@
   // Path points are tracked in screen space; on fill/stroke the shape is recorded as
   // a frame item with geometry (poly / line) keyed "fill:<style>" or "stroke:<style>".
   const PATH = { subs: [], cur: null };
-  const pathOrig = { beginPath: P.beginPath, moveTo: P.moveTo, lineTo: P.lineTo, rect: P.rect, ellipse: P.ellipse, fill: P.fill, stroke: P.stroke, fillRect: P.fillRect };
+  const pathOrig = { beginPath: P.beginPath, moveTo: P.moveTo, lineTo: P.lineTo, rect: P.rect, ellipse: P.ellipse, fill: P.fill, stroke: P.stroke, fillRect: P.fillRect, strokeRect: P.strokeRect };
   const tp = (ctx, x, y) => { const m = ctx.getTransform(); return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }; };
   const addPt = (ctx, x, y, fresh) => {
     if (fresh || !PATH.cur) PATH.subs.push(PATH.cur = []);
@@ -249,12 +256,12 @@
   const G2 = CanvasGradient.prototype, origStop = G2.addColorStop, gradColor = new WeakMap();
   G2.addColorStop = function (at, color) { if (!gradColor.has(this)) gradColor.set(this, String(color).replace(/\s+/g, '')); return origStop.call(this, at, color); };
   const styleKey = s => typeof s === 'string' ? s.replace(/\s+/g, '') : gradColor.has(s) ? `gradient:${gradColor.get(s)}` : 'gradient';
-  const recordShape = (ctx, kind, pts, style) => {
+  const recordShape = (ctx, kind, pts, style, src = `${kind === 'line' ? 'stroke' : 'fill'}:${styleKey(style)}`) => {
     const m = ctx.getTransform(), s = m.a;
     if (!SITE.isWorld({ s, e: m.e, f: m.f }) || pts.length < 2) return;   // HUD / UI
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const lw = kind === 'line' ? ctx.lineWidth * s : 0, src = `${kind === 'line' ? 'stroke' : 'fill'}:${styleKey(style)}`;
+    const lw = kind === 'line' ? ctx.lineWidth * s : 0;
     if ((x1 - x0 + lw) * (y1 - y0 + lw) < 150 && !tagOf(src)) return;   // ignore tiny particles (tagged ones, e.g. shots, kept)
     state.frame.push({ src, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0 + lw, h: y1 - y0 + lw,
       s, e: m.e, f: m.f, shape: kind, pts, lw, alpha: ctx.globalAlpha });
@@ -275,9 +282,20 @@
     if (this.canvas === canvas && typeof a[0] !== 'object') PATH.subs.forEach(sp => sp.length >= 3 && recordShape(this, 'poly', sp, this.fillStyle));
     return pathOrig.fill.apply(this, a);
   };
+  // A dashed outline is also recorded as the area it closes, keyed by its dash and width ("dash:4,4/2"), whatever its
+  // colour: pokesurvivor.com outlines every enemy telegraph so, in the attacker's type colour
+  const dashKey = ctx => { const d = ctx.getLineDash(); return d.length ? `dash:${d.join(',')}/${ctx.lineWidth}` : null; };
   P.stroke = function (...a) {
-    if (this.canvas === canvas && !a.length) PATH.subs.forEach(sp => recordShape(this, 'line', sp, this.strokeStyle));
+    if (this.canvas === canvas && !a.length) {
+      const dash = dashKey(this);
+      PATH.subs.forEach(sp => { recordShape(this, 'line', sp, this.strokeStyle); if (dash && sp.length >= 3) recordShape(this, 'poly', sp, null, dash); });
+    }
     return pathOrig.stroke.apply(this, a);
+  };
+  P.strokeRect = function (x, y, w, h) {
+    const dash = this.canvas === canvas && dashKey(this);
+    if (dash) recordShape(this, 'poly', [tp(this, x, y), tp(this, x + w, y), tp(this, x + w, y + h), tp(this, x, y + h)], null, dash);
+    return pathOrig.strokeRect.call(this, x, y, w, h);
   };
   P.fillRect = function (x, y, w, h) {
     if (this.canvas === canvas) recordShape(this, 'poly', [tp(this, x, y), tp(this, x + w, y), tp(this, x + w, y + h), tp(this, x, y + h)], this.fillStyle);
@@ -560,7 +578,11 @@
     // Suitcase / breakable ("break": rock, …): stay within caseReach for caseTime of game time (paused time doesn't
     // count), then skip it for a minute. Leaving the radius restarts the countdown. A breakable is only worth it when
     // nothing better is around (lower priority below), and only within breakRange
-    const kase = nearestTo(reachable(cases));
+    // Already opening one (state.dwell, last frame) or about to (the game starts opening it from farther than caseReach):
+    // kept even with a hazard / enemies on it
+    const atDwell = d => dist(d, me) < CFG.caseReach * 2 || (state.dwell && Math.hypot((d.x - e0) / s - state.dwell.x, (d.y - f0) / s - state.dwell.y) < 30);
+    const dwellCase = hp >= CFG.holdHp ? nearestTo(unignored(cases).filter(atDwell)) : null;
+    const kase = dwellCase || nearestTo(reachable(cases));
     const rock = nearestTo(reachable(byTag('break')).filter(d => dist(d, me) < CFG.breakRange));
     const paused = now - (state.timerChangedAt || now) > 1500;
     const dt = Math.min(100, now - (state.lastTick || now)); state.lastTick = now;
@@ -572,7 +594,9 @@
       if (state.dwell.t > CFG.caseTime) { state.ignore.push({ ...kw, until: now + 60000 }); state.dwell = null; log(dwellOn === kase ? 'mở vali xong' : 'đứng cạnh vật phá được xong'); }
     } else state.dwell = null;
     // Healing spring: only when hurt; once standing on one, stay until full (state.healing: where, best HP, since when)
-    const heal = hp < (state.healing ? 0.99 : CFG.healBelow) ? nearestTo(reachable(heals)) : null;
+    const atHealing = d => state.healing && Math.hypot((d.x - e0) / s - state.healing.x, (d.y - f0) / s - state.healing.y) < 30;
+    const heal = hp < (state.healing ? 0.99 : CFG.healBelow)
+      ? (hp >= CFG.holdHp && nearestTo(unignored(heals).filter(atHealing))) || nearestTo(reachable(heals)) : null;
     if (heal && dist(heal, me) < CFG.healReach) {
       const hw = { x: (heal.x - e0) / s, y: (heal.y - f0) / s };
       if (!state.healing || Math.hypot(state.healing.x - hw.x, state.healing.y - hw.y) > 30 || paused || hp > state.healing.hp + 0.01) state.healing = { ...hw, hp, t: now };
@@ -586,10 +610,10 @@
     else if (heal && dist(heal, me) < CFG.goodRange) { target = heal; weight = CFG.goodWeight; hold = dist(heal, me) < CFG.healReach; }
     // Event objective: not when hurt or pressed (questHp / questCrowd), not put off by a few enemies right at it (a cage
     // brings an ambush), only by a spot found unreachable. Stood on within its hold radius (world units)
-    else if (quest && !low && hp > CFG.questHp && enemies.filter(e => edge(e) < CFG.contact).length < CFG.questCrowd) {
+    else if (quest && ((!low && hp > CFG.questHp && enemies.filter(e => edge(e) < CFG.contact).length < CFG.questCrowd) || (dist(quest, me) < quest.hold && hp >= CFG.holdHp))) {
       target = quest; hold = dist(quest, me) < quest.hold; weight = hold ? CFG.questWeight : CFG.goodWeight;
     }
-    else if (kase && !low && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
+    else if (kase && (!low || kase === dwellCase) && dist(kase, me) < CFG.goodRange) { target = kase; weight = CFG.goodWeight; hold = dist(kase, me) < CFG.caseReach; }
     else if (buff && dist(buff, me) >= CFG.buffReach && dist(buff, me) < CFG.goodRange) { target = buff; weight = CFG.goodWeight; }
     else if (good && dist(good, me) < CFG.goodRange) { target = good; weight = CFG.goodWeight; }
     // XP: only walk until the orb is inside the pickup radius; it flies in by itself from there
@@ -605,7 +629,27 @@
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
     state.prevTarget = target && { enemy: target === foe, rift: target === rift, quest: target === quest, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
     state.view.walls = walls;
+    // Pinned in a corner (CFG.pinTime): run away from the walls within reach, hazards ignored (see cost)
+    state.pin = (state.pin || []).filter(p => now - p.t < CFG.pinTime);
+    if (paused || SITE.choiceOpen() || !state.dir || hold || (state.escape && state.escape.until > now)) state.pin.length = 0;
+    else state.pin.push({ t: now, ...meW });
+    if (state.pin.length > 1 && now - state.pin[0].t > CFG.pinTime * 0.9 && state.pin.every(p => Math.hypot(p.x - meW.x, p.y - meW.y) < CFG.pinMove)) {
+      const W = (x, y, r) => ({ x, y, r });
+      const near = state.walls.map(w => W(w.x, w.y, 60))
+        .concat(walls.filter(w => w.rw).map(w => W((w.x - e0) / s, (w.y - f0) / s, w.rw + 60)))
+        .concat(terrain.filter(t => t.kind === 1).map(t => W((t.x + t.w / 2 - e0) / s, (t.y + t.w / 2 - f0) / s, t.w / s / 2 + 50)))
+        .filter(w => Math.hypot(meW.x - w.x, meW.y - w.y) < w.r);
+      if (near.length) {
+        const away = near.reduce((a, w) => { const l = Math.hypot(meW.x - w.x, meW.y - w.y) || 1; return [a[0] + (meW.x - w.x) / l, a[1] + (meW.y - w.y) / l]; }, [0, 0]);
+        const ang = Math.atan2(away[1], away[0]) + (Math.random() - 0.5) * Math.PI / 3;
+        state.escape = { dir: [Math.cos(ang), Math.sin(ang)], until: now + 900 };
+        log('kẹt góc tường — thoát ra trước, bỏ qua né skill');
+      }
+      state.pin.length = 0;
+    }
     const escape = state.escape && state.escape.until > now ? state.escape.dir : null;
+    // Stood on a suitcase / healing spring / event objective: stay put through hazards and enemies (CFG.holdHp)
+    const stay = hold && target !== rock && hp >= CFG.holdHp;
     // Terrain wall tiles by world tile index, for the per-frame step check (cost): walking into one only gets the
     // player stuck, so no dodge is worth it
     const tileW = terrain.length ? terrain[0].w / s : 0;
@@ -708,15 +752,16 @@
       const p = at(1);
       let c = 0;
       const half = at(0.5);
-      for (const e of enemies) {
+      for (const e of stay ? [] : enemies) {
         // Closest along the step (half and full), so the step doesn't pass through an enemy; bigger sprites (bosses)
         // count as closer
         const d = Math.min(dist(half, e), dist(p, e)) - Math.max(e.w, e.h) / 2 / s;
         if (d < CFG.contact) c += (low ? 20 : 10) * ((CFG.contact - Math.max(d, 0)) / CFG.contact) ** 2;
       }
-      // Hazards are checked along the way (half and full step) so the path doesn't cross a telegraph
+      // Hazards are checked along the way (half and full step) so the path doesn't cross a telegraph. Not while getting
+      // unpinned from a corner or staying on a suitcase: taking the hit beats both
       for (const q of [at(0.5), p]) {
-        for (const h of hazards) {
+        for (const h of stay || escape ? [] : hazards) {
           if (h.shape) {
             const d = shapeDist(h, q) / s;                            // < 0 = inside
             if (d < CFG.hazardMargin) c += 25 * Math.min(1, (CFG.hazardMargin - d) / CFG.hazardMargin) + (d < 0 ? 10 : 0);
@@ -739,8 +784,8 @@
         else if (hit(CFG.lookahead)) c += 6;
       }
       // Away from the crowd as a whole, not just the enemies touching us (a horde closes in from every side)
-      if (dir && flee) c -= fleeW * (dir[0] * flee[0] + dir[1] * flee[1]);
-      // Getting unstuck outweighs hazards: better take a hit than stay pinned against a wall
+      if (dir && flee && !stay) c -=fleeW * (dir[0] * flee[0] + dir[1] * flee[1]);
+      // Getting unstuck comes first (hazards are skipped above): better take a hit than stay pinned against a wall
       if (escape) c -= dir ? 40 * (dir[0] * escape[0] + dir[1] * escape[1]) : 0;
       else if (target && hold) c += weight * dist(p, target) / CFG.lookahead;     // already on top: stay put
       else if (wpS) c += weight * (segDist(wpS, me, p) / s + 0.2 * dist(p, wpS)) / CFG.lookahead;   // around a wall
@@ -800,10 +845,10 @@
     const used = ms ? ms.used : isNew ? Math.min(1 + state.newSkills, slots - 1) : 1 + state.newSkills;
     if (build) {
       // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
-      // > new move outside the build while a slot is left over (the build's missing moves keep theirs) > XP passive > upgrade a
-      // build attack move > passive a build move needs to evolve > upgrade a build buff > passive (attack > defence >
-      // other) > upgrade a skill outside the build > new skill outside it with no slot left (score < 2: rerolled when
-      // possible)
+      // > upgrade a build move, in build order (#1 maxed first, attack or buff alike) > new move outside the build while
+      // a slot is left over (the build's missing moves keep theirs) > XP passive > passive a build move needs to evolve >
+      // passive (attack > defence > other) > upgrade a skill outside the build > new skill outside it with no slot left
+      // (score < 2: rerolled when possible)
       const buildIdx = build.findIndex(m => m.toLowerCase() === name.toLowerCase());
       const move = moveByName.get(name.toLowerCase());
       const owned = level > 0 && !isNew;
@@ -811,11 +856,10 @@
       const missing = build.filter(m => !ownedMoves.has(m.toLowerCase())).length;
       if (evo) { score = 500; why.push('mở tiến hoá skill'); }
       else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
+      else if (buildIdx >= 0) { score = 380 - buildIdx; why.push(`nâng move build #${buildIdx + 1} (cấp ${level}), max theo thứ tự build`); }
       else if (isNew && used + missing < slots) { score = buff ? 345 : 350; why.push(`thêm move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`); }
       else if (!move && (XP_RE.test(name) || XP_RE.test(t))) { score = 320; why.push('tăng kinh nghiệm nhận được'); }
-      else if (buildIdx >= 0 && !buff) { score = 300 - buildIdx; why.push(`nâng move tấn công build #${buildIdx + 1} (cấp ${level})`); }
       else if (needFor.length) { score = 250; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
-      else if (buildIdx >= 0) { score = 200 - buildIdx; why.push(`nâng buff build #${buildIdx + 1} (cấp ${level})`); }
       else if (owned && move) { score = 100 + level; why.push(`nâng skill ngoài build (cấp ${level})`); }
       else if (isNew || move) { score = buff ? 0 : 1; why.push('skill mới ngoài build'); }
       else if (ATK_RE.test(t)) { score = 150; why.push('nội tại tấn công'); }

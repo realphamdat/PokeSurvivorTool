@@ -52,14 +52,13 @@ On every level-up the bot scores each card and takes the best one. The reason fo
 
 1. A card that **evolves** a skill.
 2. **A build move** not taken yet (#1 before #2…).
-3. **A new move outside the build while a slot is free**: the bot cycles through every move, so filling the slots (usually 4) means more attacks. Slots for the build moves not taken yet are always kept; e.g. a 2-move build gets 2 extra moves, a full 4-move build gets none.
-4. **Learning** (the passive that raises the XP you gain): more levels sooner, so it comes before every upgrade.
-5. **Upgrade a build attack move** (#1 first).
+3. **Upgrade a build move, in Moveset order**: move #1 is maxed first, then #2… (attack and buff moves alike). Put the move you want maxed first at the top.
+4. **A new move outside the build while a slot is free**: the bot cycles through every move, so filling the slots (usually 4) means more attacks. Slots for the build moves not taken yet are always kept; e.g. a 2-move build gets 2 extra moves, a full 4-move build gets none.
+5. **Learning** (the passive that raises the XP you gain).
 6. **A passive a build move needs to evolve** (e.g. Magnet for Psychic), once that move is owned and the passive isn't.
-7. **Upgrade a build buff move** (no damage).
-8. Other passives: attack (damage, cooldown, range…) > defence (HP, regen, armour, speed, pickup…) > the rest.
-9. Upgrade a skill outside the build (highest level first).
-10. A new skill outside the build with no slot left: only when nothing else is offered. If all three cards are like that and a **Reroll** is left, the bot rerolls (PC).
+7. Other passives: attack (damage, cooldown, range…) > defence (HP, regen, armour, speed, pickup…) > the rest.
+8. Upgrade a skill outside the build (highest level first).
+9. A new skill outside the build with no slot left: only when nothing else is offered. If all three cards are like that and a **Reroll** is left, the bot rerolls (PC).
 
 **Without a build** (default build deleted): take new skills until the slots are full > Learning > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
 
