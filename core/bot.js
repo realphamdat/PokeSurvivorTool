@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.12';
+  const VERSION = '1.5.13';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -801,16 +801,16 @@
     let dialog = head;
     while (dialog.parentElement && !isDialog(dialog)) dialog = dialog.parentElement;
     const isDigit = e => !e.children.length && /^\d$/.test((e.textContent || '').trim());
-    let digits = [...dialog.querySelectorAll('*')].filter(e => isDigit(e) && visible(e));
+    let digits = PSBotList(dialog.querySelectorAll('*')).filter(e => isDigit(e) && visible(e));
     // Phones: digits hidden -> rows from the hidden digits, or the dialog's buttons if there are none; tapped (el)
     const touch = !digits.length;
-    if (touch) digits = [...dialog.querySelectorAll('*')].filter(isDigit);
+    if (touch) digits = PSBotList(dialog.querySelectorAll('*')).filter(isDigit);
     const rows = digits.map(k => {
       let row = k;
-      while (row.parentElement && row.parentElement !== dialog && [...row.parentElement.querySelectorAll('*')].filter(e => digits.includes(e)).length === 1) row = row.parentElement;
+      while (row.parentElement && row.parentElement !== dialog && PSBotList(row.parentElement.querySelectorAll('*')).filter(e => digits.includes(e)).length === 1) row = row.parentElement;
       return { key: k.textContent.trim(), row };
     });
-    if (touch && !rows.length) [...dialog.querySelectorAll('button, [role=button]')].forEach((row, i) => rows.push({ key: String(i + 1), row }));
+    if (touch && !rows.length) PSBotList(dialog.querySelectorAll('button, [role=button]')).forEach((row, i) => rows.push({ key: String(i + 1), row }));
     return rows.filter(o => !touch || visible(o.row))
       .map(({ key, row }) => ({ key, text: row.innerText.replace(/\s+/g, ' ').trim(), el: touch ? row : null }))
       .filter(o => o.text.length > 3);
@@ -827,7 +827,7 @@
     const now = performance.now();
     if (!CFG.autoPick || !state.on || now < state.pickAt || now < (state.itemScanAt || 0)) return;
     state.itemScanAt = now + 300;                                     // full DOM scan, so not every frame
-    const head = [...document.querySelectorAll('body *')].find(e => !e.children.length && visible(e) && /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''));
+    const head = PSBotList(document.querySelectorAll('body *')).find(e => !e.children.length && visible(e) && /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''));
     if (!head) return void SITE.otherChoice();
 
     if (/bond/i.test(head.innerText)) {
@@ -864,7 +864,7 @@
     state.restartAt = now + 1500;
     // Paused for a choice (level-up / item / bond) is not the end of a run
     if (SITE.choiceOpen()) return;
-    const leaves = [...document.querySelectorAll('body *')].filter(e => !e.children.length && visible(e));
+    const leaves = PSBotList(document.querySelectorAll('body *')).filter(e => !e.children.length && visible(e));
     if (leaves.some(e => /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''))) return;
     // Only buttons actually on top at their centre (not faded out / covered by the game canvas);
     // the bot's own top-left dock is looked through, so it can't hide the game's Play button
@@ -873,7 +873,7 @@
       const t = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2).find(e => !dock.contains(e));
       return !!t && (t === b || b.contains(t));
     };
-    const buttons = [...document.querySelectorAll('button, [role=button]')].filter(b => visible(b) && !dock.contains(b) && onTop(b));
+    const buttons = PSBotList(document.querySelectorAll('button, [role=button]')).filter(b => visible(b) && !dock.contains(b) && onTop(b));
     const over = leaves.some(e => /you fell|run over|game over|has caído|caíste/i.test(e.innerText || ''));
     if (state.runEnded === null) state.runEnded = over;
     const menu = SITE.menu(buttons);
@@ -1251,7 +1251,7 @@
   $m('cur').onclick = () => { $m('mon').value = currentMon(); $m('msg').textContent = currentMon() ? '' : 'Chưa thấy tên pokémon trên màn (vào trận trước)'; renderMoveset(); };
   $m('save').onclick = () => {
     const name = $m('mon').value.trim();
-    const moves = [...new Set([...ms.querySelectorAll('select[data-slot]')].map(s => s.value).filter(Boolean))];
+    const moves = [...new Set(PSBotList(ms.querySelectorAll('select[data-slot]')).map(s => s.value).filter(Boolean))];
     if (!learnable(name).length || !moves.length) return void ($m('msg').textContent = 'Chọn pokémon và ít nhất 1 move');
     window.PSBot.setBuild(name, moves);
     $m('msg').textContent = `Đã lưu ${name}: ${moves.join(' > ')}`; renderMoveset();

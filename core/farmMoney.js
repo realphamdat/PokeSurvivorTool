@@ -35,7 +35,7 @@
   const visible = el => el.getClientRects().length > 0;
   let onScreen = false;
   function scan() {
-    const head = [...document.querySelectorAll('body *')].find(e => !e.children.length && visible(e) && /you fell|run over|game over|has caído/i.test(e.innerText || ''));
+    const head = PSBotList(document.querySelectorAll('body *')).find(e => !e.children.length && visible(e) && /you fell|run over|game over|has caído/i.test(e.innerText || ''));
     if (!head) { onScreen = false; return; }
     if (onScreen) return;                                         // already counted this screen
     let box = head;

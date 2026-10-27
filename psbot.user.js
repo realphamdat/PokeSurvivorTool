@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PokeSurvivor Bot
 // @namespace    https://github.com/damhieu2808/PokeSurvivorTool
-// @version      1.5.12
+// @version      1.5.13
 // @description  Bot tự chơi pokesurvivor.com + pokesurvivor.doofcraft.com — luôn tải bản phát hành mới nhất từ repo gốc
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
@@ -19,7 +19,7 @@
 (() => {
   const BASE = 'https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/';
   // Shown on the status line so a stale install (old script still on the phone) is obvious at a glance
-  const V = '1.5.12';
+  const V = '1.5.13';
   // Same files, same order as manifest.json / loader.js
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
   const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
@@ -29,7 +29,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'psbot-status';
-      el.style.cssText = 'position:fixed;left:4px;top:4px;z-index:2147483647;max-width:90vw;font:12px monospace;background:#000c;color:#fc3;padding:3px 6px;border-radius:4px;pointer-events:none';
+      el.style.cssText = 'position:fixed;left:4px;top:4px;z-index:2147483647;max-width:94vw;max-height:44vh;overflow:auto;white-space:pre-wrap;font:12px monospace;background:#000c;color:#fc3;padding:3px 6px;border-radius:4px;pointer-events:none';
       document.documentElement.append(el);
     }
     el.textContent = `PSBot v${V}: ${msg}`;
@@ -50,6 +50,13 @@
     });
     fetch(url, { cache: 'no-store' }).then(r => (r.ok ? r.text() : Promise.reject(new Error(`${f}: HTTP ${r.status}`)))).then(ok, fail);
   });
+
+  // Firefox writes "psbot/<file>:12:5" on some builds and "psbot/<file> line 12 > Function:1:5" on others; either way
+  // it names the file and line the bot died on, so a screenshot of the status line is enough to fix it
+  const where = e => {
+    const m = /psbot\/[\w./-]+(?::\d+| line \d+)/.exec(String((e && e.stack) || ''));
+    return m ? m[0].replace(' line ', ':') : '';
+  };
 
   // ---------- Firefox (Gecko): run the bot with the userscript manager's privileges ----------
   // A Firefox userscript runs in a sandbox, but it can reach the page's own window through unsafeWindow /
@@ -85,7 +92,7 @@
       if (typeof pageWindow.eval === 'function') {
         try { pageWindow.eval(`${body}\n//# sourceURL=psbot/page.js`); inPage = true; }
         // site.js already ran → the failure is in the bot itself, not the CSP: report it instead of running twice
-        catch (e) { if (pageWindow.PSBotSite) return status(`lỗi — ${report(e)}`); }
+        catch (e) { if (pageWindow.PSBotSite) return status(`lỗi — ${report(e)}${where(e) ? ` (${where(e)})` : ''}`); }
       }
       if (!inPage) {
         // Sandbox fallback: `with (pageWindow)` gives each file the page's own globals (document, canvas prototypes,
@@ -96,10 +103,7 @@
         pageWindow.__psbotSandbox = true;
         for (let i = 0; i < code.length; i++) {
           try { new Function('W', `with (W) {\n${code[i]}\n}\n//# sourceURL=psbot/${FILES[i]}`)(pageWindow); }
-          catch (e) {
-            const at = new RegExp(`psbot/${FILES[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\d+`).exec(String((e && e.stack) || ''));
-            return status(`lỗi — ${(e && e.message) || e} (${at ? at[0] : FILES[i]})`);
-          }
+          catch (e) { return status(`lỗi — ${(e && e.message) || e} (${where(e) || FILES[i]})`); }
         }
       }
       // site.js sets PSBotSite; when that fails the page really is blocking us (or the manager hides the page window)

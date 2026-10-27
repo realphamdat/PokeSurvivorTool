@@ -2,12 +2,21 @@
 // A rewrite of the game with its own canvas, sprite paths and menus.
 // Loaded before core/bot.js, which calls PSBotSite(h) at start. h = the core's helpers
 // (CFG, state, visible, fontSize, scoreCard, pickRow), filled in once they exist: only use them inside the methods.
+
+// Realm-safe copy of a DOM list (same helper as sites/default/site.js): `[...nodeList]` / `for..of` read
+// Symbol.iterator from a page object and a Firefox userscript sandbox refuses that; index access never does
+window.PSBotList = window.PSBotList || (list => {
+  const l = typeof list === 'string' ? document.querySelectorAll(list) : list, a = [];
+  for (let i = 0; i < l.length; i++) a.push(l[i]);
+  return a;
+});
+
 window.PSBotSite = h => {
   // Choice dialog: answerable once "armed" (input is locked for 1 s after it opens) and not yet submitted
   const dcBox = () => { const b = document.querySelector('.ps-choice:not(.hidden) .ps-box.armed'); return b && !b.querySelector('.ps-cards.done') ? b : null; };
   const dcTitle = box => ((box.querySelector('h2') || {}).innerText || '').trim();
   // Card = button.ps-card > .txt > .nm (title text + chips "New · Fire" / "Lv.2 > 3" / "EVOLUTION") + .ds (description)
-  const dcName = c => { const nm = c.querySelector('.nm'); return nm ? [...nm.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : ''; };
+  const dcName = c => { const nm = c.querySelector('.nm'); return nm ? PSBotList(nm.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : ''; };
   // Phones (touch screen): the card button is tapped instead of pressing its digit key
   const tapTarget = c => (matchMedia('(pointer: coarse)').matches ? c : null);
 
@@ -39,7 +48,7 @@ window.PSBotSite = h => {
   const evolveNeeds = new Map();
   (async () => {
     try {
-      const entry = [...document.scripts].map(s => s.src).find(s => /\/assets\/index-[\w-]+\.js/.test(s));
+      const entry = PSBotList(document.scripts).map(s => s.src).find(s => /\/assets\/index-[\w-]+\.js/.test(s));
       if (!entry) return;
       const names = new Set([...(await (await fetch(entry)).text()).matchAll(/assets\/([\w-]+\.js)/g)].map(m => m[1]));
       const passiveCard = {}, requires = [];
@@ -149,7 +158,7 @@ window.PSBotSite = h => {
       const box = dcBox();
       if (!box || !/^level|cleared/i.test(dcTitle(box))) return null;
       const rr = box.querySelector('[data-testid="reroll"]');
-      return { cards: [...box.querySelectorAll('button.ps-card')].map((c, i) => readDcCard(c, i)), rerolls: rr ? +((rr.innerText.match(/\((\d+)\)/) || [])[1] || 0) : 0 };
+      return { cards: PSBotList(box.querySelectorAll('button.ps-card')).map((c, i) => readDcCard(c, i)), rerolls: rr ? +((rr.innerText.match(/\((\d+)\)/) || [])[1] || 0) : 0 };
     },
     choiceOpen: () => !!document.querySelector('.ps-choice:not(.hidden) .ps-box'),
     // Waves chest (between rounds, "Pick one: this run, or currency"): upgrading a build move first, then Rare Candy (a
@@ -157,7 +166,7 @@ window.PSBotSite = h => {
     otherChoice() {
       const box = dcBox();
       if (!box || /^level|cleared|an item|bond/i.test(dcTitle(box))) return;
-      const cards = [...box.querySelectorAll('button.ps-card')];
+      const cards = PSBotList(box.querySelectorAll('button.ps-card'));
       if (!cards.length) return;
       if (/^chest/i.test(dcTitle(box))) {
         return h.pickRow('rương', cards.map((c, i) => {

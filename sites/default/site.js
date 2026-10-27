@@ -10,8 +10,16 @@
   try { keep = localStorage.getItem('psbot.dev') === '1'; } catch {}
   if (!keep && location.pathname === '/dev.html' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) location.replace('/' + location.search + location.hash);
 })();
-// The game's Halloween (js/systems/halloween.js): 30-10 to 1-11, Spain time. No separate mode: every run started then
-// is a Halloween run (night map, ghosts, candy, the big Gengar at minute 30)
+// Realm-safe copy of a DOM list. `[...nodeList]` / `for..of` read Symbol.iterator from a page object, and a Firefox
+// userscript sandbox refuses that ("Permission denied to access property Symbol.iterator"); index access never does.
+// Shared by all files as window.PSBotList — site.js always loads first (manifest, loader and psbot.user.js).
+window.PSBotList = window.PSBotList || (list => {
+  const l = typeof list === 'string' ? document.querySelectorAll(list) : list, a = [];
+  for (let i = 0; i < l.length; i++) a.push(l[i]);
+  return a;
+});
+
+// The game's Halloween (js/systems/halloween.js): 30-10 to 1-11, Spain time. No separate mode: every run started then// is a Halloween run (night map, ghosts, candy, the big Gengar at minute 30)
 // Spain's date by hand instead of Intl: under a Firefox userscript sandbox (phones) the options object would be a
 // sandbox object handed to the page's Intl, which Firefox refuses ("Permission denied to access property
 // 'localeMatcher'"). Europe/Madrid is UTC+1, or UTC+2 while EU summer time runs: last Sunday of March 01:00 UTC
@@ -39,7 +47,7 @@ window.PSBotSite = h => {
   function cardRow(lvl) {
     for (let box = lvl.parentElement; box && box !== document.body; box = box.parentElement) {
       const groups = new Map();                                       // parent -> visible blocks
-      for (const e of box.querySelectorAll('*')) {
+      for (const e of PSBotList(box.querySelectorAll('*'))) {
         if (e.contains(lvl) || !h.visible(e) || e.querySelector('#lvl-rr-n') || /reroll|skip|banish/i.test(e.innerText)) continue;
         const r = e.getBoundingClientRect();
         if (r.width < 60 || r.height < 40 || !e.innerText.trim()) continue;
@@ -57,8 +65,8 @@ window.PSBotSite = h => {
     const t = card.innerText;
     // Card title = the largest text in the card that is not the hotkey digit. Own text only: the title box
     // also holds the tag chips ("Ember <span>New · Fire</span>")
-    const own = e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
-    const leaves = [...card.querySelectorAll('*')].filter(e => e !== k && /\D/.test(own(e)));
+    const own = e => PSBotList(e.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+    const leaves = PSBotList(card.querySelectorAll('*')).filter(e => e !== k && /\D/.test(own(e)));
     const title = leaves.reduce((b, e) => (!b || fontSize(e) > fontSize(b) ? e : b), null);
     const name = title ? own(title) : '';
     const shownLv = t.match(/\b(?:Lv|Nv|Niv)\.?\s*(\d+)/i);                 // "Lv. 3" chip on owned skills, if the game shows one
@@ -66,7 +74,7 @@ window.PSBotSite = h => {
       key, name, t,
       level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), shownLv ? +shownLv[1] - 1 : 0),
       isNew: /\bNew\b|Nuevo|Novo|Mới/i.test(t),
-      evo: CFG.evoRe.test(t) || /evo|awaken|ultimate/i.test(card.className + ' ' + [...card.querySelectorAll('[class]')].map(e => e.className).join(' ')),
+      evo: CFG.evoRe.test(t) || /evo|awaken|ultimate/i.test(card.className + ' ' + PSBotList(card.querySelectorAll('[class]')).map(e => e.className).join(' ')),
       fitLow: !!card.querySelector('.fit-low'), fitHigh: !!card.querySelector('.fit-high'),
     }), el };
   }
@@ -155,7 +163,7 @@ window.PSBotSite = h => {
   }
 
   // The game canvas: #game on desktop; if a layout (phones?) has none, the biggest visible canvas that isn't the bot's own
-  const gameCanvas = () => document.getElementById('game') || [...document.querySelectorAll('canvas:not([data-psbot-ui])')]
+  const gameCanvas = () => document.getElementById('game') || PSBotList(document.querySelectorAll('canvas:not([data-psbot-ui])'))
     .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
 
   return {
@@ -193,13 +201,13 @@ window.PSBotSite = h => {
       if (!h.visible(lvl)) return null;
       const rerolls = +(document.getElementById('lvl-rr-n') || {}).innerText || 0;
       // Desktop: visible hotkey digits, picked with the key
-      const shown = [...document.querySelectorAll('div.key')].filter(h.visible);
+      const shown = PSBotList(document.querySelectorAll('div.key')).filter(h.visible);
       if (shown.length) return { cards: shown.map(k => readCard(cardOf(k), k.innerText.trim(), k, null)), rerolls };
       // Phones hide the digits (no keyboard): cards from the hidden digits of the level-up box, else the row of
       // look-alike blocks; the card is tapped
       let box = lvl;
       while (box.parentElement && box !== document.body && !box.querySelector('div.key')) box = box.parentElement;
-      const hidden = box === document.body ? [] : [...box.querySelectorAll('div.key')].map(k => ({ k, card: cardOf(k) })).filter(o => h.visible(o.card));
+      const hidden = box === document.body ? [] : PSBotList(box.querySelectorAll('div.key')).map(k => ({ k, card: cardOf(k) })).filter(o => h.visible(o.card));
       const list = hidden.length ? hidden : cardRow(lvl).map(card => ({ k: null, card }));
       return { cards: list.map(({ k, card }, i) => readCard(card, k ? k.textContent.trim() || String(i + 1) : String(i + 1), k, card)), rerolls };
     },

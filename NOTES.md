@@ -1,6 +1,6 @@
 # Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-27 (bot v1.5.12 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
+Cập nhật: 2026-10-27 (bot v1.5.13 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
 
 ---
 
@@ -136,7 +136,7 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 9. [ ] **Tiến hoá:** chưa thấy thẻ tiến hoá trong các trận ngắn (chết trước khi max skill). Cần tài khoản có pokémon mạnh hơn hoặc trận dài hơn.
 10. [x] **Điện thoại (Android):** đã thêm nhánh Firefox trong `psbot.user.js` — **cần test trên máy thật**, xem mục 3b. Kiwi/Chromium không chạy được (CSP). **iOS** (Safari + app Userscripts) **chưa thử**; ở đó `psbot.user.js` đi đường dự phòng (`fetch` loader + `<script>` inline) nên bản thường nhiều khả năng vẫn bị chặn; doofcraft thì có thể chạy.
 11. [ ] **Đo kết quả:** đếm log "không có đường tới mục tiêu" (mong đợi vài lần mỗi phút, không ra cả loạt), ghi thời gian sống mỗi trận.
-12. [x] **Phát hành:** đã phát hành 1.5.0 → 1.5.12 (26–27/10). Lần sau (chỉ khi người dùng bảo):
+12. [x] **Phát hành:** đã phát hành 1.5.0 → 1.5.13 (26–27/10). Lần sau (chỉ khi người dùng bảo):
     1. Tăng version ở **cả** `manifest.json` lẫn `VERSION` trong `core/bot.js`.
     2. Commit trên `main`.
     3. `git tag vX.Y.Z && git push origin main main:release --tags`.
@@ -160,19 +160,21 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
 
 **Cài trên Android:** Firefox (CH Play) → Violentmonkey hoặc Tampermonkey → mở `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js` → **Install** → cho phép `raw.githubusercontent.com` → mở game. Doofcraft chạy được ở cả Kiwi và Firefox.
 
-**Đọc dòng trạng thái để biết đang chạy bản nào:** dòng góc trên trái luôn có `PSBot v1.5.12: …`. Không có số `v…` → **điện thoại vẫn đang chạy userscript cũ**, phải cập nhật (mở lại link trên → *Update/Reinstall*; nếu manager vẫn giữ bản cũ thì xoá script rồi cài lại). Lỗi 27/10 gặp đúng trường hợp này: bản 1.5.7 cũ đi vào nhánh dự phòng, chèn `<script>` bị CSP chặn, đợi 8 giây rồi báo "trang này chặn script…".
+**Đọc dòng trạng thái để biết đang chạy bản nào:** dòng góc trên trái luôn có `PSBot v1.5.13: …`. Không có số `v…` → **điện thoại vẫn đang chạy userscript cũ**, phải cập nhật (mở lại link trên → *Update/Reinstall*; nếu manager vẫn giữ bản cũ thì xoá script rồi cài lại). Lỗi 27/10 gặp đúng trường hợp này: bản 1.5.7 cũ đi vào nhánh dự phòng, chèn `<script>` bị CSP chặn, đợi 8 giây rồi báo "trang này chặn script…".
 
 **Giới hạn:**
 - **Kiwi / Chrome Android vẫn không chạy** (CSP). Muốn thì phải cài extension `.crx` có `world: "MAIN"` — chưa làm, và Android không có "Load unpacked".
 - **Không dùng `Intl.*` với options object trong code bot.** Trong sandbox, `Intl` lấy từ `with (W)` là của trang, còn `{ … }` là object của sandbox → Firefox từ chối khi ICU đọc thuộc tính: `Permission denied to access property "localeMatcher"`. Đã gặp 27/10 với `new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', … })` ở `sites/default/site.js` → thay bằng `madridDate()` tự tính (đã đối chiếu `Intl` 26 280 mốc giờ 2025–2027, khớp 100%, kể cả 2 lần đổi giờ). Đừng thêm `toLocaleString(locale, options)`; gọi không tham số thì an toàn.
-- **Lỗi realm thứ hai (27/10):** `Permission denied to access property Symbol.iterator` — khi API trang (WebIDL `sequence<…>`, spread…) lặp qua array/iterable của sandbox. Vì thế từ 1.5.12 nhánh Firefox **chạy `pageWindow.eval` trước** (realm của trang, hết lớp lỗi này); sandbox chỉ còn là dự phòng và báo kèm tên file.
-- **Lỗi realm thứ ba (27/10, bản 1.5.12):** đúng chỗ `new Blob(['…'], { type })` của nhánh chạy nền trong `bot.js` — nó chạy **ngay khi nạp** vì `CFG.background` mặc định `true`, và Blob của trang lặp qua array của sandbox → cùng lỗi `Symbol.iterator`. Nay nhánh sandbox đặt `window.__psbotSandbox = true` và `bot.js` bỏ luôn việc tạo Worker trong trường hợp đó (trên pokesurvivor.com `blob:` cũng bị CSP chặn nên vẫn dùng `setInterval`). Nếu buộc phải dùng sandbox thì đừng đưa array/object literal của sandbox vào API trang — dựng lại bằng vòng `for` + `.push()` thay vì `[...nodeList]`, và đừng truyền array vào `sequence<>`.
+- **Lỗi realm thứ hai (27/10):** `Permission denied to access property Symbol.iterator` — khi API trang (WebIDL `sequence<…>`, spread…) lặp qua array/iterable của sandbox. Vì thế từ 1.5.13 nhánh Firefox **chạy `pageWindow.eval` trước** (realm của trang, hết lớp lỗi này); sandbox chỉ còn là dự phòng và báo kèm tên file.
+- **Lỗi realm thứ ba (27/10, bản 1.5.13):** đúng chỗ `new Blob(['…'], { type })` của nhánh chạy nền trong `bot.js` — nó chạy **ngay khi nạp** vì `CFG.background` mặc định `true`, và Blob của trang lặp qua array của sandbox → cùng lỗi `Symbol.iterator`. Nay nhánh sandbox đặt `window.__psbotSandbox = true` và `bot.js` bỏ luôn việc tạo Worker trong trường hợp đó (trên pokesurvivor.com `blob:` cũng bị CSP chặn nên vẫn dùng `setInterval`).
+- **Lỗi realm thứ tư (27/10, bản 1.5.13):** `gameCanvas()` trong `sites/default/site.js` — chưa có `#game` (điện thoại nạp chậm) nên nó chạy `[...document.querySelectorAll(…)]`; spread một NodeList của trang từ sandbox đọc `Symbol.iterator` → bị chặn. Lỗi ném trong `site.js` nhưng bị bắt khi đang chạy `bot.js` nên dòng báo ghi `(core/bot.js)` — đừng tin tên file một cách tuyệt đối, nó là file đang chạy lúc lỗi nổi lên.
+- **Quy ước từ 1.5.13: không được `[...nodeList]`, `for (const x of nodeList)`, `Array.from(nodeList)` trong code bot.** Dùng `PSBotList(...)` (khai báo ở đầu mỗi `sites/<id>/site.js`, là `window.PSBotList`, copy theo chỉ số). Tương tự: đừng đưa array/object literal của sandbox vào API trang (`sequence<>`, `Intl` options…).
 - Object literal của sandbox đưa vào API trang nói chung có cùng rủi ro. Chỗ còn lại: `new Blob([…], { type })` trong `bot.js` — nhánh Worker nằm trong `try/catch` nên hỏng thì rơi về `setInterval`; nút "Xuất data.js" (F6) có thể lỗi trên điện thoại, không ảnh hưởng auto-play.
 - `Worker` tạo từ `blob:` vẫn bị CSP chặn → chế độ chạy nền rơi về `setInterval` (điện thoại đang mở tab thì không ảnh hưởng).
 - Panel/log của bot là tiếng Việt; điện thoại không có F8/F9, dùng nút ▶ Chạy trên panel.
 
 **Cần kiểm tra trên máy thật:**
-1. Panel hiện ở góc trên trái, dòng trạng thái có `v1.5.12` và không còn chữ "chặn script".
+1. Panel hiện ở góc trên trái, dòng trạng thái có `v1.5.13` và không còn chữ "chặn script".
 2. Vào trận: `PSBot.state.lastFrame.length` > 0 (nếu 0 → hook không vào được prototype; xem console có `Permission denied`/`Xray`).
 3. Bot tự đi, tự nhặt đồ, tự chọn thẻ (bấm vào thẻ — nhánh điện thoại của `site.js`).
 4. Chơi lại tự động sau khi chết.
