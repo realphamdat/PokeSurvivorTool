@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.5.11';
+  const VERSION = '1.5.12';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1403,10 +1403,16 @@
       bgWorker = { terminate: clearInterval.bind(null, setInterval(fallback, 16)) };
     };
     try {
-      bgWorker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 16)'], { type: 'text/javascript' })));
-      bgWorker.onmessage = fallback;
-      // pokesurvivor.com's CSP blocks blob: workers with an error event, not an exception
-      bgWorker.onerror = e => { bgWorker.terminate(); noWorker(e.message || 'blocked'); };
+      // A userscript sandbox (Firefox on Android) hands the page's Blob an array built in the sandbox; Firefox refuses
+      // to iterate it ("Permission denied to access property Symbol.iterator"). pokesurvivor.com's CSP blocks blob:
+      // workers anyway, so on phones the setInterval fallback is what runs — skip the attempt, no scary log line
+      if (window.__psbotSandbox) bgWorker = { terminate: clearInterval.bind(null, setInterval(fallback, 16)) };
+      else {
+        bgWorker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 16)'], { type: 'text/javascript' })));
+        bgWorker.onmessage = fallback;
+        // pokesurvivor.com's CSP blocks blob: workers with an error event, not an exception
+        bgWorker.onerror = e => { bgWorker.terminate(); noWorker(e.message || 'blocked'); };
+      }
     } catch (err) { noWorker(err); }
   }
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PokeSurvivor Bot
 // @namespace    https://github.com/damhieu2808/PokeSurvivorTool
-// @version      1.5.11
+// @version      1.5.12
 // @description  Bot tự chơi pokesurvivor.com + pokesurvivor.doofcraft.com — luôn tải bản phát hành mới nhất từ repo gốc
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
@@ -19,7 +19,7 @@
 (() => {
   const BASE = 'https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/';
   // Shown on the status line so a stale install (old script still on the phone) is obvious at a glance
-  const V = '1.5.11';
+  const V = '1.5.12';
   // Same files, same order as manifest.json / loader.js
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
   const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
@@ -70,12 +70,10 @@
   if (pageWindow) {
     Promise.all(FILES.map(get)).then(code => {
       const body = code.join('\n;\n');
-      // The stack says "psbot/page.js:1234"; turn that line into a file name so a phone screenshot is enough.
-      // base = the line the first file starts on (1 when run in the page, 2 under the sandbox's `with (W) {` line)
-      const lineStarts = base => code.map((_, i) => base + code.slice(0, i).reduce((n, c) => n + c.split('\n').length + 2, 0));
-      const report = (e, base) => {
+      // The page-realm path runs everything at once and reports "psbot/page.js:1234": turn that line into a file name
+      const starts = code.map((_, i) => 1 + code.slice(0, i).reduce((n, c) => n + c.split('\n').length + 2, 0));
+      const report = e => {
         const m = /psbot\/page\.js:(\d+)/.exec(String((e && e.stack) || ''));
-        const starts = lineStarts(base);
         const at = m ? FILES.reduce((f, _, i) => (starts[i] <= +m[1] ? FILES[i] : f), '') : '';
         return `${(e && e.message) || e}${at ? ` (${at})` : ''}`;
       };
@@ -87,13 +85,22 @@
       if (typeof pageWindow.eval === 'function') {
         try { pageWindow.eval(`${body}\n//# sourceURL=psbot/page.js`); inPage = true; }
         // site.js already ran → the failure is in the bot itself, not the CSP: report it instead of running twice
-        catch (e) { if (pageWindow.PSBotSite) return status(`lỗi — ${report(e, 1)}`); }
+        catch (e) { if (pageWindow.PSBotSite) return status(`lỗi — ${report(e)}`); }
       }
       if (!inPage) {
-        // Sandbox: `with (pageWindow)` gives the fetched files the page's own globals (document, canvas prototypes,
-        // keys, firebase). new Function bodies are non-strict, so `with` is allowed
-        try { new Function('W', `with (W) {\n${body}\n}\n//# sourceURL=psbot/page.js`)(pageWindow); }
-        catch (e) { return status(`lỗi — ${report(e, 2)}`); }
+        // Sandbox fallback: `with (pageWindow)` gives each file the page's own globals (document, canvas prototypes,
+        // keys, firebase), and new Function bodies are non-strict so `with` is allowed. Files run one at a time, like
+        // separate <script> tags, so a failure is reported with its exact file and line.
+        // The flag keeps bot.js from handing the page's Blob/Worker an array built in the sandbox (Firefox:
+        // "Permission denied to access property Symbol.iterator"); blob: is CSP-blocked on this site anyway.
+        pageWindow.__psbotSandbox = true;
+        for (let i = 0; i < code.length; i++) {
+          try { new Function('W', `with (W) {\n${code[i]}\n}\n//# sourceURL=psbot/${FILES[i]}`)(pageWindow); }
+          catch (e) {
+            const at = new RegExp(`psbot/${FILES[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\d+`).exec(String((e && e.stack) || ''));
+            return status(`lỗi — ${(e && e.message) || e} (${at ? at[0] : FILES[i]})`);
+          }
+        }
       }
       // site.js sets PSBotSite; when that fails the page really is blocking us (or the manager hides the page window)
       if (!pageWindow.PSBotSite) return status(BLOCKED);
