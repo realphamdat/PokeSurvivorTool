@@ -40,7 +40,10 @@
     // Each frame one target is chosen: rift > good item (within goodRange) > nearest enemy.
     contact: 80,          // world units (from enemy edge): only this close do enemies push the player away
     engage: 120,          // world units: distance kept from the targeted enemy while fighting it
-    lowHp: 0.5,           // HP share under which the bot only survives: no xp / breakables, enemies avoided harder
+    lowHp: 0.5,           // HP share under which the bot only survives: no xp / breakables / hunting, enemies avoided harder
+    hurtDrop: 0.25,       // ... and so does losing this share of HP within hurtWindow ms (a hard hitter: by 50 % it's too late),
+    hurtWindow: 2000,     //     for hurtHold ms after
+    hurtHold: 4000,
     huntWeight: 3,
     goodRange: 1500,      // world units: good items within this become the target
     goodWeight: 5,
@@ -472,8 +475,12 @@
     // ... nor through one on the way there (an enemy close to the straight line, ourselves included: step away first)
     const inLane = d => enemies.some(e => segDist(e, me, d) / s - Math.max(Math.abs(e.w), Math.abs(e.h)) / 2 / s < CFG.contact * 0.5);
     const reachable = list => list.filter(d => !inHazard(d) && !crowded(d) && !inLane(d) && !state.ignore.some(w => Math.hypot((d.x - e0) / s - w.x, (d.y - f0) / s - w.y) < 50));
-    // Low HP: survive first (no xp / breakables, enemies pushed away twice as hard)
-    const low = (state.hpRatio ?? 1) < CFG.lowHp;
+    // Low HP, or just lost a big share of it: survive first (no xp / breakables / hunting, enemies pushed away twice as hard)
+    const hp = state.hpRatio ?? 1;
+    state.hpLog = (state.hpLog || []).filter(([t]) => now - t < CFG.hurtWindow);
+    state.hpLog.push([now, hp]);
+    if (Math.max(...state.hpLog.map(([, v]) => v)) - hp >= CFG.hurtDrop) state.hurtUntil = now + CFG.hurtHold;
+    const low = hp < CFG.lowHp || now < (state.hurtUntil || 0);
     // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
     // around its middle, a big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for
     // points we got stuck on
@@ -519,7 +526,7 @@
     // Breakable: stand next to it while fighting, so area moves / stray shots break it (drops xp, coins, heals). One
     // close by (a small detour) comes before xp, farther ones after it
     if (rock && !low && (!target || (target === xp && dist(rock, me) < 150))) { target = rock; weight = CFG.goodWeight; stop = 0; hold = dist(rock, me) < CFG.caseReach; }
-    else if (!target && foe) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
+    else if (!target && foe && !low) { target = foe; weight = CFG.huntWeight; stop = CFG.engage; }
     state.view.target = target;
     // Kept on state (state.view is rebuilt every frame, before the stuck check reads this)
     state.prevTarget = target && { enemy: target === foe, rift: target === rift, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };

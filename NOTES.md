@@ -143,7 +143,10 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
   - Trước khi sửa: 3:55–4:13 (3 trận). Nguyên nhân: lao vào bầy quái để nhặt kinh nghiệm, và tính nhầm chính mình là quái.
   - Sau khi sửa: 7:34, 7:08. Có thêm tiến hoá và cây theo biome: 5:27, **10:18** (hạ boss Thundurus, Lunala).
   - Kết quả dao động nhiều theo biome và theo thẻ game đưa ra.
+  - 27/10 (bot 1.5.4, Mewtwo): **13:55** (hạ Kyogre, Urshifu, Deoxys; Psychic tiến hoá). Chết vì Greninja đánh 100% → 0 trong 3s, bot vẫn nhắm đánh nó ở 27% máu.
+  - Sửa sau trận đó (chưa phát hành): mất ≥ 25% máu trong 2s thì tính là máu thấp thêm 4s (`hurtDrop/hurtWindow/hurtHold`); máu thấp thì không chủ động đi đánh quái. Trận thử: 6:47, chết vì bị 40–60 quái vây (xem dòng dưới). Chưa đủ trận để đánh giá.
 - **Đợt quái ập đến** (từ 25 lên 85 con trong 3 giây) vẫn là nguyên nhân chết chính.
+- Log "chọn đồ" / "bond" lặp 2–3 lần mỗi bảng (bảng còn hiện sau lần bấm đầu, `pickAt` chỉ chờ 800ms). Chọn vẫn đúng, chưa sửa.
 - **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trong vòng 220 đơn vị thì chạy về hướng thưa nhất. 1 trận chết ở 5:35, sớm hơn bản không có nó. Nếu thử lại: chỉ bật khi máu thấp, hoặc ưu tiên hạ quái nhanh thay vì chạy.
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng.
 
