@@ -48,7 +48,7 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 
 Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ điểm cao nhất. Lý do mỗi lần chọn hiện trong console (F12), ví dụ `chọn 2 Psychic — lấy move build #2`.
 
-**Có Moveset cho pokémon đang chơi** (bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó). Thứ tự ưu tiên, tầng trên luôn thắng tầng dưới:
+**Có Moveset cho pokémon đang chơi** (bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó). Pokémon nào chưa tự đặt Moveset thì dùng build mặc định: build tốt nhất mà [SurvivorTiers](https://survivortiers.pages.dev/en/) tìm ra qua các trận mô phỏng (làm mới bằng `node crawl-moves.js --builds`). Thứ tự ưu tiên, tầng trên luôn thắng tầng dưới:
 
 1. Thẻ **tiến hoá** một skill.
 2. **Lấy move trong build** chưa có (#1 trước #2…).
@@ -61,7 +61,7 @@ Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ đi�
 9. Nâng cấp skill ngoài build (cấp cao trước).
 10. Skill mới ngoài build khi đã hết ô: chỉ lấy khi không còn gì khác. Nếu cả 3 thẻ đều thuộc loại này và còn lượt **Reroll** thì bot đổi thẻ (máy tính).
 
-**Chưa có Moveset:** lấy skill mới cho tới khi đủ ô > Learning > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
+**Không có build** (đã xoá build mặc định): lấy skill mới cho tới khi đủ ô > Learning > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
 
 Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), pokesurvivor.doofcraft.com tính là 4. Các move đã **bond** chỉ chiếm chung 1 ô, nên sau khi bond bot lại lấy thêm move mới. Game chỉ đưa thẻ move mới khi còn ô trống, nên thấy thẻ đó là bot biết còn chỗ.
 

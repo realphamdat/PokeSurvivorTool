@@ -48,7 +48,7 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
 
-**With a Moveset for the pokémon being played** (the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name). Priority, a higher tier always wins:
+**With a Moveset for the pokémon being played** (the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name). A pokémon without a Moveset of your own uses a default build: the best one [SurvivorTiers](https://survivortiers.pages.dev/en/) found in simulated runs (refreshed with `node crawl-moves.js --builds`). Priority, a higher tier always wins:
 
 1. A card that **evolves** a skill.
 2. **A build move** not taken yet (#1 before #2…).
@@ -61,7 +61,7 @@ On every level-up the bot scores each card and takes the best one. The reason fo
 9. Upgrade a skill outside the build (highest level first).
 10. A new skill outside the build with no slot left: only when nothing else is offered. If all three cards are like that and a **Reroll** is left, the bot rerolls (PC).
 
-**Without a Moveset:** take new skills until the slots are full > Learning > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
+**Without a build** (default build deleted): take new skills until the slots are full > Learning > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
 
 Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), pokesurvivor.doofcraft.com counts 4. **Bonded** moves share one slot, so after a bond the bot takes more new moves. The game only offers a new move while a slot is free, so such a card tells the bot there is room.
 

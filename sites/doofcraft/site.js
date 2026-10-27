@@ -173,7 +173,9 @@ window.PSBotSite = h => {
         else if (Math.hypot(w.x - lostFrom.x, w.y - lostFrom.y) > 24) lostFollows = true;
       }
       if (lost && !lostFollows) target = at(lost, 0, 'escort', 0);
-      else if (goal) target = at(goal, 0, 'escort', 30);
+      // The goal counts the pokémon, not us: it has to get within 56 of the centre while trailing ~40 behind. Walked
+      // through the centre, never stood still short of it (stopping 30 out left it ~70 away and the escort never ended)
+      else if (goal) target = at(goal, 0, 'escort', 0);
     }
     if (!target && active('doors')) {
       const g = nearest(world.filter(d => d.src === 'fill:gradient:rgba(255,170,60,0.9)' && Math.abs(d.w) / s > 70));

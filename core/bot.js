@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.1';
+  const VERSION = '1.6.2';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -174,7 +174,10 @@
   };
   const BUILD_KEY = 'psbot.builds';
   try { Object.assign(userBuilds, JSON.parse(localStorage.getItem(BUILD_KEY) || '{}')); } catch {}
-  Object.assign(CFG.builds, userBuilds);
+  // Below data.js: a default build for every pokémon (moves.js builds, SurvivorTiers' best simulated build)
+  const defaultBuilds = (window.PSBotMoves || {}).builds || {};
+  const isDefaultBuild = (n, b) => String(defaultBuilds[n]) === String(b);
+  Object.assign(CFG.builds, defaultBuilds, userBuilds);
   for (const k in CFG.builds) if (!CFG.builds[k].length) delete CFG.builds[k];   // [] = build deleted on this machine
 
   // ---------- frame capture ----------
@@ -1315,8 +1318,9 @@
       <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${list.map((m, j) =>
         `<option value="${m.name}" ${build[i] === m.name ? 'selected' : ''}>${j ? '' : '★ '}${moveLabel(m)}</option>`).join('')}</select></label>`).join('')
       : `<div style="color:#ff9a9a">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
-    const saved = Object.entries(CFG.builds);
-    $m('list').innerHTML = saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa có build nào';
+    const saved = Object.entries(CFG.builds).filter(([n, b]) => !isDefaultBuild(n, b));
+    const note = build.length && isDefaultBuild(name, build) ? 'Đang dùng build mặc định (SurvivorTiers). ' : '';
+    $m('list').innerHTML = note + (saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa tự lưu build nào');
   }
   function openMoveset() {
     const show = ms.style.display === 'none';
@@ -1597,7 +1601,9 @@
     resetTags() { CFG.tags = {}; saveTags(); },
     // Downloads data.js (tags + builds set with setBuild) to drop into the extension folder, so every machine gets them
     exportConfig() {
-      const json = JSON.stringify({ tags: CFG.tags, builds: CFG.builds }, null, 2);
+      // Default builds stay in moves.js; a deleted one is kept as [] so it stays deleted
+      const builds = Object.fromEntries(Object.keys({ ...defaultBuilds, ...CFG.builds }).map(n => [n, CFG.builds[n] || []]).filter(([n, b]) => !isDefaultBuild(n, b)));
+      const json = JSON.stringify({ tags: CFG.tags, builds }, null, 2);
       const src = '// Nhãn sprite + build đã đánh dấu, đi kèm extension để máy nào cài cũng có sẵn.\n' +
         `// Tạo lại file này bằng nút "Xuất data.js" trong bảng F6 (hoặc PSBot.exportConfig()), rồi chép đè vào sites/${SITE.id}/.\n` +
         `window.PSBotData = ${json};\n`;
@@ -1606,7 +1612,7 @@
       a.download = 'data.js';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      log(`đã xuất data.js: ${Object.keys(CFG.tags).length} nhãn, ${Object.keys(CFG.builds).length} build — chép đè vào sites/${SITE.id}/`);
+      log(`đã xuất data.js: ${Object.keys(CFG.tags).length} nhãn, ${Object.keys(builds).length} build — chép đè vào sites/${SITE.id}/`);
     },
     unload() {
       running = false; applyDir(null); clearInterval(updateTimer);
