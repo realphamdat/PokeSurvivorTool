@@ -2,7 +2,7 @@
 
 **Tiếng Việt** · [English](README.en.md)
 
-Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com) và [pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/#play) (tự nhận bản game theo trang). Miễn phí · tác giả [damhieu2808](https://github.com/damhieu2808)
+Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com/) và [pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/) (tự nhận bản game theo trang). Miễn phí · tác giả [damhieu2808](https://github.com/damhieu2808)
 
 ## Cài trên máy tính (Chrome)
 
@@ -12,7 +12,7 @@ Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com) và [pokesurvivor.do
 
 ## Cài trên điện thoại (Android)
 
-> ⚠️ **pokesurvivor.com chặn script** nên trên điện thoại bot có thể không chạy, tuỳ trình duyệt (Kiwi: không chạy). Gặp dòng *"PSBot: trang này chặn script…"* thì dùng PC hoặc thử trình duyệt khác. **Doofcraft chạy bình thường** trên điện thoại.
+> ⚠️ **pokesurvivor.com chặn script** nên trên điện thoại bot có thể không chạy, tuỳ trình duyệt (Kiwi: không chạy). Gặp dòng *"PSBot: trang này chặn script…"* thì dùng PC hoặc thử trình duyệt khác. **pokesurvivor.doofcraft.com chạy bình thường** trên điện thoại.
 
 1. Cài một trình duyệt cài được tiện ích (extension), ví dụ **Kiwi Browser**, **Microsoft Edge** hoặc **Firefox** (CH Play).
 2. Trong trình duyệt đó, cài tiện ích **Tampermonkey** (Firefox không có thì dùng **Violentmonkey**).
@@ -38,7 +38,11 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 
 Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
 
-Trên pokesurvivor.com, bot tự chuyển trang sang **`/dev.html`** (bản dev của chính game, cùng tài khoản và dữ liệu): ở đó bot đọc thẳng vị trí quái, vùng skill, vật phẩm nên né và nhặt chính xác hơn. Muốn tắt: gõ `localStorage['psbot.dev'] = '0'` trong console (F12).
+**🎃 Event Halloween:** nút này bấm được khi game đang có event, còn lại thì bị khoá.
+- **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** chạy chế độ Waves của event.
+- **[pokesurvivor.com](https://pokesurvivor.com/):** từ 30/10 đến 1/11 mọi trận đều là trận Halloween, nút chạy như ▶ Chạy.
+
+> ⚠️ **Bot 1.5.0–1.5.6 chuyển pokesurvivor.com sang `/dev.html`.** Từ 26/10, trang này của game không còn dùng tài khoản (không lưu lên cloud, không lên bảng xếp hạng). Từ bản 1.5.7, bot đưa bạn về trang chính. Nếu thấy địa chỉ là `pokesurvivor.com/dev.html`, hãy cập nhật bot rồi mở lại `pokesurvivor.com`.
 
 ### Bot chọn thẻ lên cấp thế nào
 
@@ -59,7 +63,7 @@ Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ đi�
 
 **Chưa có Moveset:** lấy skill mới cho tới khi đủ ô > Learning > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
 
-Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), doofcraft tính là 4. Các move đã **bond** chỉ chiếm chung 1 ô, nên sau khi bond bot lại lấy thêm move mới. Game chỉ đưa thẻ move mới khi còn ô trống, nên thấy thẻ đó là bot biết còn chỗ.
+Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), pokesurvivor.doofcraft.com tính là 4. Các move đã **bond** chỉ chiếm chung 1 ô, nên sau khi bond bot lại lấy thêm move mới. Game chỉ đưa thẻ move mới khi còn ô trống, nên thấy thẻ đó là bot biết còn chỗ.
 
 Bot luôn kèm chế độ farm xu: được cộng thêm điểm cho nội tại hút đồ / kinh nghiệm / xu, nhưng điểm cộng này không bao giờ vượt qua thứ tự build ở trên.
 

@@ -1179,12 +1179,15 @@
   function renderCtl() {
     const finished = state.target && state.done >= state.target;
     if (state.eventMode && !state.on) { SITE.event.stop(); state.eventMode = false; }
-    const ev = $('event'), evOn = !!SITE.event && SITE.event.available();
-    ev.style.display = evOn ? '' : 'none';
-    if (evOn) {
+    // Shown whenever the site has an event, disabled while there is none (or a normal run is going)
+    const ev = $('event');
+    if (SITE.event) {
+      const avail = SITE.event.available();
+      ev.style.display = '';
       ev.textContent = state.on && state.eventMode ? '■ Dừng event' : SITE.event.label;
       ev.className = `psb-btn ${state.on && state.eventMode ? 'stop' : 'evt'}`;
-      ev.disabled = state.on && !state.eventMode;
+      ev.disabled = state.on ? !state.eventMode : !avail;
+      ev.title = avail || state.eventMode ? SITE.event.title : 'Chưa có event: nút bấm được khi event đang diễn ra';
     }
     // Running the event: its own button stops it, ▶ Chạy stays as is but disabled (and the other way round)
     const evRun = state.on && state.eventMode;

@@ -2,7 +2,7 @@
 
 [Tiếng Việt](README.md) · **English**
 
-Auto-play bot for [pokesurvivor.com](https://pokesurvivor.com) and [pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/#play) (detects the game version from the site). Free · by [damhieu2808](https://github.com/damhieu2808)
+Auto-play bot for [pokesurvivor.com](https://pokesurvivor.com/) and [pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/) (detects the game version from the site). Free · by [damhieu2808](https://github.com/damhieu2808)
 
 ## Install on PC (Chrome)
 
@@ -12,7 +12,7 @@ Auto-play bot for [pokesurvivor.com](https://pokesurvivor.com) and [pokesurvivor
 
 ## Install on a phone (Android)
 
-> ⚠️ **pokesurvivor.com blocks injected scripts**, so on phones the bot may not run depending on the browser (Kiwi: doesn't work). If you see *"PSBot: trang này chặn script…"* (this page blocks scripts), use a PC or try another browser. **Doofcraft works fine** on phones.
+> ⚠️ **pokesurvivor.com blocks injected scripts**, so on phones the bot may not run depending on the browser (Kiwi: doesn't work). If you see *"PSBot: trang này chặn script…"* (this page blocks scripts), use a PC or try another browser. **pokesurvivor.doofcraft.com works fine** on phones.
 
 1. Install a browser that supports extensions, e.g. **Kiwi Browser**, **Microsoft Edge** or **Firefox** (Play Store).
 2. In that browser, install the **Tampermonkey** extension (on Firefox, use **Violentmonkey** if Tampermonkey isn't available).
@@ -38,7 +38,11 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 
 The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
 
-On pokesurvivor.com the bot switches to **`/dev.html`** (the game's own dev build, same account and save): there it reads enemy, skill-zone and item positions straight from the game, so it dodges and picks up more accurately. To turn this off, run `localStorage['psbot.dev'] = '0'` in the console (F12).
+**🎃 Event Halloween:** this button works while the game has an event on, otherwise it is disabled.
+- **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** runs the event's Waves mode.
+- **[pokesurvivor.com](https://pokesurvivor.com/):** from 30/10 to 1/11 every run is a Halloween run, and the button works like ▶ Chạy.
+
+> ⚠️ **Bot 1.5.0–1.5.6 moved pokesurvivor.com to `/dev.html`.** Since 26/10 that page of the game no longer uses your account (no cloud save, no ranking). From 1.5.7 the bot takes you back to the main page. If the address shows `pokesurvivor.com/dev.html`, update the bot and open `pokesurvivor.com` again.
 
 ### How the bot picks level-up cards
 
@@ -59,7 +63,7 @@ On every level-up the bot scores each card and takes the best one. The reason fo
 
 **Without a Moveset:** take new skills until the slots are full > Learning > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
 
-Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), doofcraft counts 4. **Bonded** moves share one slot, so after a bond the bot takes more new moves. The game only offers a new move while a slot is free, so such a card tells the bot there is room.
+Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), pokesurvivor.doofcraft.com counts 4. **Bonded** moves share one slot, so after a bond the bot takes more new moves. The game only offers a new move while a slot is free, so such a card tells the bot there is room.
 
 The coin-farming preset is always on: pickup / XP / coin passives get a few extra points, never enough to override the build order above.
 

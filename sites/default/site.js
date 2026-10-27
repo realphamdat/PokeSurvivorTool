@@ -2,17 +2,17 @@
 // Loaded before core/bot.js, which calls PSBotSite(h) at start. h = the core's helpers
 // (CFG, state, visible, fontSize, scoreCard, pickRow), filled in once they exist: only use them inside the methods.
 
-// The game's dev page (/dev.html) loads the same game unminified and leaves it on window.G: enemies, hazards, shots,
-// pickups and walls are then read from the game itself instead of guessed from the canvas (see scene() below).
-// Opening the site's home page goes there, if it still exists. localStorage['psbot.dev'] = '0' turns this off
+// The game's dev page (/dev.html) leaves the game on window.G (scene() below reads it), but since 26-10-2026 it runs
+// offline on the website: no account, no cloud save, no ranking. Bot 1.5.0-1.5.6 sent players there; they are now
+// sent back to the home page, unless localStorage['psbot.dev'] = '1' (playing offline on purpose)
 (() => {
-  let off = false;
-  try { off = localStorage.getItem('psbot.dev') === '0'; } catch {}
-  if (off || !/^\/(index\.html)?$/.test(location.pathname)) return;
-  fetch('/dev.html', { method: 'HEAD', cache: 'no-store' })
-    .then(r => { if (r.ok) location.replace('/dev.html' + location.search + location.hash); })
-    .catch(() => {});
+  let keep = false;
+  try { keep = localStorage.getItem('psbot.dev') === '1'; } catch {}
+  if (!keep && location.pathname === '/dev.html' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) location.replace('/' + location.search + location.hash);
 })();
+// The game's Halloween (js/systems/halloween.js): 30-10 to 1-11, Spain time. No separate mode: every run started then
+// is a Halloween run (night map, ghosts, candy, the big Gengar at minute 30)
+const MADRID_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', month: 'numeric', day: 'numeric' });
 
 window.PSBotSite = h => {
   // Card = the block around one hotkey digit (div.key), widened while it holds no other digit
@@ -147,6 +147,21 @@ window.PSBotSite = h => {
 
   return {
     id: 'default', label: 'Mặc định · pokesurvivor.com',
+    // Event button: runs like ▶ Chạy, only while the game's Halloween is on (checked once a minute)
+    event: {
+      label: '🎃 Event Halloween',
+      title: 'Event Halloween (30/10 – 1/11, giờ Tây Ban Nha): mọi trận trong thời gian này đều là trận Halloween (bản đồ đêm, pokémon Ma, kẹo, Gengar khổng lồ ở phút 30)',
+      available() {
+        const now = Date.now();
+        if (!(now - (this.at || 0) < 60000)) {
+          const p = Object.fromEntries(MADRID_DAY.formatToParts(now).map(x => [x.type, x.value]));
+          this.on = (+p.month === 10 && +p.day >= 30) || (+p.month === 11 && +p.day === 1);
+          this.at = now;
+        }
+        return this.on;
+      },
+      start() {}, stop() {},
+    },
     ready: () => !!gameCanvas(),
     canvas: gameCanvas,
     // World sprites are drawn scaled by the camera zoom, the HUD untransformed

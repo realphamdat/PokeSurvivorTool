@@ -11,6 +11,13 @@ Cập nhật: 2026-10-27 (bot v1.5.4 đã phát hành). Doofcraft test ở nơi 
 3. Nạp bot: `chrome://extensions` → Load unpacked thư mục repo, hoặc nạp trong console theo thứ tự ở mục 6.
 4. Nếu làm cùng Claude: Claude Code tự đọc `CLAUDE.md` (bản đồ code, quy ước, cách test). Bảo Claude **đọc file này** rồi đi lần lượt theo mục 3.
 5. **Mới (26/10):** ở mục 3 có hướng đọc dữ liệu game qua `window.G` trên `/dev.html`. **Đã làm xong tối 26/10**, xem mục 3.
+6. **⚠️ 27/10: `/dev.html` trên web giờ chạy offline.** Commit `bfdd329` của repo game (26/10) thêm vào `js/core/db.js`: `if (!G.BUILT && !localhost) { localReason = 'dev'; return false; }`. Nghĩa là không tài khoản, không cloud, không bảng xếp hạng. Bot 1.5.0–1.5.6 tự chuyển người chơi sang đó. Bản 1.5.7 bỏ việc chuyển, và đưa `/dev.html` về `/` (trừ `localStorage['psbot.dev'] = '1'`).
+   - Trên `/` không có `G`, nên bản thường lại đọc canvas. `scene()` vẫn giữ (chạy khi có `G`, ví dụ localhost).
+   - **Việc cần làm:** nhánh canvas của bản thường còn thiếu nhiều (mục 3 bước 5–7): nhãn vùng skill/đạn, địa hình, vật thể. Lấy màu/kích thước từ mã nguồn repo game.
+7. **Event Halloween bản thường** (`js/systems/halloween.js`): 30/10 đến 1/11, giờ Tây Ban Nha (theo giờ server). Không có chế độ riêng: mọi trận trong thời gian đó đều là Halloween.
+   - Có: bản đồ đêm có bí ngô, thêm pokémon Ma, kẹo (`bag.candy`, chủ yếu do pokémon Ma và bí ngô rơi), shop Kecleon bán skin bằng kẹo, banner gacha Noche Espectral, phút 30 có Gengar khổng lồ thay Arceus.
+   - Profile `default` có `event` (nút bấm được trong 3 ngày đó, chạy như ▶ Chạy).
+   - **Chưa làm:** nhận diện kẹo / bí ngô trên canvas (chưa có dữ liệu thật).
 
 ---
 
