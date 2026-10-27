@@ -1041,6 +1041,11 @@
     [data-psbot-ui] .psb-tip { position:relative; font-size:12px; color:#cfd6e2; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:6px 24px 6px 9px }
     [data-psbot-ui] .psb-tip b { color:#f5c542 }
     [data-psbot-ui] .psb-tip .psb-icon { position:absolute; top:2px; right:2px; font-size:14px; color:#7d8799 }
+    [data-psbot-ui] .psb-tabs { display:flex; border-bottom:1px solid #2e3646 }
+    [data-psbot-ui] .psb-tab { flex:1; font:600 13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#aab3c2; background:none; border:0; border-bottom:2px solid transparent; padding:8px 6px; cursor:pointer }
+    [data-psbot-ui] .psb-tab:hover { color:#e6eaf0 }
+    [data-psbot-ui] .psb-tab[aria-selected="true"] { color:#f5c542; border-bottom-color:#f5c542; background:#222838 }
+    [data-psbot-ui] .psb-body[hidden] { display:none }
     [data-psbot-ctl][data-min] > :not(:first-child) { display:none !important }
     [data-psbot-ctl][data-min] > .psb-head { border-bottom:0 }
     @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }`;
@@ -1048,8 +1053,11 @@
     <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span class="psb-title">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc trên GitHub">by damhieu2808</a></span>
       <button data-ctl="min" class="psb-icon" title="Thu gọn / mở rộng">–</button></div>
     <style>${PSB_CSS}</style>
-    <div class="psb-body">
-      <div class="psb-sec">Điều khiển</div>
+    <div class="psb-tabs" role="tablist">
+      <button data-tab="ctl" class="psb-tab" role="tab" aria-selected="true">Điều khiển</button>
+      <button data-tab="donate" class="psb-tab" role="tab" aria-selected="false">💛 Donate</button>
+    </div>
+    <div data-pane="ctl" class="psb-body">
       <label class="psb-row">Số ván
         <input data-ctl="runs" class="psb-in" type="number" min="0" step="1" style="width:70px">
         <span class="psb-muted">0 = vô hạn</span></label>
@@ -1061,6 +1069,15 @@
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
         <b>💡 Mẹo đi 30 phút:</b> Tapu Fini — Draining Kiss · Aqua Ring · Harden · Whirlpool</div>
+    </div>
+    <div data-pane="donate" class="psb-body" hidden>
+      <div class="psb-sec">Ủng hộ tác giả</div>
+      <div>Tool miễn phí và được cập nhật thường xuyên. Nếu thấy hữu ích, bạn có thể donate để tác giả có thêm thời gian làm tool 💛</div>
+      <img src="https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/main/icons/donate-qr.png" alt="QR chuyển khoản Techcombank" style="display:block;width:170px;margin:0 auto;border-radius:8px">
+      <div class="psb-muted" style="text-align:center">Quét QR bằng app ngân hàng, hoặc chuyển khoản:</div>
+      <div style="text-align:center;line-height:1.5"><b>Techcombank</b> · DAM XUAN HIEU<br>
+        <b data-ctl="acct" style="color:#f5c542;font-size:15px;letter-spacing:.04em">19036427455012</b>
+        <button data-ctl="copyacct" class="psb-btn" style="flex:0 0 auto;padding:2px 8px;font-size:12px;margin-left:4px">Copy</button></div>
     </div>
     <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc — bấm để mở GitHub" class="psb-foot">⭐ Tác giả <b>damhieu2808</b> · GitHub</a>
     <a data-ctl="update" href="${REPO}" target="_blank" rel="noopener" style="order:2;display:none;color:#1b202b;background:#f5c542;padding:6px 12px;text-decoration:none;font-weight:bold;font-size:12px"></a>`;
@@ -1083,6 +1100,16 @@
   const TIP_KEY = 'psbot.tip.1';
   try { if (localStorage.getItem(TIP_KEY)) $('tip').remove(); } catch {}
   if ($('tipx')) $('tipx').onclick = () => { $('tip').remove(); try { localStorage.setItem(TIP_KEY, '1'); } catch {} };
+  // Tabs: Điều khiển (always the one shown at start) / Donate
+  ctl.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
+    ctl.querySelectorAll('[data-tab]').forEach(t => t.setAttribute('aria-selected', t === b));
+    ctl.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== b.dataset.tab; });
+  }));
+  $('copyacct').onclick = async () => {
+    try { await navigator.clipboard.writeText($('acct').textContent); $('copyacct').textContent = 'Đã copy'; }
+    catch { getSelection().selectAllChildren($('acct')); $('copyacct').textContent = 'Giữ để copy'; }
+    setTimeout(() => { $('copyacct').textContent = 'Copy'; }, 2000);
+  };
   // Keep typing / clicks in the panel away from the game's keyboard and pointer handlers
   UI_EVENTS.forEach(t => ctl.addEventListener(t, e => e.stopPropagation()));
 
