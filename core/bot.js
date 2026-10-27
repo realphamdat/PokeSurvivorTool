@@ -317,12 +317,17 @@
     return g;
   }
   // Straight walk from a to b (world) crosses no blocked cell; a's own cell is skipped (we may stand against a wall),
-  // cells outside the grid count as free
-  function lineClear(g, a, b) {
-    const [si, sj] = g.at(a.x, a.y), steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (CFG.cell / 2));
-    for (let k = 1; k <= steps; k++) {
-      const [i, j] = g.at(a.x + (b.x - a.x) * k / steps, a.y + (b.y - a.y) * k / steps);
-      if ((i !== si || j !== sj) && i >= 0 && j >= 0 && i < g.n && j < g.n && g.blocked[j * g.n + i]) return false;
+  // cells outside the grid count as free. pad: also the two lines pad to each side (the body's width), so a corner
+  // isn't clipped on the way
+  function lineClear(g, a, b, pad = 0) {
+    const len = Math.hypot(b.x - a.x, b.y - a.y), steps = Math.ceil(len / (CFG.cell / 2));
+    const nx = pad * (a.y - b.y) / (len || 1), ny = pad * (b.x - a.x) / (len || 1);
+    for (const [ox, oy] of pad ? [[0, 0], [nx, ny], [-nx, -ny]] : [[0, 0]]) {
+      const [si, sj] = g.at(a.x + ox, a.y + oy);
+      for (let k = 1; k <= steps; k++) {
+        const [i, j] = g.at(a.x + ox + (b.x - a.x) * k / steps, a.y + oy + (b.y - a.y) * k / steps);
+        if ((i !== si || j !== sj) && i >= 0 && j >= 0 && i < g.n && j < g.n && g.blocked[j * g.n + i]) return false;
+      }
     }
     return true;
   }
@@ -439,12 +444,16 @@
       if (onScreen && d > 20 && d < state.magnet * 3) state.magnet = state.magnet * 0.8 + d * 0.2;
     }
     state.prevXp = xpNow; state.prevMe = meW;
-    // While the game is paused (level-up / item dialogs) the player can't move: not "stuck"
-    if (now - (state.timerChangedAt || now) > 1500) state.posHist.length = 0;
+    // While the game is paused (level-up / item dialogs) the player can't move: not "stuck". The frozen timer only
+    // shows that after 1.5 s, so an open dialog counts at once (else each level-up could leave a wall in open ground)
+    if (now - (state.timerChangedAt || now) > 1500 || SITE.choiceOpen()) state.posHist.length = 0;
     else state.posHist.push(meW);
     if (state.posHist.length > 20) {
       const old = state.posHist.shift();
-      if (state.on && state.dir && Math.hypot(meW.x - old.x, meW.y - old.y) < 3) {
+      // Truly held in place: little net movement AND little movement at all (dodging back and forth in front of a
+      // telegraph is not a wall, and a "wall" learnt there would close the way out)
+      const travel = state.posHist.reduce((a, p, i) => a + (i ? Math.hypot(p.x - state.posHist[i - 1].x, p.y - state.posHist[i - 1].y) : 0), 0);
+      if (state.on && state.dir && Math.hypot(meW.x - old.x, meW.y - old.y) < 3 && travel < 12) {
         const ahead = { x: meW.x + state.dir[0] * 40, y: meW.y + state.dir[1] * 40 };
         // Held back by a crowd of enemies is not a wall
         if (!enemies.some(e => Math.hypot((e.x - e0) / s - ahead.x, (e.y - f0) / s - ahead.y) < CFG.contact + 20)) state.walls = state.walls.concat({ ...ahead, until: Infinity }).slice(-300);
@@ -532,6 +541,11 @@
     state.prevTarget = target && { enemy: target === foe, rift: target === rift, w:{ x: (target.x - e0) / s, y: (target.y - f0) / s } };
     state.view.walls = walls;
     const escape = state.escape && state.escape.until > now ? state.escape.dir : null;
+    // Terrain wall tiles by world tile index, for the per-frame step check (cost): walking into one only gets the
+    // player stuck, so no dodge is worth it
+    const tileW = terrain.length ? terrain[0].w / s : 0;
+    const wallTiles = new Set(terrain.filter(t => t.kind === 1).map(t => `${Math.round((t.x - e0) / s / tileW)},${Math.round((t.y - f0) / s / tileW)}`));
+    const wallAt = (x, y) => wallTiles.size > 0 && wallTiles.has(`${Math.floor(x / tileW)},${Math.floor(y / tileW)}`);
 
     // Path finding: a wall between us and the target -> walk to the farthest cell of an A* path around it that we can
     // reach in a straight line (wp). Re-planned every 300 ms, when the target moves or once that cell is reached
@@ -586,7 +600,7 @@
       if (!path.length) return { ...plan, gaveUp: true };             // gave up: steer straight as before
       plan.cells = path.map(idx => ({ x: (g.ox + idx % g.n + 0.5) * CFG.cell, y: (g.oy + Math.floor(idx / g.n) + 0.5) * CFG.cell }));
       plan.wp = plan.cells[1] || to;
-      for (let i = plan.cells.length - 1; i > 1; i--) if (lineClear(g, from, plan.cells[i])) { plan.wp = plan.cells[i]; break; }
+      for (let i = plan.cells.length - 1; i > 1; i--) if (lineClear(g, from, plan.cells[i], CFG.bodyRadius)) { plan.wp = plan.cells[i]; break; }
       return plan;
     }
     let wp = null;
@@ -637,7 +651,16 @@
         const d = dist(p, w), r = (w.rw + 70) * 0.4;
         if (d < r) c += 15 * (1 - d / r) + 3;
       }
-      if (escape) c -= dir ? 8 * (dir[0] * escape[0] + dir[1] * escape[1]) : 0;
+      // Terrain walls: right in front of the body (pressing into it) costs more than any hazard; farther along the step
+      // less, so walking along a wall stays fine
+      if (dir && wallTiles.size) {
+        const hit = d => wallAt(meW.x + dir[0] * d, meW.y + dir[1] * d);
+        if (hit(CFG.bodyRadius + 6)) c += 60;
+        else if (hit(CFG.lookahead / 2)) c += 20;
+        else if (hit(CFG.lookahead)) c += 6;
+      }
+      // Getting unstuck outweighs hazards: better take a hit than stay pinned against a wall
+      if (escape) c -= dir ? 40 * (dir[0] * escape[0] + dir[1] * escape[1]) : 0;
       else if (target && hold) c += weight * dist(p, target) / CFG.lookahead;     // already on top: stay put
       else if (wpS) c += weight * (segDist(wpS, me, p) / s + 0.2 * dist(p, wpS)) / CFG.lookahead;   // around a wall
       // Pickups: score by how close the step passes over the item (not where it ends), so the

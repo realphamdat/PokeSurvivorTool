@@ -15,15 +15,16 @@
   function frame() {
     if (sim) {
       const dx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0), dy = (keys.s ? 1 : 0) - (keys.w ? 1 : 0), l = Math.hypot(dx, dy) || 1;
-      const nx = sim.x + dx / l * SPEED, ny = sim.y + dy / l * SPEED;
+      const nx = sim.x + dx / l * SPEED, ny = sim.y + dy / l * SPEED, px = sim.x, py = sim.y;
       if (!hitWall(nx, sim.y)) sim.x = nx;
       if (!hitWall(sim.x, ny)) sim.y = ny;
+      if ((dx || dy) && Math.hypot(sim.x - px, sim.y - py) < SPEED * 0.3) sim.blocked++;   // pushing into a wall
       sim.trail.push([Math.round(sim.x), Math.round(sim.y)]);
       if (sim.item && Math.hypot(sim.x - sim.item[0], sim.y - sim.item[1]) < 16) { sim.reachedAt = performance.now() - sim.t0; sim.item = null; }
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#243'; ctx.fillRect(0, 0, 800, 600);
       ctx.setTransform(S, 0, 0, S, 400 - sim.x * S, 300 - sim.y * S);
       for (const [wx, wy] of sim.walls) ctx.drawImage(WALL, wx, wy);
-      if (sim.hazard) { ctx.fillStyle = '#ff3030'; ctx.fillRect(...sim.hazard); }
+      if (sim.hazard && !sim.terrain) { ctx.fillStyle = '#ff3030'; ctx.fillRect(...sim.hazard); }
       if (sim.item) ctx.drawImage(ITEM, sim.item[0] - 6, sim.item[1] - 6);
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.font = '16px monospace';
       const secs = 10 + Math.floor((performance.now() - sim.t0) / 1000);
@@ -42,10 +43,30 @@
     cupHazardLeft: { walls: cup, item: [0, -240], hazard: [-420, -420, 250, 420] },
     cupHazardRight: { walls: cup, item: [0, -240], hazard: [170, -420, 250, 420] },
     open: { walls: [], item: [0, -240] },
+    // Terrain (walls given as map tiles through SITE.scene, as /dev.html and doofcraft do): the player starts deep in a
+    // pocket open at the bottom, the item is behind its back wall, and a telegraph blinks across the opening
+    pocket: { walls: [...row(-96, 64, -96), ...col(-96, -64, 64), ...col(64, -64, 64)], item: [0, -260], terrain: true,
+      hazard: [-150, 70, 300, 70], blink: 1200, start: [0, -40] },
+  };
+  // Scene for terrain runs: everything in screen space, like the default profile's scene() on /dev.html
+  const scene = cam => {
+    if (!sim || !sim.terrain) return null;
+    const { s, e, f } = cam, X = x => x * s + e, Y = y => y * s + f;
+    const on = sim.hazard && Math.floor((performance.now() - sim.t0) / sim.blink) % 2 === 0;
+    const [hx, hy, hw, hh] = sim.hazard || [0, 0, 0, 0];
+    return {
+      me: { x: X(sim.x), y: Y(sim.y) }, enemies: [], xp: [], case: [], buff: [], rift: [], wall: [], break: [], prize: [],
+      good: sim.item ? [{ src: 'sim:item', x: X(sim.item[0]), y: Y(sim.item[1]), w: 12 * s, h: 12 * s, s, e, f }] : [],
+      hazard: on ? [{ src: 'sim:zone', shape: 'poly', lw: 0, x: X(hx + hw / 2), y: Y(hy + hh / 2), w: 0, h: 0,
+        pts: [[hx, hy], [hx + hw, hy], [hx + hw, hy + hh], [hx, hy + hh]].map(([x, y]) => ({ x: X(x), y: Y(y) })) }] : [],
+      terrain: sim.walls.map(([x, y]) => ({ x: X(x), y: Y(y), w: 32 * s, kind: 1 })),
+    };
   };
   window.__run = async (name, ms) => {
     const sc = scenes[name];
-    sim = { x: 0, y: 0, walls: sc.walls, item: sc.item, hazard: sc.hazard, trail: [], reachedAt: null, t0: performance.now() };
+    const [x0, y0] = sc.start || [0, 0];
+    sim = { x: x0, y: y0, walls: sc.walls, item: sc.item, hazard: sc.hazard, terrain: !!sc.terrain, blink: sc.blink, blocked: 0, trail: [], reachedAt: null, t0: performance.now() };
+    if (sc.terrain && PSBot.SITE.scene !== scene) PSBot.SITE.scene = scene;
     for (const k in keys) keys[k] = false;
     await new Promise(r => setTimeout(r, 300));
     // Tag the wall / item sprites like F6 would
@@ -60,6 +81,6 @@
     PSBot.stop();
     const minX = Math.min(...sim.trail.map(p => p[0])), maxX = Math.max(...sim.trail.map(p => p[0]));
     return { name, reachedMs: sim.reachedAt && Math.round(sim.reachedAt), end: [Math.round(sim.x), Math.round(sim.y)], trailX: [minX, maxX],
-      ignored: PSBot.state.ignore.length, learntWalls: PSBot.state.walls.length };
+      ignored: PSBot.state.ignore.length, learntWalls: PSBot.state.walls.length, blockedFrames: sim.blocked };
   };
 })();

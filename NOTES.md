@@ -147,6 +147,18 @@ Bản thường có thể đóng gói khác, nhưng cách tìm giống vậy. Sc
   - 27/10 (bot 1.5.4, Mewtwo): **13:55** (hạ Kyogre, Urshifu, Deoxys; Psychic tiến hoá). Chết vì Greninja đánh 100% → 0 trong 3s, bot vẫn nhắm đánh nó ở 27% máu.
   - Sửa sau trận đó (chưa phát hành): mất ≥ 25% máu trong 2s thì tính là máu thấp thêm 4s (`hurtDrop/hurtWindow/hurtHold`); máu thấp thì không chủ động đi đánh quái. Trận thử: 6:47, chết vì bị 40–60 quái vây (xem dòng dưới). Chưa đủ trận để đánh giá.
 - **Đợt quái ập đến** (từ 25 lên 85 con trong 3 giây) vẫn là nguyên nhân chết chính.
+- **Kẹt tường (sửa 27/10, sau 1.5.5).** Người dùng báo bot hay kẹt ở tường địa hình lớn (lưới tím F9).
+  - **Nguyên nhân 1:** `cost()` (chấm 16 hướng mỗi frame) không biết ô tường địa hình; chỉ A* biết. Khi né skill/quái, bot đi thẳng vào tường.
+  - **Nguyên nhân 2:** điểm đi tiếp `wp` chỉ kiểm tra tâm, nên thân cạ góc tường → bị tính là kẹt → thoát theo hướng ngẫu nhiên (lực thoát yếu hơn né skill) → lại vào tường.
+  - **Nguyên nhân 3:** đứng lắc qua lại chờ skill, hoặc bảng lên cấp vừa mở (game dừng, mà phải 1,5 s bot mới biết), cũng bị tính là kẹt. Mỗi lần như vậy để lại một điểm "tường" giữ suốt trận, chặn A* ở chỗ trống.
+  - **Sửa:**
+    - `cost()` phạt bước đâm vào ô tường: sát thân +60, giữa bước +20, cuối bước +6.
+    - Lực thoát kẹt 8 → 40 (hơn né skill).
+    - `lineClear(…, pad)` kiểm tra cả bề ngang thân khi chọn `wp`.
+    - Chỉ tính kẹt khi tổng quãng đi < 12 (không phải lắc), và không tính khi `SITE.choiceOpen()`.
+  - **Test:**
+    - Trang giả lập, cảnh mới `pocket` (tường địa hình hình túi, skill nhấp nháy ở cửa): trước 0/3 lần lấy được, đâm tường 8–335 frame; sau 4/4 lần trong ~3,6 s, 0 frame. Các cảnh cũ vẫn đạt.
+    - Doofcraft Waves (Mewtwo), mỗi bên 1 trận: trước chết 6:31, 53 lần thoát kẹt, 57 điểm tường học được; sau chết 8:48, 13 lần thoát, 11 điểm.
 - Log "chọn đồ" / "bond" lặp 2–3 lần mỗi bảng (bảng còn hiện sau lần bấm đầu, `pickAt` chỉ chờ 800ms). Chọn vẫn đúng, chưa sửa.
 - **Đã thử và gỡ: chế độ "thoát vây".** Từ 12 quái trong vòng 220 đơn vị thì chạy về hướng thưa nhất. 1 trận chết ở 5:35, sớm hơn bản không có nó. Nếu thử lại: chỉ bật khi máu thấp, hoặc ưu tiên hạ quái nhanh thay vì chạy.
 - `sites/doofcraft/data.js` là bản sao data.js của bản thường. Có thể dọn các nhãn không dùng.
