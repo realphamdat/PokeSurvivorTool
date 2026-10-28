@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.8';
+  const VERSION = '1.6.9';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -110,20 +110,20 @@
     swapEvery: 10,        // ms between switches; the bot loop runs once per frame (~16 ms), so below that = every frame
     // Held items to drop for any other item, even an unknown one
     swapAwayItems: ['choice band'],
-    // Held items ("An item! You can only hold one"): higher = better. The site lists them unranked,
-    // so this ranking favours damage/cooldown, then survival, then utility. Edit freely.
+    // Held items ("An item! You can only hold one"): higher = better. Survival first, the order
+    // BoundlessEgret/pokesurvivor-autofarm settled on (runs last longer = more coins). Edit freely.
     itemScores: {
+      'shell bell': 11,     // heal 4% of damage dealt: the more the moves hit, the more it heals
+      'leftovers': 10,      // 1.5% max HP/s regen
       'quick claw': 9,      // -20% cooldown on every move, no downside
+      'focus sash': 8,      // survive a KO hit once per 60 s
+      'assault vest': 7,    // -20% damage taken (doofcraft: +32% defence)
+      'rocky helmet': 6,    // only punishes melee attackers
+      'lucky egg': 5,       // +30% XP -> more levels
+      'amulet coin': 4,     // more coins at the end of the run, no combat effect
+      'choice scarf': 3,    // +35% speed
       'life orb': 1,        // +30% damage, small HP cost per attack (never KOs)
       'choice band': 0,     // +40% damage, but locks moves (breaks E skill cycling): only when nothing else is offered
-      'leftovers': 7,       // 1.5% max HP/s regen
-      'assault vest': 7,    // -20% damage taken
-      'lucky egg': 20,      // +30% XP -> more levels: always taken, never swapped away
-      'focus sash': 6,      // survive a KO hit once per 60 s
-      'choice scarf': 5,    // +35% speed
-      'shell bell': 5,      // heal 4% of damage dealt
-      'amulet coin': 4,     // more coins at the end of the run, no combat effect
-      'rocky helmet': 3,    // only punishes melee attackers
     },
     // Card text that marks "this pick unlocks the evolution of a maxed skill" (adjust once the real wording is known)
     evoRe: /evol|evoluc|awaken|despert|unlock|desbloq|tiến hoá|★|⭐/i,
@@ -911,26 +911,29 @@
     if (!CFG.autoPick || !state.on || performance.now() < state.pickAt) return;
     const found = SITE.levelUp();
     if (!found || !found.cards.length) return;
-    // The cards as the game dealt them (SITE.pilot: pokesurvivor.com with G), ranked as the tool the pilot comes from
-    // does: the berry under 35 % HP first, a passive that evolves a maxed move at once next to an evolution, armour
-    // (-6 % damage taken a card, up to 70 %) before move upgrades
-    if (SITE.pilot) {
-      const tier = currentBuild() ? { heal: 600, evo: 490, def: 390 } : { heal: 200, evo: 150, def: 45 };
-      for (const c of found.cards) {
-        const g = SITE.pilot.card(+c.key - 1);
-        if (!g) continue;
+    // Survival rules from BoundlessEgret/pokesurvivor-autofarm, with what the site knows of each card (SITE.cardFacts:
+    // { heal, evoNow, armor: the armour card still worth taking, why }): the berry under 35 % HP first, a passive that
+    // evolves a maxed move at once next to an evolution, armour before move upgrades until capped
+    const build = currentBuild();
+    if (SITE.cardFacts) {
+      const tier = build ? { heal: 600, evo: 490, def: 390 } : { heal: 200, evo: 150, def: 45 };
+      found.cards.forEach((c, i) => {
+        const f = SITE.cardFacts(c, i);
+        if (!f) return;
         const up = (score, why) => { if (c.score < score) Object.assign(c, { score, why }); };
-        if (g.type === 'stat' && g.id === 'heal' && g.hp < 0.35) up(tier.heal, 'hồi máu (máu dưới 35%)');
-        else if (g.evoNow) up(tier.evo, 'lấy là tiến hoá ngay');
-        else if (g.type === 'stat' && g.id === 'def' && g.armor < 0.69) up(tier.def, `giáp (đang giảm ${Math.round(g.armor * 100)}% sát thương, tối đa 70%)`);
-      }
+        if (f.heal && state.hpRatio < 0.35) up(tier.heal, 'hồi máu (máu dưới 35%)');
+        else if (f.evoNow) up(tier.evo, 'lấy là tiến hoá ngay');
+        else if (f.armor) up(tier.def, `giáp (${f.why})`);
+      });
     }
     const cards = found.cards.sort((a, b) => b.score - a.score);
     state.pickAt = performance.now() + 800;
     console.table(cards);
+    // Reroll when nothing on offer helps: with a build, only upgrades outside it / new moves with no slot (under the
+    // passives' 140), as the tool above rerolls anything that neither evolves, builds nor is a passive.
     // No reroll when tapping (c.el): if R does nothing there, the bot would retry it forever instead of picking. A site
     // that answers through the game (found.reroll / c.pick: pokesurvivor.com with G) needs neither keys nor taps
-    if (cards[0].score < 2 && found.rerolls > 0 && (found.reroll || !cards[0].el)) { log('reroll'); if (found.reroll) found.reroll(); else tap('r', 'KeyR', 82); return; }
+    if (cards[0].score < (build ? 140 : 2) && found.rerolls > 0 && (found.reroll || !cards[0].el)) { log('reroll'); if (found.reroll) found.reroll(); else tap('r', 'KeyR', 82); return; }
     const c = cards[0];
     state.picks[c.name] = (state.picks[c.name] || 0) + 1;
     if (c.isNew) state.newSkills++;

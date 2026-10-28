@@ -61,7 +61,9 @@ Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ đi�
 6. **Nội tại mà move trong build cần để tiến hoá** (ví dụ Magnet cho Psychic), khi đã có move đó và chưa có nội tại.
 7. Nội tại khác: tấn công (sát thương, hồi chiêu, tầm…) > phòng thủ (máu, hồi máu, giáp, tốc độ, hút…) > còn lại.
 8. Nâng cấp skill ngoài build (cấp cao trước).
-9. Skill mới ngoài build khi đã hết ô: chỉ lấy khi không còn gì khác. Nếu cả 3 thẻ đều thuộc loại này và còn lượt **Reroll** thì bot đổi thẻ (máy tính).
+9. Skill mới ngoài build khi đã hết ô: chỉ lấy khi không còn gì khác.
+
+Nếu thẻ tốt nhất chỉ thuộc loại 8–9 và còn lượt **Reroll** thì bot đổi thẻ (máy tính; pokesurvivor.com thì cả điện thoại).
 
 **Không có build** (đã xoá build mặc định): lấy skill mới cho tới khi đủ ô > Learning > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
 
@@ -69,10 +71,12 @@ Số ô move: bản thường đọc từ game (thường 4, nâng cấp đượ
 
 Bot luôn kèm chế độ farm xu: được cộng thêm điểm cho nội tại hút đồ / kinh nghiệm / xu, nhưng điểm cộng này không bao giờ vượt qua thứ tự build ở trên.
 
-**Trên pokesurvivor.com** bot đọc được thẻ thật của game, nên thêm 3 luật đứng trên thứ tự ở trên:
-- **Baya Zidra** (hồi 45% máu) khi máu dưới 35%: đứng đầu.
-- Nội tại mà **lấy là tiến hoá ngay** một move đã max: ngay sau thẻ tiến hoá.
-- **Coraza** (giáp, -6% sát thương nhận vào mỗi thẻ, tối đa 70%): trước mọi nâng cấp move, chỉ sau move build chưa có. Đầy 70% thì thôi.
+**Luật sống sót** (cả 2 bản), đứng trên thứ tự ở trên:
+- **Sitrus Berry / Baya Zidra** (hồi 45% máu) khi máu dưới 35%: đứng đầu.
+- Nội tại mà **lấy là tiến hoá ngay** một move đã max: ngay sau thẻ tiến hoá (pokesurvivor.com).
+- **Giáp** (Armor / Coraza): trước mọi nâng cấp move, chỉ sau move build chưa có. pokesurvivor.com: -6% sát thương mỗi thẻ, tới 70%. Doofcraft: tới 20 thẻ (~67%).
+
+**Đồ cầm** (cả 2 bản), xếp cho sống lâu: Shell Bell > Leftovers > Quick Claw > Focus Sash > Assault Vest > Rocky Helmet > Lucky Egg > Amulet Coin > Choice Scarf > Life Orb > Choice Band (luôn bỏ).
 
 ### Cách bot chơi trên pokesurvivor.com
 

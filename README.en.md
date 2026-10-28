@@ -61,7 +61,9 @@ On every level-up the bot scores each card and takes the best one. The reason fo
 6. **A passive a build move needs to evolve** (e.g. Magnet for Psychic), once that move is owned and the passive isn't.
 7. Other passives: attack (damage, cooldown, range…) > defence (HP, regen, armour, speed, pickup…) > the rest.
 8. Upgrade a skill outside the build (highest level first).
-9. A new skill outside the build with no slot left: only when nothing else is offered. If all three cards are like that and a **Reroll** is left, the bot rerolls (PC).
+9. A new skill outside the build with no slot left: only when nothing else is offered.
+
+If the best card is only of kind 8–9 and a **Reroll** is left, the bot rerolls (PC; on pokesurvivor.com phones too).
 
 **Without a build** (default build deleted): take new skills until the slots are full > Learning > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
 
@@ -69,10 +71,12 @@ Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgrade
 
 The coin-farming preset is always on: pickup / XP / coin passives get a few extra points, never enough to override the build order above.
 
-**On pokesurvivor.com** the bot reads the game's own cards, so 3 rules sit above the order above:
+**Survival rules** (both versions), above the order above:
 - **Sitrus Berry** (heals 45% HP) under 35% HP: first.
-- A passive that **evolves a maxed move at once**: right after evolution cards.
-- **Armor** (-6% damage taken per card, up to 70%): before any move upgrade, only after build moves not taken yet. Stops at 70%.
+- A passive that **evolves a maxed move at once**: right after evolution cards (pokesurvivor.com).
+- **Armor**: before any move upgrade, only after build moves not taken yet. pokesurvivor.com: -6% damage taken per card, up to 70%. Doofcraft: up to 20 cards (~67%).
+
+**Held items** (both versions), ranked for survival: Shell Bell > Leftovers > Quick Claw > Focus Sash > Assault Vest > Rocky Helmet > Lucky Egg > Amulet Coin > Choice Scarf > Life Orb > Choice Band (always dropped).
 
 ### How the bot plays on pokesurvivor.com
 

@@ -3,7 +3,7 @@
 // Run results are summed in localStorage ("psbot.farm"). PSFarm.stats() = per-run table, PSFarm.reset() = clear.
 //
 // Coins (end-of-run screen): Time + Defeated + Bosses + collected pickups, × Fortune.
-// Pickups and bosses pay the most, so: pick up everything, go for rifts/bosses, favour Amulet Coin.
+// Every term grows with the time survived, so held items are ranked for survival (core itemScores), not Amulet Coin.
 (function start(tries = 0) {
   // bot.js may still be waiting for the game canvas (extension load): retry for a while
   if (!window.PSBot) {
@@ -23,7 +23,6 @@
     bonusRe: /magnet|pickup|pick-up|attract|radius|coin|fortune|luck|experience|\bxp\b|exp\b|imán|monedas|suerte/i,
     bonusScore: 4,
   });
-  Object.assign(CFG.itemScores, { 'amulet coin': 10 });              // second only to lucky egg (core: 20)
 
   // ---------- coin tracking ----------
   const KEY = 'psbot.farm';

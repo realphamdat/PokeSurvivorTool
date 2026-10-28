@@ -328,6 +328,14 @@ window.PSBotSite = h => {
     // Plays from G when there is one (pilot.js): steering, orbs, active slot, auto-unpause, dialogs; and the results
     // screen / menu by the game's ids (also without G)
     pilot,
+    // Survival card rules (core levelUp), from the cards the game dealt: Sitrus Berry, a passive that evolves a move at
+    // once, Coraza (armour: -6 % damage taken a card, up to 70 %, js/systems/levelup.js)
+    cardFacts(c, i) {
+      const g = pilot && pilot.card(i);
+      if (!g) return null;
+      return { heal: g.type === 'stat' && g.id === 'heal', evoNow: g.evoNow, armor: g.type === 'stat' && g.id === 'def' && g.armor < 0.69,
+        why: `đang giảm ${Math.round(g.armor * 100)}% sát thương, tối đa 70%` };
+    },
     // Panel checkbox "don't submit to the leaderboard" (wrapper at the top), on by default; only with G
     noRank: window.G ? {
       get: () => { try { return localStorage.getItem('psbot.norank') !== '0'; } catch { return true; } },

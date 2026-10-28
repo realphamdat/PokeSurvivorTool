@@ -210,6 +210,10 @@ window.PSBotSite = h => {
     return { target, hide };
   }
 
+  const MENU = '[data-testid="menu-solo"], [data-testid="solo-start"]';
+  const RESTART = ['[data-testid="game-exit"]', '[data-testid="saved-run-new-confirm"] [data-testid="dialog-confirm"]',
+    '[data-testid="saved-run-resume"]', '[data-testid="solo-start"]', '[data-testid="menu-solo"]'];
+
   return {
     id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
     event,
@@ -235,6 +239,12 @@ window.PSBotSite = h => {
     bySize: { 'canvas:34x16': 'heal', 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
       'canvas:8x23': 'wall', 'canvas:24x28': 'wall', 'canvas:6x20': 'wall', 'canvas:14x11': 'break' },
     evolveNeeds,              // move name -> passive card it needs to evolve
+    // Survival card rules (core levelUp), by card name (game config): Sitrus Berry heals 45 %; Armor adds 0.1 defence
+    // up to 2 (damage taken / (1 + defence): ~67 % less after 20 cards), counted from this run's picks
+    cardFacts(c) {
+      const armor = h.state.picks.Armor || 0;
+      return { heal: c.name === 'Sitrus Berry', armor: c.name === 'Armor' && armor < 20, why: `${armor}/20 thẻ, tối đa giảm ~67% sát thương` };
+    },
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding
     // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
     // Chests are solid here (radius 12): "next to" one is farther than a walk-over suitcase
@@ -264,12 +274,17 @@ window.PSBotSite = h => {
       }
       h.pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80), el: tapTarget(c) })));
     },
-    menu: buttons => buttons.some(b => b.matches('[data-testid="menu-solo"], [data-testid="solo-start"]')),
+    // The core only passes buttons that are on top at their centre; on phones (zoom, rotation, scrolling) that test can
+    // miss them all, so the game's own test ids are also looked up directly (visible ones)
+    menu: buttons => buttons.some(b => b.matches(MENU)) || PSBotList(document.querySelectorAll(MENU)).some(h.visible),
     // Results -> menu, continue a saved run (or confirm ending it), Solo -> Play
     restartButton(buttons) {
-      for (const sel of ['[data-testid="game-exit"]', '[data-testid="saved-run-new-confirm"] [data-testid="dialog-confirm"]',
-        '[data-testid="saved-run-resume"]', '[data-testid="solo-start"]', '[data-testid="menu-solo"]']) {
+      for (const sel of RESTART) {
         const b = buttons.find(b => b.matches(sel));
+        if (b) return b;
+      }
+      for (const sel of RESTART) {
+        const b = PSBotList(document.querySelectorAll(sel)).find(h.visible);
         if (b) return b;
       }
     },
