@@ -3,6 +3,7 @@
 // @author       damhieu2808
 // @homepageURL  https://github.com/damhieu2808/PokeSurvivorTool
 // @match        https://pokesurvivor.com/*
+// @match        https://www.pokesurvivor.com/*
 // @match        https://pokesurvivor.doofcraft.com/*
 // @grant        none
 // @run-at       document-idle
@@ -33,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.1';
+  const VERSION = '1.7.2';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {

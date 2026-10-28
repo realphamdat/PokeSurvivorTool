@@ -33,6 +33,7 @@ const out = `// ==UserScript==
 // @homepageURL  ${REPO}
 // @license      MIT
 // @match        https://pokesurvivor.com/*
+// @match        https://www.pokesurvivor.com/*
 // @match        https://pokesurvivor.doofcraft.com/*
 // @run-at       document-start
 // @grant        none
