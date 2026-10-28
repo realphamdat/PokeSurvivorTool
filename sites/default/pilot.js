@@ -339,6 +339,7 @@ window.PSBotPilot = h => {
     if (target && target.escort) fear = Math.max(fear, 1);   // the escorted pokémon gets hurt by enemies too
     // Judgment: only orbs right next to the player with Arceus far away
     if (judging && target && !(target.orb && Math.hypot(target.x - p.x, target.y - p.y) < 140 && (!arceus || Math.hypot(arceus.x - p.x, arceus.y - p.y) > 320))) target = null;
+    S.target = target;                                         // for the F9 overlay
     const arena = (g.Rift && g.Rift.inArena) || judging;
     const W = g.World;
 
@@ -675,7 +676,19 @@ window.PSBotPilot = h => {
   // Choices are answered through the game (bond / item above, level-up in site.js) once its RunUI is wrapped
   const choices = () => { const g = G(); return !!(g && g.RunUI && g.RunUI.showBond && g.RunUI.showBond.psbot); };
 
-  return { active, on, steer, tick, holdSlot, card, bond, item, choices, runOver, menuOpen, restartButton, suggestion, mode: () => S.mode };
+  // What the pilot is after, in screen space for the core's F9 overlay (cam: world * s + e / f): the target it walks to
+  // (its final goal when on a route), the rest of the A* route, the waypoint and the direction it steers
+  function overlay(cam) {
+    const X = x => x * cam.s + cam.e, Y = y => y * cam.s + cam.f, t = S.target, route = S.plan && S.plan.path;
+    return {
+      target: t ? { x: X(t.fx ?? t.x), y: Y(t.fy ?? t.y) } : null,
+      wp: t && t.fx !== undefined ? { x: X(t.x), y: Y(t.y) } : null,
+      path: route ? route.pts.map(([x, y]) => ({ x: X(x), y: Y(y) })) : [],
+      pdir: S.out,
+    };
+  }
+
+  return { active, on, steer, tick, holdSlot, card, bond, item, choices, runOver, menuOpen, restartButton, suggestion, overlay, mode: () => S.mode };
 };
 // Once per page: the moment the player pauses a run themselves (the pilot's autoResume leaves that pause alone)
 if (!window.__psbotPauseKey) {

@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.4';
+  const VERSION = '1.7.5';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -438,8 +438,9 @@
 
   function tick(frame) {
     // The profile's pilot drives from the game's own state (pokesurvivor.com with G): no keys from here meanwhile, or
-    // the game would take them for the player's own and the pilot would yield
-    if (SITE.pilot && SITE.pilot.active()) { if (state.dir) applyDir(null); state.view = null; return; }
+    // the game would take them for the player's own and the pilot would yield. The scene is still read for the F9 overlay
+    const piloted = !!(SITE.pilot && SITE.pilot.active());
+    if (piloted && state.dir) applyDir(null);
     let world = frame.filter(SITE.isWorld);
     if (!world.length) return;
     const pokes = world.filter(d => CFG.enemyRe.test(d.src));
@@ -504,6 +505,26 @@
     }) : [];
     const prizes = byTag('prize'), heals = byTag('heal');
     state.view = { me, enemies, goods, hazards, rifts, buffs, heals, xps, cases, prizes, s, terrain };
+    // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
+    // around its middle, a big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for
+    // points we got stuck on
+    const footprint = d => {
+      const w = Math.abs(d.w) / s, h = Math.abs(d.h) / s;
+      // Read from the game (site.js scene: "G:tree"…): already at its collision centre, boxed 2.5 x its radius
+      if (/^G:/.test(d.src)) return { x: d.x, y: d.y, rw: w / 2.5, of: d };
+      if (Math.max(w, h) >= 128) return { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d, of: d };
+      // The site knows where its props are solid: a circle of radius r, `up` above the sprite's bottom
+      const pf = SITE.propFoot;
+      if (pf) return { x: d.x, y: d.y + (h / 2 - pf.up) * s, rw: pf.r, of: d };
+      return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4, of: d } : { x: d.x, y: d.y, rw: w * 0.4, of: d };
+    };
+    // Piloted: the overlay shows what the pilot is after (target, A* route, direction) instead of the keys' decisions,
+    // with the solid props (trees, rocks, small chests) it steers around
+    if (piloted) {
+      state.view.walls = byTag('wall').concat(byTag('break')).map(footprint);
+      if (SITE.pilot.overlay) Object.assign(state.view, SITE.pilot.overlay(cam));
+      return;
+    }
 
     // Stuck detection: player's world position barely changes while a key is held.
     // Each stuck event leaves a "wall" point ahead of the player, kept for the whole run (path finding goes around
@@ -576,17 +597,6 @@
     state.hpLog.push([now, hp]);
     if (Math.max(...state.hpLog.map(([, v]) => v)) - hp >= CFG.hurtDrop) state.hurtUntil = now + CFG.hurtHold;
     const low = hp < CFG.lowHp || now < (state.hurtUntil || 0);
-    // Where walls block: a tall prop (tree: only the trunk is solid) around the bottom of the sprite, a squat one (rock)
-    // around its middle, a big tile (128+ world units) over its whole box. rw = blocking radius in world units, 0 for
-    // points we got stuck on
-    const footprint = d => {
-      const w = Math.abs(d.w) / s, h = Math.abs(d.h) / s;
-      if (Math.max(w, h) >= 128) return { x: d.x, y: d.y, rw: Math.max(w, h) / 2, box: d, of: d };
-      // The site knows where its props are solid: a circle of radius r, `up` above the sprite's bottom
-      const pf = SITE.propFoot;
-      if (pf) return { x: d.x, y: d.y + (h / 2 - pf.up) * s, rw: pf.r, of: d };
-      return h > w * 1.2 ? { x: d.x, y: d.y + (h / 2 - w / 4) * s, rw: w / 4, of: d } : { x: d.x, y: d.y, rw: w * 0.4, of: d };
-    };
     // A map chunk once tagged "wall" with F7 (it blocked its whole 512 units) counts by its terrain tiles instead
     const solid = d => !(!sc && SITE.terrain && SITE.terrain(d));
     const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').filter(solid).map(footprint), byTag('break').map(footprint));
@@ -1218,7 +1228,8 @@
     if (v.wp) { g.strokeStyle = '#fff'; g.beginPath(); g.arc(v.wp.x, v.wp.y, 8, 0, 7); g.stroke(); }
     g.strokeStyle = '#ff4'; g.beginPath(); g.arc(v.me.x, v.me.y, CFG.contact * v.s, 0, 7); g.stroke();
     if (v.target) { g.strokeStyle = '#fff8'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.target.x, v.target.y); g.stroke(); g.setLineDash([]); }
-    if (state.dir) { g.strokeStyle = '#4cf'; g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.me.x + state.dir[0] * 40, v.me.y + state.dir[1] * 40); g.stroke(); }
+    const dir = state.dir || v.pdir;                                   // keys sent, or the pilot's own direction
+    if (dir) { g.strokeStyle = '#4cf'; g.beginPath(); g.moveTo(v.me.x, v.me.y); g.lineTo(v.me.x + dir[0] * 40, v.me.y + dir[1] * 40); g.stroke(); }
   }
 
   // ---------- control panel: ▶ play N runs (0 = forever), ⏸ pause / resume, ■ stop ----------
