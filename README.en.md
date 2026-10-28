@@ -69,9 +69,26 @@ Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgrade
 
 The coin-farming preset is always on: pickup / XP / coin passives get a few extra points, never enough to override the build order above.
 
+**On pokesurvivor.com** the bot reads the game's own cards, so 3 rules sit above the order above:
+- **Sitrus Berry** (heals 45% HP) under 35% HP: first.
+- A passive that **evolves a maxed move at once**: right after evolution cards.
+- **Armor** (-6% damage taken per card, up to 70%): before any move upgrade, only after build moves not taken yet. Stops at 70%.
+
+### How the bot plays on pokesurvivor.com
+
+The bot reads the game's real state instead of the screen. Its steering is based on [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT):
+- **Dodging:** scores 16 directions, predicts where enemies will have caught up and when each telegraph lands (where the player is when it does). The lower the HP, the more common enemies are avoided; bosses, shots and telegraphs always are.
+- **Targets:** Gholdengo > rift > lost pokémon / Meowth > altar buff, healing spring (HP < 60%), big chest > pickups. Routes come from A* on the real terrain; a target that can't be reached before it's gone is skipped.
+- Stands where walls / trees don't block its shots. With a crowd around, it runs a big circle with the enemies trailing behind.
+- **Rift** and **Arceus** (minute 30): circles inside the arena, keeping the boss on the far side.
+- **Orbs:** a crowd-control orb under 40% HP or with 8 enemies on the player, a buff orb while a boss is up (before, the bot pressed 5–8 all the time and used them at once).
+- When the game pauses itself on losing focus, the bot unpauses it (unless you paused with Esc / P).
+
+Without the game's state (bookmarklet, doofcraft) the bot works as before, reading the screen.
+
 ## Updates
 
 - **PC:** when the panel shows the yellow line "⬆ Có bản mới" (new version available), download the ZIP from step 1 again and unzip it over the old folder.
-- **Phone:** updates itself, nothing to do.
+- **Phone:** the userscript manager updates it from time to time (or tap **Check for updates**).
 
 Need help installing: contact [TikTok @phuongnguyenconhat](https://www.tiktok.com/@phuongnguyenconhat) · [MIT](LICENSE)

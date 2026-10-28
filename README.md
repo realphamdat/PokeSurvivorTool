@@ -69,9 +69,26 @@ Số ô move: bản thường đọc từ game (thường 4, nâng cấp đượ
 
 Bot luôn kèm chế độ farm xu: được cộng thêm điểm cho nội tại hút đồ / kinh nghiệm / xu, nhưng điểm cộng này không bao giờ vượt qua thứ tự build ở trên.
 
+**Trên pokesurvivor.com** bot đọc được thẻ thật của game, nên thêm 3 luật đứng trên thứ tự ở trên:
+- **Baya Zidra** (hồi 45% máu) khi máu dưới 35%: đứng đầu.
+- Nội tại mà **lấy là tiến hoá ngay** một move đã max: ngay sau thẻ tiến hoá.
+- **Coraza** (giáp, -6% sát thương nhận vào mỗi thẻ, tối đa 70%): trước mọi nâng cấp move, chỉ sau move build chưa có. Đầy 70% thì thôi.
+
+### Cách bot chơi trên pokesurvivor.com
+
+Bot đọc trạng thái thật của game thay vì nhìn màn hình. Cách lái dựa trên [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT):
+- **Né:** chấm 16 hướng, dự đoán quái đuổi tới đâu và vùng skill nổ lúc nào (lúc nó nổ mình đứng ở đâu). Máu càng thấp càng sợ quái thường; boss, đạn, vùng skill thì luôn né.
+- **Mục tiêu:** Gholdengo > rift > cứu pokémon lạc / Meowth > buff, hồ hồi máu (máu < 60%), rương lớn > nhặt đồ. Đường đi tính bằng A* trên địa hình thật; không tới kịp trước khi mục tiêu biến mất thì bỏ.
+- Đứng chỗ bắn không bị tường / cây chặn. Quái đông thì chạy vòng tròn lớn, kéo quái theo sau.
+- **Rift** và **Arceus** (phút 30): chạy vòng trong sân, giữ boss ở phía đối diện.
+- **Orb:** orb khống chế khi máu dưới 40% hoặc bị 8 quái vây, orb buff khi có boss (trước đây bot bấm 5–8 liên tục nên dùng hết ngay).
+- Game tự pause khi mất focus thì bot tự chơi tiếp (trừ khi bạn tự bấm Esc / P).
+
+Không có trạng thái game (bookmarklet, doofcraft) thì bot dùng cách cũ: đọc màn hình.
+
 ## Cập nhật
 
 - **Máy tính:** khi panel hiện dòng vàng "⬆ Có bản mới", tải lại ZIP ở bước 1 rồi giải nén đè lên thư mục cũ.
-- **Điện thoại:** tự cập nhật, không cần làm gì.
+- **Điện thoại:** trình quản lý userscript tự cập nhật định kỳ (hoặc bấm **Check for updates**).
 
 Cần cài hộ: liên hệ [TikTok @phuongnguyenconhat](https://www.tiktok.com/@phuongnguyenconhat) · [MIT](LICENSE)

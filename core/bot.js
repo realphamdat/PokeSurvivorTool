@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.7';
+  const VERSION = '1.6.8';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -431,6 +431,9 @@
   }
 
   function tick(frame) {
+    // The profile's pilot drives from the game's own state (pokesurvivor.com with G): no keys from here meanwhile, or
+    // the game would take them for the player's own and the pilot would yield
+    if (SITE.pilot && SITE.pilot.active()) { if (state.dir) applyDir(null); state.view = null; return; }
     let world = frame.filter(SITE.isWorld);
     if (!world.length) return;
     const pokes = world.filter(d => CFG.enemyRe.test(d.src));
@@ -842,7 +845,7 @@
     for (const t of state.hudTexts) { const b = CFG.builds[t.toLowerCase()]; if (b) return b; }
     return null;
   };
-  Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow });   // for the site profile's methods
+  Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow, currentBuild });   // for the site profile's methods
   function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh }) {
     const build = currentBuild();
     const noDmg = /no damage|sin daño|sem dano/i.test(t);
@@ -908,27 +911,44 @@
     if (!CFG.autoPick || !state.on || performance.now() < state.pickAt) return;
     const found = SITE.levelUp();
     if (!found || !found.cards.length) return;
+    // The cards as the game dealt them (SITE.pilot: pokesurvivor.com with G), ranked as the tool the pilot comes from
+    // does: the berry under 35 % HP first, a passive that evolves a maxed move at once next to an evolution, armour
+    // (-6 % damage taken a card, up to 70 %) before move upgrades
+    if (SITE.pilot) {
+      const tier = currentBuild() ? { heal: 600, evo: 490, def: 390 } : { heal: 200, evo: 150, def: 45 };
+      for (const c of found.cards) {
+        const g = SITE.pilot.card(+c.key - 1);
+        if (!g) continue;
+        const up = (score, why) => { if (c.score < score) Object.assign(c, { score, why }); };
+        if (g.type === 'stat' && g.id === 'heal' && g.hp < 0.35) up(tier.heal, 'hồi máu (máu dưới 35%)');
+        else if (g.evoNow) up(tier.evo, 'lấy là tiến hoá ngay');
+        else if (g.type === 'stat' && g.id === 'def' && g.armor < 0.69) up(tier.def, `giáp (đang giảm ${Math.round(g.armor * 100)}% sát thương, tối đa 70%)`);
+      }
+    }
     const cards = found.cards.sort((a, b) => b.score - a.score);
     state.pickAt = performance.now() + 800;
     console.table(cards);
-    // No reroll when tapping (c.el): if R does nothing there, the bot would retry it forever instead of picking
-    if (cards[0].score < 2 && found.rerolls > 0 && !cards[0].el) { log('reroll'); tap('r', 'KeyR', 82); return; }
+    // No reroll when tapping (c.el): if R does nothing there, the bot would retry it forever instead of picking. A site
+    // that answers through the game (found.reroll / c.pick: pokesurvivor.com with G) needs neither keys nor taps
+    if (cards[0].score < 2 && found.rerolls > 0 && (found.reroll || !cards[0].el)) { log('reroll'); if (found.reroll) found.reroll(); else tap('r', 'KeyR', 82); return; }
     const c = cards[0];
     state.picks[c.name] = (state.picks[c.name] || 0) + 1;
     if (c.isNew) state.newSkills++;
     log('chọn', c.key, c.name, '—', c.why);
-    if (c.el) tapEl(c.el); else tap(c.key, `Digit${c.key}`, 48 + +c.key);
+    if (c.pick) c.pick(); else if (c.el) tapEl(c.el); else tap(c.key, `Digit${c.key}`, 48 + +c.key);
   }
 
   // Only while the run timer is ticking and no level-up is open: the dialogs also use digit hotkeys
   function useItems(t) {
     if (!CFG.useItems || !state.on || state.dead || t < (state.itemAt || 0)) return;
+    if (SITE.pilot && SITE.pilot.active()) return;                 // the pilot uses orbs when they help instead
     if (!state.timerText || t - state.timerChangedAt > 1100 || SITE.choiceOpen()) return;
     state.itemAt = t + CFG.itemEvery;
     CFG.itemKeys.forEach(k => tap(k, `Digit${k}`, 48 + +k));
   }
   function swapSkills(t) {
     if (!CFG.swapSkills || !state.on || state.dead || t < (state.swapAt || 0)) return;
+    if (SITE.pilot && SITE.pilot.holdSlot()) return;               // orbit moves lose their orbs on a switch
     if (!state.timerText || t - state.timerChangedAt > 1100 || SITE.choiceOpen()) return;
     state.swapAt = t + CFG.swapEvery;
     // Press + release at once: tap()'s 60 ms hold would leave E down and swallow the next presses
@@ -968,7 +988,8 @@
     const now = performance.now();
     if (!CFG.autoPick || !state.on || now < state.pickAt || now < (state.itemScanAt || 0)) return;
     state.itemScanAt = now + 300;                                     // full DOM scan, so not every frame
-    const head = PSBotList(document.querySelectorAll('body *')).find(e => !e.children.length && visible(e) && /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''));
+    if (SITE.pilot && SITE.pilot.choices()) return;                  // answered through the game itself
+    const head =PSBotList(document.querySelectorAll('body *')).find(e => !e.children.length && visible(e) && /only hold one|An item!|Bond!|to bond/i.test(e.innerText || ''));
     if (!head) return void SITE.otherChoice();
 
     if (/bond/i.test(head.innerText)) {
@@ -1018,9 +1039,11 @@
       return !!t && (t === b || b.contains(t));
     };
     const buttons = PSBotList(document.querySelectorAll('button, [role=button]')).filter(b => visible(b) && !dock.contains(b) && onTop(b));
-    const over = leaves.some(e => /you fell|run over|game over|has caído|caíste/i.test(e.innerText || ''));
+    // A pilot reads the results screen / menu by the game's ids: no button text or hit-testing, which phones get wrong
+    const pilot = SITE.pilot;
+    const over = (pilot && pilot.runOver()) || leaves.some(e => /you fell|run over|game over|has caído|caíste/i.test(e.innerText || ''));
     if (state.runEnded === null) state.runEnded = over;
-    const menu = SITE.menu(buttons);
+    const menu = (pilot && pilot.menuOpen()) || SITE.menu(buttons);
     if (!over && !menu && now - (state.timerChangedAt || 0) < 2500) return;
     const justEnded = over && !state.runEnded;
     state.runEnded = over;
@@ -1029,7 +1052,7 @@
       log(`xong ván ${state.done}${state.target ? `/${state.target}` : ''}`);
       if (state.target && state.done >= state.target) { state.on = false; applyDir(null); log('đã chơi đủ số ván — dừng'); return; }
     }
-    const b = SITE.restartButton(buttons);
+    const b = (pilot && pilot.restartButton()) || SITE.restartButton(buttons);
     if (b) { log('tự chơi lại: bấm', JSON.stringify(b.innerText.trim().slice(0, 40))); b.click(); }
   }
 
@@ -1102,7 +1125,7 @@
     hud.style.display = tag.on || state.debug ? '' : 'none';
     hud.textContent = tag.on
       ? (tag.pending ? `${tag.pending}: 1=tốt 2=nguy hiểm 3=rift 4=vật cản 5=buff 6=kinh nghiệm 7=vali 8=phá được 9=hồi máu 0=xoá nhãn Esc=huỷ` : 'GẮN NHÃN (F7): click vào vật trên màn hình')
-      : `bot ${state.on ? 'ON' : 'OFF'} (F8) · ván ${state.done + 1}${state.target ? `/${state.target}` : ''}${state.dwell ? ` · mở vali ${(state.dwell.t / 1000).toFixed(1)}/${CFG.caseTime / 1000}s` : ''} · địch ${v ? v.enemies.length : 0} · exp ${v ? v.xps.length : 0} (hút ${Math.round(state.magnet)}) · tốt ${v ? v.goods.length : 0} · buff ${v ? v.buffs.length : 0} · nguy hiểm ${v ? v.hazards.length : 0} · rift ${v ? v.rifts.length : 0} · chặn rank ${state.netBlocked}`;
+      : `bot ${state.on ? 'ON' : 'OFF'} (F8) · ván ${state.done + 1}${state.target ? `/${state.target}` : ''}${state.dwell ? ` · mở vali ${(state.dwell.t / 1000).toFixed(1)}/${CFG.caseTime / 1000}s` : ''} · địch ${v ? v.enemies.length : 0} · exp ${v ? v.xps.length : 0} (hút ${Math.round(state.magnet)}) · tốt ${v ? v.goods.length : 0} · buff ${v ? v.buffs.length : 0} · nguy hiểm ${v ? v.hazards.length : 0} · rift ${v ? v.rifts.length : 0} · chặn rank ${state.netBlocked}${SITE.pilot && SITE.pilot.active() ? ` · lái theo G: ${SITE.pilot.mode()}` : ''}`;
     if (tag.on && tag.box) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(tag.box.x - tag.box.w / 2, tag.box.y - tag.box.h / 2, tag.box.w, tag.box.h); }
     if (state.highlight) {
       g.strokeStyle = '#0ff'; g.lineWidth = 2;
@@ -1238,6 +1261,7 @@
       </div>
       <button data-ctl="event" class="psb-btn evt" style="display:none" title="${SITE.event ? SITE.event.title : ''}"></button>
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
+      ${SITE.pilot ? '<div data-ctl="gstate" class="psb-muted" style="font-size:11px"></div>' : ''}
       ${SITE.noRank ? '<label class="psb-row psb-muted" title="Ván do bot chơi không lên bảng xếp hạng"><input data-ctl="norank" type="checkbox"> Không gửi bảng xếp hạng</label>' : ''}
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
@@ -1345,6 +1369,9 @@
     $('play').className = `psb-btn ${state.on && !evRun ? 'stop' : 'go'}`;
     $('play').disabled = evRun;
     $('dot').className = `psb-dot${state.on ? ' on' : ''}`;
+    // Phones have no console: whether the bot reads the game itself, and what the pilot is doing
+    if ($('gstate')) $('gstate').textContent = !window.G ? 'Đọc game: không (đọc màn hình) — tải lại trang để thử lại'
+      : `Đọc game: có${SITE.pilot.active() ? ` · ${SITE.pilot.mode() || 'đang lái'}` : ''}`;
     $('status').textContent = finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'
       : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`;
@@ -1618,6 +1645,7 @@
     renderCtl();
     levelUp();
     dialogPick();
+    if (SITE.pilot) SITE.pilot.tick();
     useItems(t);
     swapSkills(t);
     autoRestart(t);

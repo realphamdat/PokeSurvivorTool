@@ -254,6 +254,30 @@ window.PSBotSite = h => {
   const gameCanvas = () => document.getElementById('game') || PSBotList(document.querySelectorAll('canvas:not([data-psbot-ui])'))
     .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
 
+  const pilot = window.PSBotPilot ? window.PSBotPilot(h) : null;
+  // Level-up cards as the game dealt them (pilot.js wraps G.LevelUp.offer), picked with G.RunUI.pick: no reading or
+  // tapping the DOM, which phones lay out differently. Null without G (DOM path below)
+  function dealtCards() {
+    const g = window.G, offer = window.__psbotOffer, p = g && g.Game && g.Game.player;
+    if (!p || !g.RunUI || !g.RunUI.pick || !g.UI || !g.UI.isOpen('scr-levelup') || !offer || !offer.length) return null;
+    // The game ignores a pick right after the cards appear (run-ui.js guarded()): an empty list = try again later
+    if (performance.now() - (window.__psbotOfferAt || 0) < 700) return { cards: [], rerolls: 0 };
+    const rr = document.getElementById('lvl-reroll');
+    const rerolls = rr && !rr.classList.contains('hidden') ? +(document.getElementById('lvl-rr-n') || {}).textContent || 0 : 0;
+    return {
+      cards: offer.map((c, i) => {
+        const id = String(c.key).split(':').slice(1).join(':'), m = p.moves.find(x => x.id === id);
+        const name = String(c.title || '').split(' → ')[0];
+        return { ...h.scoreCard({
+          key: String(i + 1), name, t: `${c.title || ''} ${c.tag || ''} ${c.desc || ''}`,
+          level: c.type === 'new' ? 0 : m ? m.lvl || 1 : 0, isNew: c.type === 'new',
+          evo: c.type === 'evo' || (c.type === 'stat' && c.color === '#ffd23f'), fitLow: false, fitHigh: false,
+        }), pick: () => g.RunUI.pick(i) };
+      }),
+      rerolls, reroll: () => g.RunUI.reroll(),
+    };
+  }
+
   return {
     id: 'default', label: 'Mặc định · pokesurvivor.com',
     // Event button: runs like ▶ Chạy, only while the game's Halloween is on (checked once a minute)
@@ -301,6 +325,9 @@ window.PSBotSite = h => {
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding, when scene() is null
     // Move slots of the player, a bonded group being one (/dev.html only; else the core counts picks)
     moveSlots: () => { const P = window.G && G.Game && G.Game.player; return P && P.slots ? { used: P.slots.length, max: P.maxMoves } : null; },
+    // Plays from G when there is one (pilot.js): steering, orbs, active slot, auto-unpause, dialogs; and the results
+    // screen / menu by the game's ids (also without G)
+    pilot,
     // Panel checkbox "don't submit to the leaderboard" (wrapper at the top), on by default; only with G
     noRank: window.G ? {
       get: () => { try { return localStorage.getItem('psbot.norank') !== '0'; } catch { return true; } },
@@ -311,6 +338,8 @@ window.PSBotSite = h => {
     // 100+ at once (a rift arena's forced weather), and as hazards they left no safe step
     cfg: { caseReach: 40, autoTelegraph: false },
     levelUp() {
+      const dealt = dealtCards();
+      if (dealt) return dealt;
       const lvl = document.getElementById('lvl-num');
       if (!h.visible(lvl)) return null;
       const rerolls = +(document.getElementById('lvl-rr-n') || {}).innerText || 0;
