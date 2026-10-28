@@ -51,12 +51,14 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
 
-The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name, or the partner in the save while at the menu. That tool's builds come built in for 3 pokémon (Shell Bell recommended for all):
+The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD, or the partner in the save while at the menu. The popup follows the pokémon being played (🎯 button green); typing another name stops that, 🎯 resumes it. That tool's builds come built in for 3 pokémon (Shell Bell recommended for all):
 - **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
 - **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
 - **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (buy Energy Ball as its "Starting move" in the shop).
 
-Any other pokémon without a Moveset **picks its moves itself**: one damage move that suits its better attack stat (homing shots, bursts and auras first, melee last) → the attack buff for that side (Nasty Plot if Sp. Atk is higher, Swords Dance if Attack is) → Harden → Aqua Ring → a second damage move. pokesurvivor.com reads the stats from the game; doofcraft has no physical / special split, so it just follows that order.
+Any other pokémon without a Moveset gets a **3-move default build**: its starting move (★) → the attack buff for its side (Nasty Plot if Sp. Atk is higher, Swords Dance / Dragon Dance if Attack is) → Harden. The 4th slot is yours to set; until you save a build, the bot fills it during the run (a damage move that suits its stats, homing shots first). The Moveset popup shows this default build; edit it and press **Lưu** (Save) and the bot follows yours.
+
+Move lists in the popup: on pokesurvivor.com they come **from the game** (the starting move you bought, TMs taught / not yet, names in the game's language) when the bot reads the game; doofcraft uses the wiki's. The attack side comes from the game's stats, else from the starting move.
 
 A higher tier always wins:
 
@@ -86,6 +88,7 @@ The bot reads the game's real state instead of the screen. Its steering is based
 - **Rift** and **Arceus** (minute 30): circles inside the arena, keeping the boss on the far side.
 - **Orbs:** a crowd-control orb under 40% HP or with 8 enemies on the player, a buff orb while a boss is up (before, the bot pressed 5–8 all the time and used them at once).
 - When the game pauses itself on losing focus, the bot unpauses it (unless you paused with Esc / P).
+- **Pokémon suggestion** (on the menu / results screen): your 3 owned pokémon that play unattended best, and whether to switch from the current one. Scored with the game's damage formula: best unaimed move × the attack stat that move uses × same type (×1.2) × its own weather (Kyogre's rain: ×1.5 to Water) × toughness × speed × upgrades bought. The bot never switches by itself.
 
 Without the game's state (bookmarklet, doofcraft) the bot works as before, reading the screen.
 

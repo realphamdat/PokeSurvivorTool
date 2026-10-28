@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.2';
+  const VERSION = '1.7.3';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -855,28 +855,59 @@
   const BUFF_STAT = { 'nasty plot': 'satk', 'swords dance': 'patk', 'dragon dance': 'patk', harden: 'def', 'aqua ring': 'regen', agility: 'spd' };
   // g (site, from the game): { kind, cat, stat, fit, side, dmgOwned }. Else moves.js, the card's fit marks, and the side
   // the owned damage moves are on (doofcraft has no physical / special split: no side, no fit)
-  function autoNew(lname, noDmg, fitLow, fitHigh, g = {}) {
-    const m = moveByName.get(lname) || {};
-    const kind = g.kind || m.kind, cat = g.cat || (m.cat !== 'status' ? m.cat : null);
-    const ownedDmg = [...new Set([...Object.keys(state.picks), ...state.hudTexts].map(n => moveByName.get(n.toLowerCase())).filter(x => x && x.cat !== 'status'))];
-    const phys = ownedDmg.filter(x => x.cat === 'physical').length, spec = ownedDmg.length - phys;
-    const side = g.side || (phys > spec ? 'physical' : spec > phys ? 'special' : null);
-    if (kind === 'buff' || m.cat === 'status' || (!m.kind && noDmg)) {
-      const stat = g.stat || BUFF_STAT[lname];
-      if ((stat === 'satk' || stat === 'patk') && (!side || (stat === 'satk') === (side === 'special'))) return [850, 'buff tấn công hợp pokémon'];
+  // A move's [score, why]: buff = its stat (satk / patk / def / regen / spd), else a damage move of kind / cat, fit
+  // true / false / null (unknown), n = damage moves already owned
+  // (atkBuff: an attack buff is owned already, so another one is no better than an off-side one)
+  function autoScore({ buff, stat, kind, fit, n, side, atkBuff }) {
+    if (buff) {
+      if ((stat === 'satk' || stat === 'patk') && !atkBuff && (!side || (stat === 'satk') === (side === 'special'))) return [850, 'buff tấn công hợp pokémon'];
       if (stat === 'def') return [845, 'buff phòng thủ'];
       if (stat === 'regen') return [838, 'buff hồi máu'];
       return stat === 'spd' ? [300, 'buff tốc độ'] : [150, 'buff không hợp'];
     }
-    const n = g.dmgOwned ?? ownedDmg.length;
-    const fit = g.fit != null ? g.fit >= 0.999 : fitHigh ? true : fitLow ? false : side && cat ? cat === side : null;
     const score = (n === 0 ? 860 : n === 1 ? 815 : 780) + (fit === true ? 10 : fit === false ? -40 : 0) + (KIND_PRI[kind] || 5);
     return [score, `move sát thương thứ ${n + 1}${fit === false ? ', không hợp chỉ số' : fit ? ', hợp chỉ số' : ''}`];
   }
+  function autoNew(lname, noDmg, fitLow, fitHigh, g = {}) {
+    const m = moveByName.get(lname) || {};
+    const kind = g.kind || m.kind, cat = g.cat || (m.cat !== 'status' ? m.cat : null);
+    const ownedNames = [...Object.keys(state.picks), ...state.hudTexts].map(n => n.toLowerCase());
+    const ownedDmg = [...new Set(ownedNames.map(n => moveByName.get(n)).filter(x => x && x.cat !== 'status'))];
+    const phys = ownedDmg.filter(x => x.cat === 'physical').length, spec = ownedDmg.length - phys;
+    const side = g.side || (phys > spec ? 'physical' : spec > phys ? 'special' : null);
+    const fit = g.fit != null ? g.fit >= 0.999 : fitHigh ? true : fitLow ? false : side && cat ? cat === side : null;
+    const atkBuff = ownedNames.some(n => BUFF_STAT[n] === 'satk' || BUFF_STAT[n] === 'patk');
+    return autoScore({ buff: kind === 'buff' || m.cat === 'status' || (!m.kind && noDmg), stat: g.stat || BUFF_STAT[lname], kind, fit, n: g.dmgOwned ?? ownedDmg.length, side, atkBuff });
+  }
+  // The default build of a pokémon without one (the player's choice: 3 moves, the 4th left to them): its starting move
+  // (always owned: the first damage move) > the attack buff for its side (Nasty Plot / Swords Dance or Dragon Dance)
+  // > Harden, from what it learns (learnsetOf: the game's own lists, else the wiki's). Its side: the game's stats
+  // (SITE.monSide), else its starting move's category (counting its moves' categories got Gengar wrong). Marked .auto:
+  // scoreCard fills the free slot as autoNew would
+  const autoBuilds = new Map();                                       // name -> { at, build }
+  function autoBuild(name) {
+    const n = name.toLowerCase(), hit = autoBuilds.get(n);
+    if (hit && performance.now() - hit.at < 3000) return hit.build;
+    const ls = learnsetOf(n);
+    let build = null;
+    if (ls) {
+      const pool = [...ls.natural, ...ls.taught], start = ls.natural[0];
+      const statOf = m => m.stat || BUFF_STAT[m.name.toLowerCase()];
+      const side = (SITE.monSide && SITE.monSide(n)) || (start.cat !== 'status' ? start.cat : null);
+      const atk = pool.filter(m => statOf(m) === 'satk' || statOf(m) === 'patk');
+      const buff = atk.find(m => !side || (statOf(m) === 'satk') === (side === 'special')) || (side ? null : atk[0]);
+      build = [start, buff, pool.find(m => statOf(m) === 'def')].filter(Boolean).map(m => m.name);
+      build = [...new Set(build)];
+      build.auto = true;
+    }
+    autoBuilds.set(n, { at: performance.now(), build });
+    return build;
+  }
   const fontSize = el => parseFloat(getComputedStyle(el).fontSize) || 0;
-  // The HUD draws the current pokémon's name; use it to look up its build
+  // The HUD draws the current pokémon's name: its saved / built-in build, else the one made for it (autoBuild)
   const currentBuild = () => {
     for (const t of state.hudTexts) { const b = CFG.builds[t.toLowerCase()]; if (b) return b; }
+    for (const t of state.hudTexts) { const b = autoBuild(t); if (b) return b; }
     return null;
   };
   Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow, currentBuild });   // for the site profile's methods
@@ -910,6 +941,8 @@
       const missing = build ? build.filter(m => !ownedMoves.has(m.toLowerCase())).length : 0;
       if (buildIdx >= 0) { score = 900 - 5 * buildIdx; why = `lấy move build #${buildIdx + 1}`; }
       else if (!build && used < slots) [score, why] = autoNew(lname, noDmg, fitLow, fitHigh, auto);
+      // The made-up 3-move build leaves its 4th slot to the auto order; a player's build keeps the others low
+      else if (build && build.auto && used + missing < slots) [score, why] = autoNew(lname, noDmg, fitLow, fitHigh, auto);
       else if (build && used + missing < slots) { score = 200; why = `move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`; }
       else { score = -100; why = 'skill mới, hết ô'; }
     } else if (kind === 'up') {
@@ -1280,7 +1313,7 @@
       </div>
       <button data-ctl="event" class="psb-btn evt" style="display:none" title="${SITE.event ? SITE.event.title : ''}"></button>
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
-      ${SITE.pilot ? '<div data-ctl="gstate" class="psb-muted" style="font-size:11px"></div>' : ''}
+      ${SITE.pilot ? '<div data-ctl="gstate" class="psb-muted" style="font-size:11px"></div><div data-ctl="suggest" class="psb-tip" style="display:none;white-space:pre-line" title="Sức mạnh khi treo máy: move tự ngắm tốt nhất × chỉ số tấn công hợp move × cùng hệ × thời tiết tự tạo × độ trâu × tốc độ × nâng cấp đã mua. Bot không tự đổi pokémon."></div>' : ''}
       ${SITE.noRank ? '<label class="psb-row psb-muted" title="Ván do bot chơi không lên bảng xếp hạng"><input data-ctl="norank" type="checkbox"> Không gửi bảng xếp hạng</label>' : ''}
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
@@ -1391,6 +1424,12 @@
     // Phones have no console: whether the bot reads the game itself, and what the pilot is doing
     if ($('gstate')) $('gstate').textContent = !window.G ? 'Đọc game: không (đọc màn hình) — tải lại trang để thử lại'
       : `Đọc game: có${SITE.pilot.active() ? ` · ${SITE.pilot.mode() || 'đang lái'}` : ''}`;
+    // On the menu / results: which owned pokémon plays unattended best (pilot.js suggestion, read only)
+    if ($('suggest')) {
+      const s = SITE.pilot.suggestion();
+      if ($('suggest').textContent !== s) $('suggest').textContent = s;
+      $('suggest').style.display = s ? '' : 'none';
+    }
     $('status').textContent = finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'
       : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`;
@@ -1421,10 +1460,20 @@
     const s = gameSave(), ids = (s && s.ptm && s.ptm[(MOVES.dex || {})[name.toLowerCase()]]) || [];
     return new Set(MOVES.moves.filter(m => ids.includes(m.id)).map(m => m.name));
   };
-  const learnable = name => [...(MOVES.mons[name.toLowerCase()] || []).map(i => MOVES.moves[i]), ...tmMoves(name)];
-  // In a run: the name on the HUD; at the menu: the save's partner
-  const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t])
-    || monByDex[(gameSave() || {}).partner] || '';
+  // What a pokémon learns: { natural (starting move first), taught: TMs taught, tms: TMs not taught yet }, moves as
+  // { name, kind, cat ('status' = buff), dmg, cd, stat? }. The game's own lists when the site reads them
+  // (SITE.learnset: pokesurvivor.com with G, names in the game's language like its cards), else the wiki's (moves.js)
+  function learnsetOf(name) {
+    const n = name.toLowerCase(), game = SITE.learnset && SITE.learnset(n);
+    if (game) return game;
+    const natural = (MOVES.mons[n] || []).map(i => MOVES.moves[i]).filter(Boolean);
+    if (!natural.length) return null;
+    const tms = tmMoves(n), taught = taughtTms(n);
+    return { natural, taught: tms.filter(m => taught.has(m.name)), tms: tms.filter(m => !taught.has(m.name)), wiki: true };
+  }
+  // In a run: the name on the HUD; at the menu: the partner (the game's save, else its localStorage copy)
+  const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t] || learnsetOf(t))
+    || (SITE.partnerName && SITE.partnerName()) || monByDex[(gameSave() || {}).partner] || '';
   const ms = document.createElement('div');
   ms.dataset.psbotUi = '';
   ms.className = 'psb';
@@ -1434,7 +1483,7 @@
     <div class="psb-body">
       <div class="psb-sec">Pokémon</div>
       <div class="psb-row"><input data-ms="mon" class="psb-in" list="psbot-mons" placeholder="Tên pokémon hoặc bấm 🎯" style="flex:1;min-width:0">
-        <button data-ms="cur" class="psb-btn info" style="flex:0 0 auto" title="Bấm khi đang trong trận để lấy pokémon và danh sách move">🎯 Đang chơi</button></div>
+        <button data-ms="cur" class="psb-btn info" style="flex:0 0 auto" title="Bật: tên và danh sách move tự đổi theo pokémon đang chơi (trong trận: tên trên HUD; ở menu: partner). Tự gõ tên thì tắt">🎯 Đang chơi</button></div>
       <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
       <div class="psb-sec">4 move ưu tiên</div>
       <div data-ms="slots" style="display:flex;flex-direction:column;gap:5px"></div>
@@ -1450,38 +1499,51 @@
   const $m = k => ms.querySelector(`[data-ms="${k}"]`);
   const moveLabel = m => `${m.name} · ${m.cat === 'status' ? 'buff' : `${m.kind} ${m.dmg ?? '?'}dmg/${m.cd ?? '?'}s`}`;
   function renderMoveset() {
-    const name = $m('mon').value.trim().toLowerCase(), build = CFG.builds[name] || [];
-    const natural = (MOVES.mons[name] || []).map(i => MOVES.moves[i]), tms = tmMoves(name), taught = taughtTms(name);
+    const name = $m('mon').value.trim().toLowerCase(), made = !CFG.builds[name] && autoBuild(name), build = CFG.builds[name] || made || [];
+    const ls = learnsetOf(name) || { natural: [], taught: [], tms: [] }, natural = ls.natural;
     const opt = (m, i, mark) => `<option value="${m.name}" ${build[i] === m.name ? 'selected' : ''}>${mark}${moveLabel(m)}</option>`;
     // Taught TMs first: the game only offers a TM's card once it was taught to this pokémon
-    const tmGroups = i => [[tms.filter(m => taught.has(m.name)), 'TM đã dạy', 'TM ✓ '], [tms.filter(m => !taught.has(m.name)), 'TM chưa dạy (mua ở Kecleon Shop)', 'TM ']]
+    const tmGroups = i => [[ls.taught, 'TM đã dạy', 'TM ✓ '], [ls.tms, 'TM chưa dạy (mua ở Kecleon Shop)', 'TM ']]
       .filter(([l]) => l.length).map(([l, label, mark]) => `<optgroup label="${label}">${l.map(m => opt(m, i, mark)).join('')}</optgroup>`).join('');
-    // A build move missing from the crawled lists (the wiki lags the game: Leaf Storm, Giga Drain) stays selectable
-    const listed = new Set([...natural, ...tms].map(m => m.name));
+    // A build move missing from the lists (the wiki lags the game: Leaf Storm, Giga Drain) stays selectable
+    const listed = new Set([...natural, ...ls.taught, ...ls.tms].map(m => m.name));
     const extra = i => build[i] && !listed.has(build[i]) ? `<option value="${build[i]}" selected>${build[i]}</option>` : '';
     $m('slots').innerHTML = natural.length ? [0, 1, 2, 3].map(i => `<label class="psb-row"><span class="psb-muted" style="width:18px">#${i + 1}</span>
       <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${extra(i)}${natural.map((m, j) => opt(m, i, j ? '' : '★ ')).join('')}${tmGroups(i)}</select></label>`).join('')
       : `<div style="color:#ff9a9a">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
     const saved = Object.entries(CFG.builds).filter(([n, b]) => !isDefaultBuild(n, b));
-    const note = build.length && isDefaultBuild(name, build) ? 'Đang dùng build có sẵn (pokesurvivor-autofarm). '
-      : !build.length && name ? 'Chưa có build: bot tự chọn move (1 move sát thương hợp pokémon → buff tấn công → Harden → Aqua Ring → move sát thương thứ 2). ' : '';
+    const note = (natural.length && !ls.wiki ? 'Danh sách move lấy từ game. ' : '')
+      + (made ? 'Build mặc định (chưa lưu): move khởi đầu → buff tấn công hợp pokémon → Harden; ô trống bot tự chọn. Sửa rồi bấm Lưu để giữ. '
+        : build.length && isDefaultBuild(name, build) ? 'Đang dùng build có sẵn (pokesurvivor-autofarm). ' : '');
     $m('list').innerHTML = note + (saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa tự lưu build nào');
+  }
+  // Follow mode (on by default, 🎯): the popup switches to the pokémon being played whenever that changes (a new run, a
+  // new partner on the menu). Typing a name or loading a saved build turns it off, so an edit isn't swapped away
+  let follow = true;
+  const setFollow = on => { follow = on; $m('cur').classList.toggle('go', on); $m('cur').classList.toggle('info', !on); };
+  function followMoveset() {
+    const editing = ms.contains(document.activeElement) && /^(SELECT|INPUT)$/.test(document.activeElement.tagName);
+    if (!follow || ms.style.display === 'none' || editing) return;
+    const mon = currentMon();
+    if (mon && mon !== $m('mon').value.trim().toLowerCase()) { $m('mon').value = mon; $m('msg').textContent = ''; renderMoveset(); }
   }
   function openMoveset() {
     const show = ms.style.display === 'none';
     ms.style.display = show ? 'flex' : 'none';
-    if (show) { if (!$m('mon').value) $m('mon').value = currentMon(); $m('msg').textContent = ''; renderMoveset(); }
+    if (show) { if (follow || !$m('mon').value) $m('mon').value = currentMon() || $m('mon').value; $m('msg').textContent = ''; renderMoveset(); }
   }
   $('moveset').onclick = openMoveset;
   $m('close').onclick = openMoveset;
-  $m('mon').oninput = renderMoveset;
-  $m('cur').onclick = () => { $m('mon').value = currentMon(); $m('msg').textContent = currentMon() ? '' : 'Chưa thấy tên pokémon (vào trận trước)'; renderMoveset(); };
+  $m('mon').oninput = () => { setFollow(false); renderMoveset(); };
+  $m('cur').onclick = () => { setFollow(true); $m('mon').value = currentMon(); $m('msg').textContent = currentMon() ? '' : 'Chưa thấy tên pokémon (vào trận trước)'; renderMoveset(); };
+  setFollow(true);
   $m('save').onclick = () => {
     const name = $m('mon').value.trim();
     const moves = [...new Set(PSBotList(ms.querySelectorAll('select[data-slot]')).map(s => s.value).filter(Boolean))];
-    if (!learnable(name).length || !moves.length) return void ($m('msg').textContent = 'Chọn pokémon và ít nhất 1 move');
+    const ls = learnsetOf(name);
+    if (!ls || !moves.length) return void ($m('msg').textContent = 'Chọn pokémon và ít nhất 1 move');
     window.PSBot.setBuild(name, moves);
-    const taught = taughtTms(name), untaught = tmMoves(name).filter(m => moves.includes(m.name) && !taught.has(m.name)).map(m => m.name);
+    const untaught = ls.tms.filter(m => moves.includes(m.name)).map(m => m.name);
     $m('msg').textContent = `Đã lưu ${name}: ${moves.join(' > ')}` + (untaught.length ? ` · chưa dạy TM ${untaught.join(', ')}: game chưa đưa thẻ này` : ''); renderMoveset();
   };
   $m('del').onclick = () => {
@@ -1490,7 +1552,7 @@
     window.PSBot.setBuild(name, []);
     $m('msg').textContent = `Đã xoá build ${name}`; renderMoveset();
   };
-  $m('list').onclick = e => { const a = e.target.closest('[data-load]'); if (a) { $m('mon').value = a.dataset.load; renderMoveset(); } };
+  $m('list').onclick = e => { const a = e.target.closest('[data-load]'); if (a) { setFollow(false); $m('mon').value = a.dataset.load; renderMoveset(); } };
 
   // ---------- catalog (F6): every world sprite type seen, with thumbnail + stats ----------
   function toggleCatalog() { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; renderPanel(); }
@@ -1646,7 +1708,7 @@
 
   // ---------- main loop ----------
   const origRAF = window.requestAnimationFrame.bind(window);
-  let running = true, lastResend = 0, lastPanel = 0;
+  let running = true, lastResend = 0, lastPanel = 0, lastFollow = 0;
   function loop(t) {
     if (!running) return;
     canvas = SITE.canvas() || canvas;
@@ -1666,6 +1728,7 @@
     if (frame.length) { state.lastFrame = frame; collect(frame); tick(frame); }
     if (t - lastPanel > 1000 && !panel.matches(':hover')) { lastPanel = t; renderPanel(); }
     renderCtl();
+    if (t - lastFollow > 500) { lastFollow = t; followMoveset(); }
     levelUp();
     dialogPick();
     if (SITE.pilot) SITE.pilot.tick();

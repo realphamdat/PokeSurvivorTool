@@ -51,12 +51,14 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 
 Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ điểm cao nhất. Lý do mỗi lần chọn hiện trong console (F12), ví dụ `chọn 2 Psychic — lấy move build #2`.
 
-Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó, hoặc pokémon partner trong save nếu đang ở menu. Có sẵn build của tool đó cho 3 pokémon (đều nên cầm Shell Bell):
+Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD, hoặc pokémon partner trong save nếu đang ở menu. Popup tự đổi theo pokémon đang chơi (nút 🎯 sáng xanh); tự gõ tên khác thì thôi theo, bấm 🎯 để theo lại. Có sẵn build của tool đó cho 3 pokémon (đều nên cầm Shell Bell):
 - **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
 - **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
 - **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (mua "Starting move" Energy Ball trong shop).
 
-Pokémon khác chưa có Moveset thì **bot tự chọn move**: 1 move sát thương hợp chỉ số tấn công của pokémon (đạn tự ngắm, nổ, hào quang trước, cận chiến sau) → buff tấn công đúng phía (Nasty Plot nếu Sp.Atk cao hơn, Swords Dance nếu Atk cao hơn) → Harden → Aqua Ring → move sát thương thứ 2. pokesurvivor.com đọc chỉ số từ game; doofcraft không chia vật lý / đặc biệt, nên chỉ theo thứ tự đó.
+Pokémon khác chưa có Moveset thì dùng **build mặc định 3 move**: move khởi đầu (★) → buff tấn công đúng phía (Nasty Plot nếu Sp.Atk cao hơn, Swords Dance / Dragon Dance nếu Atk cao hơn) → Harden. Ô thứ 4 để bạn tự chỉnh; nếu bạn chưa lưu build thì bot tự lấp ô đó trong trận (move sát thương hợp chỉ số, đạn tự ngắm trước). Popup Moveset hiện build mặc định này; sửa rồi bấm **Lưu** thì bot theo build của bạn.
+
+Danh sách move trong popup: pokesurvivor.com lấy **từ game** (đúng move khởi đầu đã mua, TM đã dạy / chưa dạy, tên theo ngôn ngữ game) khi bot đọc được game; doofcraft dùng danh sách từ wiki. Phía tấn công lấy từ chỉ số trong game; không đọc được thì theo move khởi đầu.
 
 Tầng trên luôn thắng tầng dưới:
 
@@ -86,6 +88,7 @@ Bot đọc trạng thái thật của game thay vì nhìn màn hình. Cách lái
 - **Rift** và **Arceus** (phút 30): chạy vòng trong sân, giữ boss ở phía đối diện.
 - **Orb:** orb khống chế khi máu dưới 40% hoặc bị 8 quái vây, orb buff khi có boss (trước đây bot bấm 5–8 liên tục nên dùng hết ngay).
 - Game tự pause khi mất focus thì bot tự chơi tiếp (trừ khi bạn tự bấm Esc / P).
+- **Gợi ý pokémon** (ở menu / màn kết thúc trận): 3 pokémon bạn đang có mạnh nhất khi treo máy, và pokémon đang dùng có nên đổi không. Điểm tính theo công thức sát thương của game: move tự ngắm tốt nhất × chỉ số tấn công hợp move × cùng hệ (×1,2) × thời tiết tự tạo (Kyogre có mưa: ×1,5 hệ Nước) × độ trâu × tốc độ × nâng cấp đã mua. Bot không tự đổi, bạn tự chọn.
 
 Không có trạng thái game (bookmarklet, doofcraft) thì bot dùng cách cũ: đọc màn hình.
 

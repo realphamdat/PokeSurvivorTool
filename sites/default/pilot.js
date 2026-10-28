@@ -624,10 +624,58 @@ window.PSBotPilot = h => {
     return { type, id: rest.join(':'), evoNow: type === 'stat' && c.color === '#ffd23f' };
   }
 
+  // ---------- menu: which owned pokémon plays unattended best (read only: the player switches) ----------
+  // BoundlessEgret/pokesurvivor-autofarm's power(): the game's damage formula for its best unaimed starting move (attack
+  // multiplier x fit of the move's category x 1.2 same type for a single-type pokémon x its own weather: Kyogre's rain
+  // is x1.5 to water), times toughness, speed and the upgrades bought for it. Kyogre 2.74 and Mewtwo 1.86 beat Arceus
+  const WEATHER_OF = { drizzle: 'water', drought: 'fire', 'sand-stream': 'rock', 'snow-warning': 'ice' };
+  const WEATHER_MUL = { water: 1.5, fire: 1.5, rock: 1.3, ice: 1.3 };
+  const AFK_KINDS = ['homing', 'aura', 'orbit', 'nova'];
+  function power(g, sv, dex) {
+    const mon = g.DEX_BY[dex];
+    if (!mon) return 0;
+    let pool = [];
+    try { pool = g.startChoices(dex); } catch {}
+    const abil = ((g.DEX_ABIL && g.DEX_ABIL[dex]) || []).filter(Boolean);
+    let off = 0;
+    for (const id of pool) {
+      const m = g.Moves.BY_ID[id];
+      if (!m || !(AFK_KINDS.includes(m.kind) || (m.kind === 'projectile' && m.homing))) continue;   // Confusion: a homing shot
+      let v = (mon.atk || 1) * (m.cat && g.Stats ? g.Stats.fit(mon, m.cat) : 1);
+      if (mon.types.length === 1 && m.type === mon.types[0]) v *= 1.2;
+      for (const a of abil) if (WEATHER_OF[a] === m.type) v *= WEATHER_MUL[m.type];
+      off = Math.max(off, v);
+    }
+    if (!off) off = (mon.atk || 1) * 0.6;                     // no move that hits unaimed
+    const tough = Math.sqrt((mon.hp || 80) / 100 * (((mon.df || 60) + (mon.sd || 60)) / 180));
+    const u = (sv.pupg || {})[dex] || {};
+    const inv = 0.04 * (u.atk || 0) + 0.03 * (u.cd || 0) + 0.02 * (u.def || 0) + 0.01 * (u.hp || 0) + 0.015 * (u.crit || 0) + 0.01 * (u.regen || 0);
+    return off * Math.sqrt(tough) * (0.8 + 0.2 * (mon.spd || 100) / 110) * (1 + inv);
+  }
+  // A line for the panel while on the menu / results ('' otherwise), worked out at most every 5 s
+  let sugg = { at: -1e9, text: '' };
+  function suggestion() {
+    const g = G(), sv = g && g.DB && g.DB.save;
+    if (!sv || !sv.owned || !g.DEX_BY || !g.startChoices || !g.Moves || !g.Game || !['ui', 'over'].includes(g.Game.state)) return '';
+    if (now() - sugg.at < 5000) return sugg.text;
+    const fmt = n => n.toFixed(2).replace('.', ',');
+    const name = d => (g.T ? g.T(g.DEX_BY[d].name) : g.DEX_BY[d].name);
+    const ranked = Object.keys(sv.owned).map(Number).filter(d => g.DEX_BY[d]).map(d => ({ d, p: power(g, sv, d) })).sort((a, b) => b.p - a.p);
+    const cur = ranked.find(r => r.d === sv.partner), best = ranked[0];
+    let text = '';
+    if (best) {
+      text = 'Nên dùng: ' + ranked.slice(0, 3).map(r => `${name(r.d)} ${fmt(r.p)}`).join(' · ');
+      // The original only switches for 15 % or more
+      if (cur) text += cur.p >= best.p / 1.15 ? `\nĐang dùng ${name(cur.d)} ${fmt(cur.p)}: đã gần mạnh nhất` : `\nĐang dùng ${name(cur.d)} ${fmt(cur.p)}: nên đổi`;
+    }
+    sugg = { at: now(), text };
+    return text;
+  }
+
   // Choices are answered through the game (bond / item above, level-up in site.js) once its RunUI is wrapped
   const choices = () => { const g = G(); return !!(g && g.RunUI && g.RunUI.showBond && g.RunUI.showBond.psbot); };
 
-  return { active, on, steer, tick, holdSlot, card, bond, item, choices, runOver, menuOpen, restartButton, mode: () => S.mode };
+  return { active, on, steer, tick, holdSlot, card, bond, item, choices, runOver, menuOpen, restartButton, suggestion, mode: () => S.mode };
 };
 // Once per page: the moment the player pauses a run themselves (the pilot's autoResume leaves that pause alone)
 if (!window.__psbotPauseKey) {

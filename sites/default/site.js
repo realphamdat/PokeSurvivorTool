@@ -255,6 +255,8 @@ window.PSBotSite = h => {
     .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
 
   const pilot = window.PSBotPilot ? window.PSBotPilot(h) : null;
+  // A pokémon of the game's pokédex by (lower-case) name; null without G
+  const dexEntry = name => { const g = window.G; return (g && g.DEX && g.DEX.find(d => d.name.toLowerCase() === name)) || null; };
   // Level-up cards as the game dealt them (pilot.js wraps G.LevelUp.offer), picked with G.RunUI.pick: no reading or
   // tapping the DOM, which phones lay out differently. Null without G (DOM path below)
   function dealtCards() {
@@ -336,6 +338,34 @@ window.PSBotSite = h => {
     // Plays from G when there is one (pilot.js): steering, orbs, active slot, auto-unpause, dialogs; and the results
     // screen / menu by the game's ids (also without G)
     pilot,
+    // A pokémon's better attack side for the core's autoBuild, from the game's pokédex (js/systems/stats.js sideOf;
+    // null when even or without G)
+    monSide(name) {
+      const mon = dexEntry(name);
+      return mon && mon.pa != null && mon.sa != null && mon.pa !== mon.sa ? (mon.sa > mon.pa ? 'special' : 'physical') : null;
+    },
+    // What a pokémon learns, from the game itself rather than the wiki (which lags it): natural moves with the starting
+    // move first (bought "Starting move" included: G.startMoveOf), TMs taught / not yet (js/systems/mons.js). Names in the
+    // game's language, as its cards show them. Null without G
+    learnset(name) {
+      const g = window.G, mon = dexEntry(name);
+      if (!mon || !g.Moves || !g.Moves.poolFor || !g.Moves.BY_ID) return null;
+      const move = id => {
+        const m = g.Moves.BY_ID[id];
+        return m && { id, name: g.T ? g.T(m.name, 'move') : m.name, kind: m.kind, cat: m.kind === 'buff' ? 'status' : m.cat, dmg: m.dmg, cd: m.cd, stat: m.stat };
+      };
+      const list = ids => ids.map(move).filter(Boolean);
+      const start = g.startMoveOf ? g.startMoveOf(mon.dex) : g.Moves.startFor(mon);
+      const natural = list([...new Set([start, ...g.Moves.poolFor(mon, true)])]);
+      if (!natural.length) return null;
+      const M = g.Mons;
+      return { natural, taught: M && M.taught ? list(M.taught(mon.dex)) : [], tms: M && M.learnable ? list(M.learnable(mon.dex)) : [] };
+    },
+    // The partner picked on the menu, from the game's save (fresher than its localStorage copy)
+    partnerName() {
+      const g = window.G, sv = g && g.DB && g.DB.save, mon = sv && g.DEX_BY && g.DEX_BY[sv.partner];
+      return mon ? mon.name.toLowerCase() : '';
+    },
     // From the cards the game dealt (core levelUp): a passive that evolves a maxed move at once (gold card)
     cardFacts(c, i) {
       const g = pilot && pilot.card(i);
