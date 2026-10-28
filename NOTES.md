@@ -61,7 +61,8 @@ Cập nhật: 2026-10-28 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp s
 | `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ❌ (core tự dùng `evo` trong `moves.js`, lấy từ wiki) | ✅ (đọc cấu hình game) |
 | `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `caseReach: 40` | `caseReach: 45`, … |
 | `scene(cam)` | Cả cảnh (quái, nguy hiểm, vật phẩm, tường, địa hình) theo nhãn, toạ độ màn hình; `null` = đọc canvas | ✅ (từ `window.G`, chỉ trên `/dev.html`) | ❌ |
-| `event` | Nút chạy event trong panel: `{ label, title, available(), start(), stop() }` (mục 4b) | ❌ | ✅ (Halloween Waves) |
+| `event` / `events` | Nút chạy event / chế độ trong panel: `{ label, title, available(), start(), stop() }` (mục 4b); `events` = danh sách nhiều nút | ✅ (`event`, Halloween) | ✅ (`events`: Halloween Waves, Hyper) |
+| `zMove` | `{ key: [key, code, keyCode], radius }`: phím Z-move; core bấm khi ≥ `CFG.zCrowd` quái trong `radius` (hoặc ≥ `zCrowdLow` khi máu thấp) | ❌ | ✅ (F, 400) |
 | `objective(world, me, cam)` | Mục tiêu nhiệm vụ event `{ target: {x, y, src, hold}, hide: Set }`: `hide` = vật bỏ khỏi mọi danh sách (pokémon lạc / trong lồng, thanh máu) | ❌ | ✅ (mục 4b) |
 
 ---
@@ -292,6 +293,13 @@ Nếu bước 2 hỏng: thử đổi manager (Violentmonkey ↔ Tampermonkey) v�
 - Lồng đang nhốt: vẽ sprite pokémon (`/sprites/<dex>/Idle.png`) bên trong rồi chồng song sắt lên. Bot đang coi con này là quái, phải loại ra.
 - Vòng tiến độ khi đứng cạnh: `arc` bán kính 26; màu `#ffd25a` cho đèn, `#7dffb0` cho lồng.
 - Bảng nhiệm vụ góc phải ("Free the caged Pokémon 0/2", "Light the lanterns 0/4", "Trick-or-treat 0/3") và mũi tên chỉ hướng kèm khoảng cách đều vẽ trên canvas, bot đọc được trong `hudTexts`.
+
+**Z-move và Hyper (28/10, chưa phát hành, đọc từ mã nguồn game, chưa chạy trận thật):**
+- **Z-move:** thẻ "<X>ium Z" (chip `.tag-chip` "Z-Move"), 10% mỗi lần lên cấp từ phút 15 (Waves: vòng 10; Hyper: thời gian ×2 nên 7:30), chỉ khi pokémon có hệ có Z-move và chưa Mega (Mega xoá Z-move). Dùng bằng phím **F** (`KeyF` / tay cầm LT, không phải Z): `useZMove`, nổ sức mạnh 4000 × tấn công trong bán kính 400, đẩy lùi 400, boss tối đa 10% máu, gồng 0,6 s (bất tử), hồi 120 s. Client bỏ qua phím khi chưa có / đang hồi (không gửi gì).
+- Trước đây bot chấm thẻ Z là **tiến hoá 1000** (mô tả có "Mega Evolving", khớp `evoRe`) nhưng không bao giờ bấm F. Giờ `readDcCard` chấm 690, core bấm F (`SITE.zMove`, `CFG.zCrowd` 8 / `zCrowdLow` 3, mỗi giây tối đa 1 lần).
+- **Hyper:** `ps.runMode = 'hyper'` (luôn có, khác Waves). Màn Solo đọc chế độ 1 lần lúc mở, nên `setMode` bấm luôn tab `[data-testid="solo-mode-<mode>"]` nếu đang hiện. Tuning: `hyper: { speed: 2, riftSpeed: 1.6, xpMul: 1.3, rewardMul: 1.5 }`.
+- **Ván lưu dở khác chế độ:** luồng chơi lại luôn bấm `saved-run-resume`, nên bấm ⚡ Hyper khi có ván WAVES lưu dở thì bot chơi tiếp ván WAVES. Người dùng chọn: bot **dừng và báo** trên panel (`restartButton` trả `{ halt }`, core `state.halt`), không tự End run. Chế độ của ván lưu đọc từ `[data-testid="saved-run-mode"]` (Normal / HYPER / WAVES). ▶ Chạy (không chọn chế độ) vẫn chơi tiếp mọi ván lưu như trước.
+- **Test điện thoại giả lập (28/10, Chrome emulate 844x390 touch + UA Android, game thật):** phím WASD đi được khi `pointer: coarse`; phím E được game nhận (`preventDefault`), F bị bỏ qua khi chưa có Z (đúng). Chưa thấy Z-move thật (vòng 1). Hyper: chặn ván WAVES lưu dở ✓, không có ván lưu thì vào ván HYPER ✓, dừng thì `ps.runMode` về như cũ ✓. Trang giả lập cảm ứng: thẻ Z được chạm chọn; hàng nút chế độ trên panel nhỏ bị tràn → thêm `flex-wrap`.
 
 **Network / memory (trận waves):**
 - Cùng API với trận thường: `POST /api/runs/start` có thêm `{"waves": true}`, rồi khoảng 30 giây một lần `POST /api/runs/checkpoint`. Không thấy request bảng xếp hạng event trong trận.

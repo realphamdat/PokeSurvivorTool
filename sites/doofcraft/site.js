@@ -99,19 +99,33 @@ window.PSBotSite = h => {
     const { state, CFG } = h;
     const t = c.innerText;
     const lv = t.match(/\bLv\.?\s*(\d+)\s*>/i);                          // upgrade chip: current level > next
+    // Z crystal ("Firium Z", chip "Z-Move"): its own slot, fired with F (SITE.zMove). Its text ("Mega Evolving removes
+    // it") reads as an evolution, so it is ranked here: under a passive an owned move needs, over move upgrades
+    const z = PSBotList(c.querySelectorAll('.tag-chip')).some(e => e.textContent.trim() === 'Z-Move');
     return { ...h.scoreCard({
       key: String(i + 1), name, t,
       level: Math.max((state.picks[name] || 0) + (state.hudTexts.has(name) ? 1 : 0), lv ? +lv[1] : 0),
       isNew: /\bNew\b/i.test(t), evo: c.classList.contains('evo') || CFG.evoRe.test(t), fitLow: false, fitHigh: false,
-    }), el: tapTarget(c) };
+    }), ...(z && { score: 690, why: 'Z-move (bấm F: nổ quanh mình, hồi 120 s)', isNew: false, inBuild: false }), el: tapTarget(c) };
   }
 
-  // ---------- Halloween event: "Waves" run mode ----------
+  // ---------- run modes: Halloween event "Waves", Hyper ----------
   // The game keeps the run mode in localStorage['ps.runMode'] (normal / hyper / waves) and offers waves only while the
   // event lasts, through the menu's event card (Play Waves). Solo -> Play then starts whatever mode is stored, so
-  // replays stay in waves. The mode the player had is put back when the bot stops
+  // replays stay in it. The Solo screen reads it once when opened: if that screen is up, its own mode tab is clicked
+  // (solo-mode-<mode>). The mode the player had is put back when the bot stops
   const MODE_KEY = 'ps.runMode';
-  let eventSeen = false, prevMode;
+  let eventSeen = false, prevMode, wanted = null;      // wanted: the mode a mode button runs
+  const setMode = mode => {
+    wanted = mode;
+    try { prevMode = localStorage.getItem(MODE_KEY); localStorage.setItem(MODE_KEY, mode); } catch {}
+    const tab = document.querySelector(`[data-testid="solo-mode-${mode}"]`);
+    if (tab && h.visible(tab)) tab.click();
+  };
+  const restoreMode = () => {
+    wanted = null;
+    try { if (prevMode == null) localStorage.removeItem(MODE_KEY); else localStorage.setItem(MODE_KEY, prevMode); } catch {}
+  };
   const event = {
     label: '🎃 Event Halloween',
     title: 'Chơi chế độ Waves của event Halloween (các vòng liên tiếp, rương giữa vòng, boss mỗi 25 vòng)',
@@ -120,13 +134,19 @@ window.PSBotSite = h => {
       return eventSeen;
     },
     start() {
-      try { prevMode = localStorage.getItem(MODE_KEY); localStorage.setItem(MODE_KEY, 'waves'); } catch {}
+      setMode('waves');
       const card = document.querySelector('[data-testid="event-card-play"]');
       if (card && h.visible(card)) card.click();
     },
-    stop() {
-      try { if (prevMode == null) localStorage.removeItem(MODE_KEY); else localStorage.setItem(MODE_KEY, prevMode); } catch {}
-    },
+    stop: restoreMode,
+  };
+  // Hyper: the game's tuning scales time ×2 (enemies, Eternatus at 30:00, Z-moves from 7:30), ×1.3 xp, ×1.5 coins
+  const hyper = {
+    label: '⚡ Hyper',
+    title: 'Chơi chế độ HYPER: mọi thứ mạnh lên nhanh gấp đôi, Eternatus ở 30:00, ×1,5 xu, bảng xếp hạng riêng. Nên dùng pokémon đã nâng max',
+    available: () => true,
+    start() { setMode('hyper'); },
+    stop: restoreMode,
   };
 
   // ---------- Halloween objectives (Haunted Hollow, 1-2 a round), drawn as the game's renderer does ----------
@@ -216,8 +236,10 @@ window.PSBotSite = h => {
 
   return {
     id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
-    event,
-    objective,                // Halloween objectives: target + sprites that aren't enemies / pickups
+    events: [event, hyper],
+    // Z-move: F (KeyF, the game's useZMove), a burst on every foe within 400 world units, 120 s to recharge
+    zMove: { key: ['f', 'KeyF', 70], radius: 400 },
+    objective,               // Halloween objectives: target + sprites that aren't enemies / pickups
     ready: () => !!document.getElementById('app'),
     canvas: () => document.querySelector('canvas.ps-canvas'),
     // The whole frame is scaled by devicePixelRatio; the world also gets the camera translation, the HUD doesn't
@@ -275,6 +297,14 @@ window.PSBotSite = h => {
     menu: buttons => buttons.some(b => b.matches(MENU)) || PSBotList(document.querySelectorAll(MENU)).some(h.visible),
     // Results -> menu, continue a saved run (or confirm ending it), Solo -> Play
     restartButton(buttons) {
+      // A mode button never continues a saved run of another mode (its card says which: Normal / HYPER / WAVES), nor
+      // ends it: the bot stops and says so
+      const resume = document.querySelector('[data-testid="saved-run-resume"]');
+      if (wanted && resume && h.visible(resume)) {
+        const m = ((document.querySelector('[data-testid="saved-run-mode"]') || {}).textContent || '').trim();
+        const saved = /hyper/i.test(m) ? 'hyper' : /waves/i.test(m) ? 'waves' : 'normal';
+        if (saved !== wanted) return { halt: `Có ván ${m || saved} lưu dở: chơi tiếp hoặc bấm End run trong game trước, rồi bấm lại nút.` };
+      }
       for (const sel of RESTART) {
         const b = buttons.find(b => b.matches(sel));
         if (b) return b;

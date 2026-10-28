@@ -47,6 +47,8 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** runs the event's Waves mode.
 - **[pokesurvivor.com](https://pokesurvivor.com/):** from 30/10 to 1/11 every run is a Halloween run, and the button works like ▶ Chạy.
 
+**⚡ Hyper** (pokesurvivor.doofcraft.com): runs the game's HYPER mode (everything scales twice as fast, Eternatus at 30:00, ×1.5 coins, its own leaderboard; a max-upgraded pokémon is recommended). Once the bot stops, the game's run mode goes back to what it was (for the event button too). If a saved run of another mode is waiting, the bot doesn't continue it: it stops and says so on the panel; continue it or press **End run** in the game first, then press the button again.
+
 > ⚠️ **Bot 1.5.0–1.5.6 moved pokesurvivor.com to `/dev.html`.** Since 26/10 that page of the game no longer uses your account (no cloud save, no ranking). From 1.5.7 the bot takes you back to the main page. If the address shows `pokesurvivor.com/dev.html`, update the bot and open `pokesurvivor.com` again.
 
 ### How the bot picks level-up cards
@@ -74,6 +76,8 @@ A higher tier always wins:
 8. **Upgrade a move that can't evolve** (build moves first, in build order).
 9. **A new move outside the build** while a slot is to spare (slots for the build moves not taken yet are always kept).
 10. A new skill with no slot left: only when nothing else is offered.
+
+**Z-move** (pokesurvivor.doofcraft.com, cards like "Firium Z", "Psychium Z" with a Z-Move tag, from minute 15, round 10 in Waves, 7:30 in Hyper): ranked between 5 and 6. Once it has one, the bot presses **F** with 8 or more enemies within the burst (400), or 3 or more at low HP; it then recharges for 120 seconds.
 
 If no card is of kind 1–7 and a **Reroll** is left, the bot rerolls (PC; on pokesurvivor.com phones too).
 

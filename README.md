@@ -47,6 +47,8 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** chạy chế độ Waves của event.
 - **[pokesurvivor.com](https://pokesurvivor.com/):** từ 30/10 đến 1/11 mọi trận đều là trận Halloween, nút chạy như ▶ Chạy.
 
+**⚡ Hyper** (pokesurvivor.doofcraft.com): chạy chế độ HYPER của game (mọi thứ mạnh lên nhanh gấp đôi, Eternatus ở 30:00, ×1,5 xu, bảng xếp hạng riêng; nên dùng pokémon đã nâng max). Bot dừng thì chế độ chơi trong game trở về như cũ (cả với nút event). Nếu đang có ván lưu dở của chế độ khác, bot không chơi tiếp ván đó mà dừng và báo trên panel: chơi tiếp hoặc bấm **End run** trong game trước, rồi bấm lại nút.
+
 > ⚠️ **Bot 1.5.0–1.5.6 chuyển pokesurvivor.com sang `/dev.html`.** Từ 26/10, trang này của game không còn dùng tài khoản (không lưu lên cloud, không lên bảng xếp hạng). Từ bản 1.5.7, bot đưa bạn về trang chính. Nếu thấy địa chỉ là `pokesurvivor.com/dev.html`, hãy cập nhật bot rồi mở lại `pokesurvivor.com`.
 
 ### Bot chọn thẻ lên cấp thế nào
@@ -74,6 +76,8 @@ Tầng trên luôn thắng tầng dưới:
 8. **Nâng cấp move không tiến hoá được** (move build trước, theo thứ tự build).
 9. **Move mới ngoài build** khi còn ô thừa (ô của các move build chưa có luôn được giữ lại).
 10. Skill mới khi đã hết ô: chỉ lấy khi không còn gì khác.
+
+**Z-move** (pokesurvivor.doofcraft.com, thẻ "Firium Z", "Psychium Z"… có nhãn Z-Move, từ phút 15, vòng 10 ở Waves, phút 7:30 ở Hyper): xếp giữa mục 5 và 6. Đã có Z-move thì bot bấm **F** khi có từ 8 quái trong tầm nổ (400), hoặc từ 3 quái khi máu thấp; nổ xong phải chờ 120 giây.
 
 Nếu không có thẻ nào thuộc mục 1–7 và còn lượt **Reroll** thì bot đổi thẻ (máy tính; pokesurvivor.com thì cả điện thoại).
 

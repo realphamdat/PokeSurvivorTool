@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.6';
+  const VERSION = '1.7.7';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -54,6 +54,8 @@
     // kills (fewer levels later on) and one run can't tell whether it helps; try with PSBot.CFG.crowdFlee = 10
     crowdFlee: Infinity,
     fleeCrowdWeight: 8,
+    zCrowd: 8,            // Z-move (SITE.zMove) fired with this many enemies within its radius, or zCrowdLow while HP is low
+    zCrowdLow: 3,
     huntWeight: 3,
     huntHp: 0.75,         // enemies are only walked up to above this HP, and with fewer than huntCrowd enemies' edges within
     huntCrowd: 8,         // 200; else the player holds back and lets moves fire (walking up to one dragged it into the horde)
@@ -597,6 +599,13 @@
     state.hpLog.push([now, hp]);
     if (Math.max(...state.hpLog.map(([, v]) => v)) - hp >= CFG.hurtDrop) state.hurtUntil = now + CFG.hurtHold;
     const low = hp < CFG.lowHp || now < (state.hurtUntil || 0);
+    // Z-move (SITE.zMove, doofcraft: F): a burst on every enemy within its radius, then a long recharge. Fired at a crowd,
+    // or at a few while HP is low; the game ignores the key while there is none or it recharges
+    const zm = SITE.zMove;
+    if (zm && now > (state.zAt || 0)) {
+      const inZ = enemies.filter(e => dist(e, me) < zm.radius).length;
+      if (inZ >= CFG.zCrowd || (low && inZ >= CFG.zCrowdLow)) { tap(...zm.key); state.zAt = now + 1000; }
+    }
     // A map chunk once tagged "wall" with F7 (it blocked its whole 512 units) counts by its terrain tiles instead
     const solid = d => !(!sc && SITE.terrain && SITE.terrain(d));
     const walls = state.walls.map(w => ({ ...toScreen(w), rw: 0 })).concat(byTag('wall').filter(solid).map(footprint), byTag('break').map(footprint));
@@ -1115,6 +1124,8 @@
       if (state.target && state.done >= state.target) { state.on = false; applyDir(null); log('đã chơi đủ số ván — dừng'); return; }
     }
     const b = (pilot && pilot.restartButton()) || SITE.restartButton(buttons);
+    // The site may refuse to go on ({ halt: why }, doofcraft: a saved run of another mode): stopped, why on the panel
+    if (b && b.halt) { control.stop(); state.halt = b.halt; log(b.halt); return; }
     if (b) { log('tự chơi lại: bấm', JSON.stringify(b.innerText.trim().slice(0, 40))); b.click(); }
   }
 
@@ -1333,6 +1344,8 @@
       [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height:28px !important; font-size:12px !important }
       [data-psbot-ui] .psb-icon { min-height:0 !important; font-size:16px !important }
     }`;
+  // Mode buttons: the profile's events, or its single event
+  const EVENTS = SITE.events || (SITE.event ? [SITE.event] : []);
   ctl.innerHTML = `
     <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span class="psb-title">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc trên GitHub">by damhieu2808</a></span>
       <button data-ctl="hplay" class="psb-icon" title="Chạy / dừng (panel đang thu gọn)">▶</button>
@@ -1350,7 +1363,7 @@
         <button data-ctl="play" class="psb-btn go">▶ Chạy</button>
         <button data-ctl="moveset" class="psb-btn acc">⚔ Moveset</button>
       </div>
-      <button data-ctl="event" class="psb-btn evt" style="display:none" title="${SITE.event ? SITE.event.title : ''}"></button>
+      ${EVENTS.length ? `<div class="psb-row" style="flex-wrap:wrap">${EVENTS.map((e, i) => `<button data-ctl="event${i}" class="psb-btn evt" title="${e.title}"></button>`).join('')}</div>` : ''}
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
       ${SITE.pilot ? '<div data-ctl="gstate" class="psb-muted" style="font-size:11px"></div><div data-ctl="suggest" class="psb-tip" style="display:none;white-space:pre-line" title="Sức mạnh khi treo máy: move tự ngắm tốt nhất × chỉ số tấn công hợp move × cùng hệ × thời tiết tự tạo × độ trâu × tốc độ × nâng cấp đã mua. Bot không tự đổi pokémon."></div>' : ''}
       ${SITE.noRank ? '<label class="psb-row psb-muted" title="Ván do bot chơi không lên bảng xếp hạng"><input data-ctl="norank" type="checkbox"> Không gửi bảng xếp hạng</label>' : ''}
@@ -1411,7 +1424,7 @@
       try { localStorage.setItem(RUNS_KEY, String(n)); } catch {}
       // runEnded: null = not known yet; autoRestart's first look sets it, so a results screen already up when ▶ is
       // pressed is not counted as one of the n runs
-      Object.assign(state, { target: n, done: 0, runEnded: null, on: true, started: true, restartAt: 0 });
+      Object.assign(state, { target: n, done: 0, runEnded: null, on: true, started: true, restartAt: 0, halt: null });
       log(`chạy ${n ? `${n} ván` : 'vô hạn'}`);
     },
     pause() { state.on = false; applyDir(null); log('tạm dừng — bạn có thể tự điều khiển'); },
@@ -1436,28 +1449,28 @@
   // One button: ▶ Chạy (counts runs from 0 again) <-> ■ Dừng; its twin on the title row works while collapsed
   $('play').onclick = () => (state.on ? control.stop() : control.play());
   $('hplay').onclick = () => (state.on ? control.stop() : control.play());
-  // Event button (SITE.event, doofcraft's Halloween waves): the same runs in the event's mode; the site puts the
-  // player's own mode back once the bot is off (stopped, or done with its runs)
-  $('event').onclick = () => {
-    if (state.on) return control.stop();
-    SITE.event.start(); state.eventMode = true; control.play();
-  };
+  // Event / mode buttons (EVENTS: doofcraft's Halloween waves and Hyper): the same runs in that mode; the site puts the
+  // player's own mode back once the bot is off (stopped, or done with its runs). state.eventMode = the one running
+  EVENTS.forEach((e, i) => {
+    $(`event${i}`).onclick = () => {
+      if (state.on) return control.stop();
+      e.start(); state.eventMode = e; control.play();
+    };
+  });
 
   function renderCtl() {
     const finished = state.target && state.done >= state.target;
-    if (state.eventMode && !state.on) { SITE.event.stop(); state.eventMode = false; }
-    // Shown whenever the site has an event, disabled while there is none (or a normal run is going)
-    const ev = $('event');
-    if (SITE.event) {
-      const avail = SITE.event.available();
-      ev.style.display = '';
-      ev.textContent = state.on && state.eventMode ? '■ Dừng event' : SITE.event.label;
-      ev.className = `psb-btn ${state.on && state.eventMode ? 'stop' : 'evt'}`;
-      ev.disabled = state.on ? !state.eventMode : !avail;
-      ev.title = avail || state.eventMode ? SITE.event.title : 'Chưa có event: nút bấm được khi event đang diễn ra';
-    }
-    // Running the event: its own button stops it, ▶ Chạy stays as is but disabled (and the other way round)
-    const evRun = state.on && state.eventMode;
+    if (state.eventMode && !state.on) { state.eventMode.stop(); state.eventMode = null; }
+    // Disabled while unavailable (no event on), or while another run is going
+    EVENTS.forEach((e, i) => {
+      const ev = $(`event${i}`), avail = e.available(), mine = state.on && state.eventMode === e;
+      ev.textContent = mine ? '■ Dừng' : e.label;
+      ev.className = `psb-btn ${mine ? 'stop' : 'evt'}`;
+      ev.disabled = state.on ? !mine : !avail;
+      ev.title = avail || mine ? e.title : 'Chưa có event: nút bấm được khi event đang diễn ra';
+    });
+    // Running one: its own button stops it, ▶ Chạy stays as is but disabled (and the other way round)
+    const evRun = state.on && !!state.eventMode;
     $('play').textContent = state.on && !evRun ? '■ Dừng' : '▶ Chạy';
     $('play').className = `psb-btn ${state.on && !evRun ? 'stop' : 'go'}`;
     $('play').disabled = evRun;
@@ -1477,6 +1490,7 @@
     // sandbox on a phone): the panel works, the player doesn't move. Said plainly, phones have no console
     const blind = !state.frameAt && performance.now() - bootAt > 8000;
     $('status').textContent = (blind ? '⚠ Không thấy hình game: bot đang chạy ngoài trang (sandbox). Tải lại trang; vẫn vậy thì dùng Firefox + Violentmonkey. ' : '')
+      + (state.halt && !state.on ? `⚠ ${state.halt} ` : '')
       + (finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'
       : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`);
