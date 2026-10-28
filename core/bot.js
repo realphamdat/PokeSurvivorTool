@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.5';
+  const VERSION = '1.7.6';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1473,9 +1473,13 @@
       if ($('suggest').textContent !== s) $('suggest').textContent = s;
       $('suggest').style.display = s ? '' : 'none';
     }
-    $('status').textContent = finished ? `Đã xong ${state.done}/${state.target} ván`
+    // Never a single game frame seen: the bot runs where the game's canvas isn't hooked (a userscript manager's
+    // sandbox on a phone): the panel works, the player doesn't move. Said plainly, phones have no console
+    const blind = !state.frameAt && performance.now() - bootAt > 8000;
+    $('status').textContent = (blind ? '⚠ Không thấy hình game: bot đang chạy ngoài trang (sandbox). Tải lại trang; vẫn vậy thì dùng Firefox + Violentmonkey. ' : '')
+      + (finished ? `Đã xong ${state.done}/${state.target} ván`
       : !state.started && !state.on ? 'Chưa chạy — nhập số ván rồi bấm ▶'
-      : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`;
+      : `${state.on ? 'Đang chạy' : 'Tạm dừng'} · ván ${state.done + 1}${state.target ? `/${state.target}` : ' (vô hạn)'}`);
   }
 
   // ---------- moveset popup: pick up to 4 priority moves per pokémon from its learnable list (moves.js) ----------
@@ -1764,6 +1768,7 @@
   // ---------- main loop ----------
   const origRAF = window.requestAnimationFrame.bind(window);
   let running = true, lastResend = 0, lastPanel = 0, lastFollow = 0;
+  const bootAt = performance.now();
   function loop(t) {
     if (!running) return;
     canvas = SITE.canvas() || canvas;
@@ -1780,7 +1785,7 @@
       // spectator camera (E / A / D switch the watched player), so the bot stops pressing them until revived
       state.dead = [...state.hudTexts].some(x => /^spectat/i.test(x) || /^0 \/ \d+$/.test(x));
     }
-    if (frame.length) { state.lastFrame = frame; collect(frame); tick(frame); }
+    if (frame.length) { state.frameAt = t; state.lastFrame = frame; collect(frame); tick(frame); }
     if (t - lastPanel > 1000 && !panel.matches(':hover')) { lastPanel = t; renderPanel(); }
     renderCtl();
     if (t - lastFollow > 500) { lastFollow = t; followMoveset(); }
