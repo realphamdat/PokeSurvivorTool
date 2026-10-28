@@ -51,12 +51,19 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 
 Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ điểm cao nhất. Lý do mỗi lần chọn hiện trong console (F12), ví dụ `chọn 2 Psychic — lấy move build #2`.
 
-Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó, hoặc pokémon partner trong save nếu đang ở menu. Pokémon nào chưa tự đặt Moveset thì dùng build mặc định: build tốt nhất mà [SurvivorTiers](https://survivortiers.pages.dev/en/) tìm ra qua các trận mô phỏng (làm mới bằng `node crawl-moves.js --builds`). Tầng trên luôn thắng tầng dưới:
+Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó, hoặc pokémon partner trong save nếu đang ở menu. Có sẵn build của tool đó cho 3 pokémon (đều nên cầm Shell Bell):
+- **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
+- **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
+- **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (mua "Starting move" Energy Ball trong shop).
+
+Pokémon khác chưa có Moveset thì **bot tự chọn move**: 1 move sát thương hợp chỉ số tấn công của pokémon (đạn tự ngắm, nổ, hào quang trước, cận chiến sau) → buff tấn công đúng phía (Nasty Plot nếu Sp.Atk cao hơn, Swords Dance nếu Atk cao hơn) → Harden → Aqua Ring → move sát thương thứ 2. pokesurvivor.com đọc chỉ số từ game; doofcraft không chia vật lý / đặc biệt, nên chỉ theo thứ tự đó.
+
+Tầng trên luôn thắng tầng dưới:
 
 1. Thẻ **tiến hoá** một skill.
 2. Nội tại **lấy là tiến hoá ngay** một move đã max (thẻ vàng; pokesurvivor.com).
 3. **Sitrus Berry / Baya Zidra** (hồi 45% máu) khi **máu dưới 35%**. Máu khoẻ thì gần cuối (sau mục 7).
-4. **Lấy move trong build** chưa có (#1 trước #2…). Không có build: lấy move mới bất kỳ khi còn ô.
+4. **Lấy move trong build** chưa có (#1 trước #2…). Không có build: move mới khi còn ô, theo thứ tự tự chọn ở trên.
 5. **Nội tại mà move đang có cần để tiến hoá** (ví dụ Magnet cho Psychic), khi chưa lấy nội tại đó. Đứng trên mọi nâng cấp move.
 6. **Nâng cấp move còn tiến hoá được**: càng gần max càng gấp; move trong build được cộng thêm chút.
 7. **Nội tại**: **giáp** (Armor / Coraza) trước tiên cho tới khi đầy (pokesurvivor.com: -6% sát thương mỗi thẻ, tới 70%; doofcraft: 20 thẻ, khoảng 67%). Sau đó: Power > Reflexes > (Focus / Sniper, doofcraft) > Vigor > Synthesis > Learning > Magnet > Sprint.

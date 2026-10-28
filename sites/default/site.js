@@ -275,6 +275,11 @@ window.PSBotSite = h => {
           // What the card is, from the game: stat id, a move's max level / evolved, armour capped (-6 % a card up to 70 %)
           type: c.type, stat: c.type === 'stat' ? id : undefined, maxLvl: m && m.def && m.def.maxLvl, evolved: !!(m && m.evolved),
           armorFull: (p.dmgReduce || 0) >= 0.69,
+          // A new move without a build (core autoNew): its kind / category / buffed stat, how well it suits the pokémon
+          // (js/systems/stats.js fit, sideOf) and the damage moves already owned
+          auto: c.type === 'new' && g.Moves && g.Moves.BY_ID[id] ? (d => ({ kind: d.kind, cat: d.cat, stat: d.stat,
+            fit: d.cat && g.Stats ? g.Stats.fit(p.mon, d.cat) : 1, side: g.Stats ? g.Stats.sideOf(p.mon) : null,
+            dmgOwned: p.moves.filter(x => x.kind !== 'buff').length }))(g.Moves.BY_ID[id]) : undefined,
         }), pick: () => g.RunUI.pick(i) };
       }),
       rerolls, reroll: () => g.RunUI.reroll(),

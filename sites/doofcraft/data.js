@@ -32,27 +32,5 @@ window.PSBotData = {
     "canvas:12x12#1ko4idv": "buff",
     "fill:#ffd95e": "xp"
   },
-  "builds": {
-    "kartana": [
-      "Vine Whip",
-      "Quick Attack",
-      "Swords Dance",
-      "Harden"
-    ],
-    "mewtwo": [
-      "Hyper Beam",
-      "Psychic",
-      "Harden",
-      "Nasty Plot"
-    ],
-    "slaking": [
-      "Body Slam",
-      "Quick Attack",
-      "Swords Dance",
-      "Tackle"
-    ],
-    "volcarona": [
-      "Nasty Plot"
-    ]
-  }
+  "builds": {}
 };

@@ -51,12 +51,19 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
 
-The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name, or the partner in the save while at the menu. A pokémon without a Moveset of your own uses a default build: the best one [SurvivorTiers](https://survivortiers.pages.dev/en/) found in simulated runs (refreshed with `node crawl-moves.js --builds`). A higher tier always wins:
+The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name, or the partner in the save while at the menu. That tool's builds come built in for 3 pokémon (Shell Bell recommended for all):
+- **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
+- **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
+- **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (buy Energy Ball as its "Starting move" in the shop).
+
+Any other pokémon without a Moveset **picks its moves itself**: one damage move that suits its better attack stat (homing shots, bursts and auras first, melee last) → the attack buff for that side (Nasty Plot if Sp. Atk is higher, Swords Dance if Attack is) → Harden → Aqua Ring → a second damage move. pokesurvivor.com reads the stats from the game; doofcraft has no physical / special split, so it just follows that order.
+
+A higher tier always wins:
 
 1. A card that **evolves** a skill.
 2. A passive that **evolves a maxed move at once** (gold card; pokesurvivor.com).
 3. **Sitrus Berry** (heals 45% HP) **under 35% HP**. At good HP it's near the bottom (after 7).
-4. **A build move** not taken yet (#1 before #2…). Without a build: any new move while a slot is free.
+4. **A build move** not taken yet (#1 before #2…). Without a build: a new move while a slot is free, in the order above.
 5. **A passive an owned move needs to evolve** (e.g. Magnet for Psychic), not taken yet. Above every move upgrade.
 6. **Upgrade a move that can still evolve**: the nearer its max, the sooner; build moves get a little extra.
 7. **Passives**: **Armor** first until capped (pokesurvivor.com: -6% damage taken per card, up to 70%; doofcraft: 20 cards, ~67%). Then Power > Reflexes > (Focus / Sniper, doofcraft) > Vigor > Synthesis > Learning > Magnet > Sprint.

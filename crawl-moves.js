@@ -1,6 +1,5 @@
 // Re-crawl the learnable moves of every pokémon from pokesurvivor.wiki into core/moves.js:  node crawl-moves.js
 // Only add / refresh the evolution table (move -> stat card it needs) in the existing core/moves.js:  node crawl-moves.js --evo
-// Only refresh the default builds (SurvivorTiers' best simulated build per pokémon) in core/moves.js:  node crawl-moves.js --builds
 // Only refresh the TM table (pokesurvivor.com's js/data/tms.js) in core/moves.js:  node crawl-moves.js --tm
 const fs = require('fs');
 const outFile = require('path').join(__dirname, 'core', 'moves.js');
@@ -42,18 +41,6 @@ async function addEvolutions(data) {
   for (const m of data.moves) { if (evo[m.name]) m.evo = evo[m.name]; else delete m.evo; }
   console.log('evolutions', data.moves.filter(m => m.evo).length, 'of', data.moves.length, 'moves');
 }
-// Default build per pokémon: the best of the melee / ranged builds https://survivortiers.pages.dev found in simulated runs
-async function addBuilds(data) {
-  const json = async f => JSON.parse(await get(`https://survivortiers.pages.dev/data/${f}.json`));
-  const [species, index, moves] = await Promise.all(['species', 'pokemon-index', 'moves'].map(json));
-  // Ids are slugs ("swords-dance"); their moves.json only lists attacks, so status moves take the name from ours
-  const slug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const names = Object.fromEntries([...moves.map(m => [m.id, m.en.name]), ...data.moves.map(m => [slug(m.name), m.name])]);
-  data.builds = {};
-  for (const p of index) { const b = species.builds[p.dex]; if (b && b[b.best]) data.builds[p.nameEn.toLowerCase()] = b[b.best].moves.map(id => names[id] || id); }
-  const known = new Set(data.moves.map(m => m.name));
-  console.log('builds', Object.keys(data.builds).length, 'moves not in moves.js', [...new Set(Object.values(data.builds).flat())].filter(n => !known.has(n)));
-}
 // TMs (pokesurvivor.com's Kecleon Shop): moves a pokémon can be taught outside its natural list. tm[name] = indices
 // into moves, dex[name] = dex number (the save keeps the partner and the taught TMs by dex); moves get their game id
 // (the save names a taught TM by it, and "giga-drain" is Grass Knot)
@@ -82,16 +69,14 @@ async function addTms(data) {
 const write = (data, date) => {
   const src = '// Moves each pokémon can learn (first = starting move), crawled from https://pokesurvivor.wiki/pokedex\n' +
     `// ${date} · ${Object.keys(data.mons).length} pokémon · ${data.moves.length} moves. mons[name] = indices into moves; evo = stat card the move needs to evolve.\n` +
-    '// builds[name] = default build (moves by priority) from https://survivortiers.pages.dev\n' +
     '// tm[name] = moves it can be taught with a TM (pokesurvivor.com js/data/tms.js), dex[name] = dex number, moves[i].id = game id\n' +
     `window.PSBotMoves = ${JSON.stringify(data)};\n`;
   fs.writeFileSync(outFile, src);
 };
 (async () => {
-  if (['--evo', '--builds', '--tm'].some(a => process.argv.includes(a))) {
+  if (['--evo', '--tm'].some(a => process.argv.includes(a))) {
     const text = fs.readFileSync(outFile, 'utf8'), data = JSON.parse(text.slice(text.indexOf('PSBotMoves = ') + 13, text.lastIndexOf(';')));
     if (process.argv.includes('--evo')) await addEvolutions(data);
-    if (process.argv.includes('--builds')) await addBuilds(data);
     if (process.argv.includes('--tm')) await addTms(data);
     return write(data, (text.match(/^\/\/ (\d{4}-\d\d-\d\d)/m) || [])[1] || new Date().toISOString().slice(0, 10));
   }
@@ -109,7 +94,6 @@ const write = (data, date) => {
     mons: Object.fromEntries(list.filter(m => out[m.name.toLowerCase()]).map(m => [m.name.toLowerCase(), out[m.name.toLowerCase()].map(n => idx[n])])),
   };
   await addEvolutions(data);
-  await addBuilds(data);
   await addTms(data);
   write(data, new Date().toISOString().slice(0, 10));
   console.log('done', Object.keys(data.mons).length, 'mons', names.length, 'moves', 'fails', fails);

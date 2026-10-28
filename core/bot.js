@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.0';
+  const VERSION = '1.7.1';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -185,8 +185,13 @@
   };
   const BUILD_KEY = 'psbot.builds';
   try { Object.assign(userBuilds, JSON.parse(localStorage.getItem(BUILD_KEY) || '{}')); } catch {}
-  // Below data.js: a default build for every pokémon (moves.js builds, SurvivorTiers' best simulated build)
-  const defaultBuilds = (window.PSBotMoves || {}).builds || {};
+  // Below data.js: the builds BoundlessEgret/pokesurvivor-autofarm ships (all with Shell Bell, Bulbasaur's needs Energy
+  // Ball bought as its starting move). Any other pokémon without a Moveset picks its moves itself (scoreCard: autoNew)
+  const defaultBuilds = {
+    mewtwo: ['Confusion', 'Harden', 'Nasty Plot', 'Psychic'],
+    kyogre: ['Bubble', 'Nasty Plot', 'Aqua Ring', 'Hydro Pump'],
+    bulbasaur: ['Energy Ball', 'Nasty Plot', 'Leaf Storm', 'Giga Drain'],
+  };
   const isDefaultBuild = (n, b) => String(defaultBuilds[n]) === String(b);
   Object.assign(CFG.builds, defaultBuilds, userBuilds);
   for (const k in CFG.builds) if (!CFG.builds[k].length) delete CFG.builds[k];   // [] = build deleted on this machine
@@ -842,6 +847,31 @@
     armor: 'def', coraza: 'def', synthesis: 'rgn', 'síntesis': 'rgn', magnet: 'mag', 'imán': 'mag', learning: 'xp',
     aprendizaje: 'xp', 'sitrus berry': 'heal', 'baya zidra': 'heal', focus: 'crit', sniper: 'crit' };
   const STAT_PRI = { atk: 60, cd: 55, crit: 50, def: 45, hp: 40, rgn: 35, xp: 30, mag: 25, spd: 15 };
+  // New moves without a build, as that tool picks them (scoreNewMove): one damage move on the pokémon's better attack
+  // side 860 > the buff for that side 850 > Harden 845 > Aqua Ring 838 > a 2nd damage move 815 > more 780; a damage
+  // move off its side -40, on it +10, plus how well its kind hits unaimed (KIND_PRI). Speed buff 300, others 150
+  const KIND_PRI = { homing: 13, nova: 12, aura: 12, orbit: 11, chain: 10, projectile: 9, boomerang: 8, beam: 8, meteor: 8, turret: 7, mine: 6, cone: 6, melee: 4, dash: 3, trail: 3 };
+  const BUFF_STAT = { 'nasty plot': 'satk', 'swords dance': 'patk', 'dragon dance': 'patk', harden: 'def', 'aqua ring': 'regen', agility: 'spd' };
+  // g (site, from the game): { kind, cat, stat, fit, side, dmgOwned }. Else moves.js, the card's fit marks, and the side
+  // the owned damage moves are on (doofcraft has no physical / special split: no side, no fit)
+  function autoNew(lname, noDmg, fitLow, fitHigh, g = {}) {
+    const m = moveByName.get(lname) || {};
+    const kind = g.kind || m.kind, cat = g.cat || (m.cat !== 'status' ? m.cat : null);
+    const ownedDmg = [...new Set([...Object.keys(state.picks), ...state.hudTexts].map(n => moveByName.get(n.toLowerCase())).filter(x => x && x.cat !== 'status'))];
+    const phys = ownedDmg.filter(x => x.cat === 'physical').length, spec = ownedDmg.length - phys;
+    const side = g.side || (phys > spec ? 'physical' : spec > phys ? 'special' : null);
+    if (kind === 'buff' || m.cat === 'status' || (!m.kind && noDmg)) {
+      const stat = g.stat || BUFF_STAT[lname];
+      if ((stat === 'satk' || stat === 'patk') && (!side || (stat === 'satk') === (side === 'special'))) return [850, 'buff tấn công hợp pokémon'];
+      if (stat === 'def') return [845, 'buff phòng thủ'];
+      if (stat === 'regen') return [838, 'buff hồi máu'];
+      return stat === 'spd' ? [300, 'buff tốc độ'] : [150, 'buff không hợp'];
+    }
+    const n = g.dmgOwned ?? ownedDmg.length;
+    const fit = g.fit != null ? g.fit >= 0.999 : fitHigh ? true : fitLow ? false : side && cat ? cat === side : null;
+    const score = (n === 0 ? 860 : n === 1 ? 815 : 780) + (fit === true ? 10 : fit === false ? -40 : 0) + (KIND_PRI[kind] || 5);
+    return [score, `move sát thương thứ ${n + 1}${fit === false ? ', không hợp chỉ số' : fit ? ', hợp chỉ số' : ''}`];
+  }
   const fontSize = el => parseFloat(getComputedStyle(el).fontSize) || 0;
   // The HUD draws the current pokémon's name; use it to look up its build
   const currentBuild = () => {
@@ -851,13 +881,13 @@
   Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow, currentBuild });   // for the site profile's methods
   // Card order of BoundlessEgret/pokesurvivor-autofarm (inject.js scoreCard), both sites, with or without a build:
   // evolution 1000 > gold passive that evolves a move at once 980 (levelUp, SITE.cardFacts) > Sitrus Berry under 35 % HP
-  // 950 > build move not taken yet 900 (no build: any new move while a slot is free, 850) > passive an owned move needs
+  // 950 > build move not taken yet 900 (no build: a new move while a slot is free, autoNew 780-873) > passive an owned move needs
   // to evolve 700 > upgrade of a move that can still evolve 600-650 (the nearer max, the sooner) > other passives 500+
   // (armour first until capped, then STAT_PRI) > upgrade of a move that can't evolve 430+ > new move outside the build
   // with a slot to spare 200 > berry at good HP 10 > new move with no slot -100. Below 500 = nothing that helps: rerolled.
   // The site may tell what a card is (type 'new' | 'up' | 'evo' | 'stat', stat id, maxLvl, armorFull, evolved: dealt by
   // the game); else it is told by its name
-  function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh, type, stat, maxLvl, armorFull, evolved }) {
+  function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh, type, stat, maxLvl, armorFull, evolved, auto }) {
     const build = currentBuild();
     const noDmg = /no damage|sin daño|sem dano/i.test(t);
     const lname = name.toLowerCase();
@@ -878,7 +908,7 @@
     else if (kind === 'new') {
       const missing = build ? build.filter(m => !ownedMoves.has(m.toLowerCase())).length : 0;
       if (buildIdx >= 0) { score = 900 - 5 * buildIdx; why = `lấy move build #${buildIdx + 1}`; }
-      else if (!build && used < slots) { score = noDmg ? 840 : 850; why = `skill mới (${used}/${slots} ô)`; }
+      else if (!build && used < slots) [score, why] = autoNew(lname, noDmg, fitLow, fitHigh, auto);
       else if (build && used + missing < slots) { score = 200; why = `move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`; }
       else { score = -100; why = 'skill mới, hết ô'; }
     } else if (kind === 'up') {
@@ -1425,11 +1455,15 @@
     // Taught TMs first: the game only offers a TM's card once it was taught to this pokémon
     const tmGroups = i => [[tms.filter(m => taught.has(m.name)), 'TM đã dạy', 'TM ✓ '], [tms.filter(m => !taught.has(m.name)), 'TM chưa dạy (mua ở Kecleon Shop)', 'TM ']]
       .filter(([l]) => l.length).map(([l, label, mark]) => `<optgroup label="${label}">${l.map(m => opt(m, i, mark)).join('')}</optgroup>`).join('');
+    // A build move missing from the crawled lists (the wiki lags the game: Leaf Storm, Giga Drain) stays selectable
+    const listed = new Set([...natural, ...tms].map(m => m.name));
+    const extra = i => build[i] && !listed.has(build[i]) ? `<option value="${build[i]}" selected>${build[i]}</option>` : '';
     $m('slots').innerHTML = natural.length ? [0, 1, 2, 3].map(i => `<label class="psb-row"><span class="psb-muted" style="width:18px">#${i + 1}</span>
-      <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${natural.map((m, j) => opt(m, i, j ? '' : '★ ')).join('')}${tmGroups(i)}</select></label>`).join('')
+      <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${extra(i)}${natural.map((m, j) => opt(m, i, j ? '' : '★ ')).join('')}${tmGroups(i)}</select></label>`).join('')
       : `<div style="color:#ff9a9a">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
     const saved = Object.entries(CFG.builds).filter(([n, b]) => !isDefaultBuild(n, b));
-    const note = build.length && isDefaultBuild(name, build) ? 'Đang dùng build mặc định (SurvivorTiers). ' : '';
+    const note = build.length && isDefaultBuild(name, build) ? 'Đang dùng build có sẵn (pokesurvivor-autofarm). '
+      : !build.length && name ? 'Chưa có build: bot tự chọn move (1 move sát thương hợp pokémon → buff tấn công → Harden → Aqua Ring → move sát thương thứ 2). ' : '';
     $m('list').innerHTML = note + (saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa tự lưu build nào');
   }
   function openMoveset() {
