@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PokeSurvivor Bot",
-  "version": "1.6.6",
+  "version": "1.6.7",
   "description": "Auto-play bot and coin-farming preset for pokesurvivor.com and pokesurvivor.doofcraft.com by damhieu2808 (F6 catalog, F7 tag, F8 on/off, F9 overlay).",
   "homepage_url": "https://github.com/damhieu2808/PokeSurvivorTool",
   "icons": {
@@ -17,6 +17,12 @@
     }
   },
   "content_scripts": [
+    {
+      "matches": ["https://pokesurvivor.com/*"],
+      "js": ["sites/default/hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": ["https://pokesurvivor.com/*"],
       "js": ["sites/default/site.js", "sites/default/data.js", "core/moves.js", "core/bot.js", "core/farmMoney.js"],

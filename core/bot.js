@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.6';
+  const VERSION = '1.6.7';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1238,6 +1238,7 @@
       </div>
       <button data-ctl="event" class="psb-btn evt" style="display:none" title="${SITE.event ? SITE.event.title : ''}"></button>
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
+      ${SITE.noRank ? '<label class="psb-row psb-muted" title="Ván do bot chơi không lên bảng xếp hạng"><input data-ctl="norank" type="checkbox"> Không gửi bảng xếp hạng</label>' : ''}
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
         <b>💡 Mẹo đi 30 phút:</b> Tapu Fini — Draining Kiss · Aqua Ring · Harden · Whirlpool</div>
@@ -1274,6 +1275,7 @@
   const TIP_KEY = 'psbot.tip.1';
   try { if (localStorage.getItem(TIP_KEY)) $('tip').remove(); } catch {}
   if ($('tipx')) $('tipx').onclick = () => { $('tip').remove(); try { localStorage.setItem(TIP_KEY, '1'); } catch {} };
+  if ($('norank')) { $('norank').checked = SITE.noRank.get(); $('norank').onchange = () => SITE.noRank.set($('norank').checked); }
   // Tabs: Điều khiển (always the one shown at start) / Donate
   ctl.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
     ctl.querySelectorAll('[data-tab]').forEach(t => t.setAttribute('aria-selected', t === b));

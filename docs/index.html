@@ -78,15 +78,14 @@
 
     <div class="card">
       <h2>Cài đặt (điện thoại Android)</h2>
-      <p class="muted">ℹ️ pokesurvivor.com chặn script chèn vào trang (CSP), nên trên Android phải dùng <b>Firefox</b>: bot chạy bằng quyền của userscript, không cần chèn script. <b>Kiwi / Chrome trên Android không chạy được</b> với bản thường; pokesurvivor.doofcraft.com vẫn chạy bình thường trên mọi trình duyệt.</p>
+      <p class="muted">ℹ️ Toàn bộ bot nằm sẵn trong file userscript. Trình quản lý userscript tự chạy code đó trong trang, nên việc pokesurvivor.com chặn script chèn vào trang (CSP) không còn ảnh hưởng. Khuyên dùng <b>Firefox</b>. Edge / Kiwi + Tampermonkey trên Android từng không chạy được với bản cũ; với cách mới thì chưa thử lại.</p>
       <ol>
         <li>Cài <b>Firefox</b> (CH Play).</li>
         <li>Trong Firefox, cài tiện ích <b>Violentmonkey</b> hoặc <b>Tampermonkey</b> (menu ⋮ → Tiện ích).</li>
         <li>Bấm <b>Copy</b>, dán vào <b>thanh địa chỉ</b> của trình duyệt đó rồi mở:
           <div class="copy"><code>https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js</code><button type="button" data-copy data-done="Đã copy" data-hold="Giữ để copy">Copy</button></div></li>
-        <li>Tampermonkey tự mở trang cài script → bấm <b>Install</b> (Cài đặt).</li>
-        <li>Vào game. Lần đầu, Tampermonkey hỏi quyền truy cập <code>raw.githubusercontent.com</code> (nơi bot tải code): chọn <b>Always allow</b> (luôn cho phép) rồi tải lại trang. Không cho phép thì bot không chạy.</li>
-        <li>Panel <b>PokeSurvivor Bot</b> hiện ở góc trên bên trái. Bot tự cập nhật, không cần cài lại.</li>
+        <li>Trình quản lý tự mở trang cài script → bấm <b>Install</b> (Cài đặt). Đã cài bản cũ thì cài đè lên.</li>
+        <li>Vào game: panel <b>PokeSurvivor Bot</b> hiện ở góc trên bên trái. Trình quản lý tự kiểm tra bản mới định kỳ; muốn cập nhật ngay thì bấm <b>Check for updates</b> trong trình quản lý.</li>
       </ol>
     </div>
 
@@ -124,15 +123,14 @@
 
     <div class="card">
       <h2>Install (Android phone)</h2>
-      <p class="muted">ℹ️ pokesurvivor.com blocks scripts added to the page (CSP), so on Android use <b>Firefox</b>: the bot runs with the userscript manager's privileges and never adds a script. <b>Kiwi / Chrome on Android cannot run</b> the normal version; pokesurvivor.doofcraft.com still works in any browser.</p>
+      <p class="muted">ℹ️ The whole bot is inside the userscript file. The userscript manager runs that code in the page itself, so pokesurvivor.com blocking scripts added to the page (CSP) no longer matters. <b>Firefox</b> is recommended. Edge / Kiwi + Tampermonkey on Android did not work with the old version; the new way is not tested there yet.</p>
       <ol>
         <li>Install <b>Firefox</b> (Play Store).</li>
         <li>In Firefox, install the <b>Violentmonkey</b> or <b>Tampermonkey</b> add-on (menu ⋮ → Add-ons).</li>
         <li>Tap <b>Copy</b>, paste into that browser's <b>address bar</b> and open it:
           <div class="copy"><code>https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js</code><button type="button" data-copy data-done="Copied" data-hold="Hold to copy">Copy</button></div></li>
-        <li>Tampermonkey opens its install page → tap <b>Install</b>.</li>
-        <li>Open the game. The first time, Tampermonkey asks for access to <code>raw.githubusercontent.com</code> (where the bot downloads its code): choose <b>Always allow</b>, then reload the page. Without it the bot can't run.</li>
-        <li>The <b>PokeSurvivor Bot</b> panel appears in the top-left corner. The bot updates itself, no reinstall needed.</li>
+        <li>The manager opens its install page → tap <b>Install</b>. If an older version is installed, install over it.</li>
+        <li>Open the game: the <b>PokeSurvivor Bot</b> panel appears in the top-left corner. The manager checks for new versions on its own; to update right away, tap <b>Check for updates</b> in the manager.</li>
       </ol>
     </div>
 

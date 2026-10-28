@@ -1,6 +1,6 @@
 # CLAUDE.md — PokeSurvivor Bot
 
-Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thường", profile `default`) và **pokesurvivor.doofcraft.com** (bản viết lại, profile `doofcraft`). JS thuần, không build, không test framework. Chạy như Chrome extension MV3 (`content_scripts`, `world: "MAIN"`), hoặc qua `loader.js` / `psbot.user.js` (tải code của bản đã phát hành, nhánh `release`).
+Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thường", profile `default`) và **pokesurvivor.doofcraft.com** (bản viết lại, profile `doofcraft`). JS thuần, không build, không test framework. Chạy như Chrome extension MV3 (`content_scripts`, `world: "MAIN"`), hoặc qua `loader.js` (tải code của bản đã phát hành, nhánh `release`) / `psbot.user.js` (userscript gộp sẵn mọi file, sinh bởi `build-userscript.js`).
 
 **Việc đang dở: đọc `NOTES.md` trước.** Cả 2 bản đã test trên game thật. Bản thường từng đọc cảnh từ `window.G` trên `/dev.html` (26/10), nhưng trên web trang đó giờ chạy offline (không tài khoản), nên từ 1.5.7 bot ở lại `/` và đọc canvas (NOTES.md mục 3). Việc còn mở: NOTES.md mục 3 bước 9–11 và mục 4. Mạng nơi làm việc của người dùng chặn pokesurvivor.com: ở đó chỉ test được doofcraft và trang giả lập.
 
@@ -13,7 +13,7 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
   - **`release`:** bản người dùng đang dùng. `loader.js` (userscript/bookmarklet tải file bot từ đây), link ZIP trong README/`docs/index.html`, và thông báo cập nhật (`manifest.json` trên `release`) đều đọc nhánh này.
   - **Không checkout `release`.** Chỉ cập nhật nó bằng lệnh phát hành bên dưới, và **chỉ khi người dùng bảo phát hành**.
 - **Phát hành:**
-  1. Tăng version ở **cả** `manifest.json` và `const VERSION` trong `core/bot.js`.
+  1. Tăng version ở **cả** `manifest.json` và `const VERSION` trong `core/bot.js`, rồi `node build-userscript.js` (sinh lại `psbot.user.js` với `@version` mới; trình quản lý userscript chỉ cập nhật khi `@version` tăng).
   2. Commit trên `main`.
   3. `git tag vX.Y.Z && git push origin main main:release --tags`
   4. (Tuỳ chọn) `gh release create vX.Y.Z --notes "…"`.
@@ -43,7 +43,9 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 - `sites/<id>/data.js`: nhãn sprite + build xuất từ nút "Xuất data.js" (F6). Thứ tự ưu tiên: mặc định < data.js < localStorage.
 - `core/moves.js`: sinh bởi `node crawl-moves.js` (pokesurvivor.wiki). `node crawl-moves.js --evo` chỉ làm mới bảng tiến hoá (`evo`). `--tm` chỉ làm mới bảng TM (`tm`, `dex`, `id` của move; lấy từ `js/data/tms.js` của repo game). Popup Moveset đọc TM đã dạy từ save game trong localStorage (`ps.cloud.*` / `ps.save.*`, trường `ptm[dex]`, `partner`).
 - Thứ tự nạp (manifest/loader): `site.js` → `data.js` → `moves.js` → `bot.js` → `farmMoney.js`. `loader.js` phải ở gốc repo.
-- `psbot.user.js` có 3 nhánh: Firefox/Gecko (`unsafeWindow`/`wrappedJSObject` + `with (pageWindow)` → chạy bằng quyền userscript, dùng được trên pokesurvivor.com), Chromium desktop (`GM_addElement` → thẻ `<script>`), còn lại (`loader.js` inline, chỉ dùng được khi trang không có CSP như doofcraft). Sửa nhánh Firefox thì test trên Firefox Android thật.
+- `sites/default/hook.js` (bản thường, `document_start`): setter tạm `Object.prototype.Game` bắt object nội bộ của game (`ns`, có `BUILT === true` và `LIFT`) lúc game gán `ns.Game`, rồi gán `window.G = ns` → `scene()` đọc trạng thái game thật trên `/`. Nạp muộn (bookmarklet, `loader.js`) thì không bắt được → bot đọc canvas. Cách này học từ BoundlessEgret/pokesurvivor-autofarm (MIT).
+- `psbot.user.js` **là file sinh ra**, đừng sửa tay: `node build-userscript.js` gộp các file theo `manifest.json` (mỗi file bọc trong 1 hàm; `run_at: document_start` chạy ngay, phần còn lại chạy lúc `DOMContentLoaded`). Header `@grant none`, `@inject-into page`, `@run-at document-start`: trình quản lý tự chạy code trong trang nên CSP không chặn. Cập nhật qua `@updateURL` (nhánh `release`). Chỉ có `loader.js` và extension còn tải file riêng lẻ.
+- Không gửi bảng xếp hạng: `site.js` (bản thường) bọc `G.Ranking.submitSolo/submitGroup`, bỏ qua khi bot đang chạy và `SITE.noRank.get()` (localStorage `psbot.norank`, khác `'0'` = bật). Checkbox trên panel chỉ hiện khi có `G`.
 
 ## Kiểm tra thay đổi
 
@@ -59,10 +61,10 @@ Bot tự chơi cho 2 bản game PokeSurvivor: **pokesurvivor.com** ("bản thư�
 
 - **Mã nguồn bản thường** công khai tại <https://github.com/JPTER78/pokesurvivor> (phục vụ pokesurvivor.com). Đọc ở đó để tìm màu/kích thước/cấu hình thay vì đoán.
 - pokesurvivor.com có `<meta>` CSP chặn `<script>` chèn vào trang → **đừng chèn thẻ script / inline script, vô ích**. Đường chạy:
-  - PC: extension (`world: "MAIN"`) hoặc Tampermonkey desktop (`GM_addElement` qua API của extension).
-  - Android: **Firefox + Violentmonkey/Tampermonkey** — `psbot.user.js` chạy code trong sandbox của userscript với `with (pageWindow)`, tức là dùng **quyền của extension** (CSP của trang không áp dụng cho code của extension, không phải lách CSP). Xem NOTES.md mục 3b.
-  - Kiwi / Chrome trên Android: **không chạy** (isolated world, không có `chrome.userScripts`, buộc phải chèn `<script>` → bị CSP chặn).
-- Bản thường: `/dev.html` để lộ `window.G` (`SITE.scene()` đọc được), nhưng **từ 26/10 trên web nó chạy offline**: không tài khoản, không cloud, không bảng xếp hạng (`js/core/db.js`, `localReason = 'dev'`). **Đừng chuyển người chơi sang đó.** `site.js` đưa `/dev.html` về `/` (trừ `localStorage['psbot.dev'] = '1'`). Trên `/` không có `G` → bot đọc canvas.
+  - PC: extension (`world: "MAIN"`) hoặc Tampermonkey desktop.
+  - Userscript (`psbot.user.js` gộp sẵn, `@grant none` + `@inject-into page`): trình quản lý tự chạy code trong trang (quyền của extension, CSP của trang không áp dụng). Android: **Firefox + Violentmonkey/Tampermonkey** (cách gộp sẵn này chưa thử trên máy thật). Bản cũ (≤ 1.6.6) tải code rồi chạy bằng `with (pageWindow)` / `GM_addElement`, xem NOTES.md mục 3b.
+  - Kiwi / Edge + Tampermonkey trên Android: bản cũ **không chạy** (isolated world, không có `chrome.userScripts`, buộc phải chèn `<script>` → bị CSP chặn). Bản gộp sẵn chưa thử lại.
+- Bản thường: `/dev.html` để lộ `window.G` (`SITE.scene()` đọc được), nhưng **từ 26/10 trên web nó chạy offline**: không tài khoản, không cloud, không bảng xếp hạng (`js/core/db.js`, `localReason = 'dev'`). **Đừng chuyển người chơi sang đó.** `site.js` đưa `/dev.html` về `/` (trừ `localStorage['psbot.dev'] = '1'`). Trên `/`, `G` có nhờ `hook.js` (extension / userscript); nạp muộn thì không có `G` → bot đọc canvas.
 - Test bằng Chrome riêng (`--user-data-dir`): đặt profile ở **đường dẫn ngắn** (vd `C:\Users\<user>\.psbot-chrome`). Trong thư mục Temp dài, Cache Storage lỗi "Unexpected internal error" → Service Worker của game không tải được sprite → quái thành chấm tròn, bot không thấy quái. Thêm `--disable-backgrounding-occluded-windows --disable-renderer-backgrounding` kẻo cửa sổ bị che thì rAF dừng.
 - Chuỗi có `$` (regex `\$R\[`) trong lệnh shell bị hỏng → viết script ra file rồi chạy bằng `node`.
 - Bản thường dùng `sizeTags: true` → `tagOf()` **không** đọc `SITE.bySize`.

@@ -4,11 +4,34 @@
 
 // The game's dev page (/dev.html) leaves the game on window.G (scene() below reads it), but since 26-10-2026 it runs
 // offline on the website: no account, no cloud save, no ranking. Bot 1.5.0-1.5.6 sent players there; they are now
-// sent back to the home page, unless localStorage['psbot.dev'] = '1' (playing offline on purpose)
+// sent back to the home page, unless localStorage['psbot.dev'] = '1' (playing offline on purpose). On the home page
+// hook.js (run at document_start by the extension / userscript) puts the same object on window.G
 (() => {
   let keep = false;
   try { keep = localStorage.getItem('psbot.dev') === '1'; } catch {}
   if (!keep && location.pathname === '/dev.html' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) location.replace('/' + location.search + location.hash);
+})();
+// Leaderboard: runs the bot plays are not submitted while the panel's checkbox is on (SITE.noRank). Wrapped once per
+// page; the live bot (window.PSBot, replaced when bot.js is reloaded) decides at submit time
+(() => {
+  let tries = 0;
+  const t = setInterval(() => {
+    const R = window.G && window.G.Ranking;
+    if (!R && ++tries < 60) return;
+    clearInterval(t);
+    if (R) for (const k of ['submitSolo', 'submitGroup']) {
+      const orig = R[k];
+      if (typeof orig !== 'function' || orig.psbot) continue;
+      R[k] = Object.assign(function () {
+        const bot = window.PSBot;
+        if (bot && bot.state.on && bot.SITE.noRank && bot.SITE.noRank.get()) {
+          console.log('%c[PSBot]', 'color:#7cf', 'ván do bot chơi: không gửi bảng xếp hạng');
+          return Promise.resolve(null);
+        }
+        return orig.apply(this, arguments);
+      }, { psbot: true });
+    }
+  }, 1000);
 })();
 // Realm-safe copy of a DOM list. `[...nodeList]` / `for..of` read Symbol.iterator from a page object, and a Firefox
 // userscript sandbox refuses that ("Permission denied to access property Symbol.iterator"); index access never does.
@@ -278,6 +301,11 @@ window.PSBotSite = h => {
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding, when scene() is null
     // Move slots of the player, a bonded group being one (/dev.html only; else the core counts picks)
     moveSlots: () => { const P = window.G && G.Game && G.Game.player; return P && P.slots ? { used: P.slots.length, max: P.maxMoves } : null; },
+    // Panel checkbox "don't submit to the leaderboard" (wrapper at the top), on by default; only with G
+    noRank: window.G ? {
+      get: () => { try { return localStorage.getItem('psbot.norank') !== '0'; } catch { return true; } },
+      set: on => { try { localStorage.setItem('psbot.norank', on ? '1' : '0'); } catch {} },
+    } : null,
     // The big chest is solid (player + chest radius ~25 apart at best) and opens within ~48 of its centre.
     // Telegraphs are known by their dash (tags above): red-ish shapes are hit sparks and weather particles here, often
     // 100+ at once (a rift arena's forced weather), and as hazards they left no safe step

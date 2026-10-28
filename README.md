@@ -12,7 +12,7 @@ Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com/) và [pokesurvivor.d
 
 ## Cài trên điện thoại (Android)
 
-> ℹ️ **pokesurvivor.com chặn script chèn vào trang** (CSP), nên trên Android phải dùng **Firefox**: bot chạy bằng quyền của userscript, không cần chèn script. **Kiwi / Chrome trên Android không chạy được** với bản thường (doofcraft vẫn chạy bình thường trên mọi trình duyệt).
+> ℹ️ Toàn bộ bot nằm sẵn trong file userscript. Trình quản lý userscript tự chạy code đó trong trang, nên việc pokesurvivor.com chặn script chèn vào trang (CSP) không còn ảnh hưởng. Khuyên dùng **Firefox**. Edge / Kiwi + Tampermonkey trên Android từng không chạy được với bản cũ; với cách mới thì chưa thử lại.
 
 1. Cài **Firefox** (CH Play).
 2. Trong Firefox, cài tiện ích **Violentmonkey** hoặc **Tampermonkey** (menu ⋮ → Tiện ích / Add-ons).
@@ -22,9 +22,10 @@ Bot tự chơi [pokesurvivor.com](https://pokesurvivor.com/) và [pokesurvivor.d
 https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js
 ```
 
-4. Tampermonkey tự mở trang cài script → bấm **Install** (Cài đặt).
-5. Vào game. Lần đầu, Tampermonkey hỏi quyền truy cập `raw.githubusercontent.com` (nơi bot tải code): chọn **Always allow** (luôn cho phép) rồi tải lại trang. Không cho phép thì bot không chạy.
-6. Panel **PokeSurvivor Bot** hiện ở góc trên bên trái.
+4. Trình quản lý tự mở trang cài script → bấm **Install** (Cài đặt). Đã cài bản cũ thì cài đè lên.
+5. Vào game: panel **PokeSurvivor Bot** hiện ở góc trên bên trái.
+
+Trình quản lý tự kiểm tra bản mới định kỳ. Muốn cập nhật ngay: mở trình quản lý → **Check for updates** (Kiểm tra cập nhật), hoặc mở lại link ở bước 3.
 
 ## Cài trên iPhone / iPad
 
@@ -37,6 +38,8 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 ## Dùng
 
 Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Trên pokesurvivor.com, danh sách có thêm các move TM pokémon đó học được (Kecleon Shop): "TM ✓" là đã dạy, "TM" là chưa dạy (game chỉ đưa thẻ TM đã dạy). Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
+
+**Không gửi bảng xếp hạng** (pokesurvivor.com, bật sẵn): ván do bot chơi không được gửi lên bảng xếp hạng. Ván bạn tự chơi (bot tắt) vẫn được gửi. Muốn ván của bot lên bảng thì bỏ tick ô này trên panel.
 
 **🎃 Event Halloween:** nút này bấm được khi game đang có event, còn lại thì bị khoá.
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** chạy chế độ Waves của event.

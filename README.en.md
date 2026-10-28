@@ -12,7 +12,7 @@ Auto-play bot for [pokesurvivor.com](https://pokesurvivor.com/) and [pokesurvivo
 
 ## Install on a phone (Android)
 
-> ℹ️ **pokesurvivor.com blocks scripts added to the page** (CSP), so on Android use **Firefox**: the bot runs with the userscript manager's own privileges and never adds a script. **Kiwi / Chrome on Android cannot run the normal version** (doofcraft still works in any browser).
+> ℹ️ The whole bot is inside the userscript file. The userscript manager runs that code in the page itself, so pokesurvivor.com blocking scripts added to the page (CSP) no longer matters. **Firefox** is recommended. Edge / Kiwi + Tampermonkey on Android did not work with the old version; the new way is not tested there yet.
 
 1. Install **Firefox** (Play Store).
 2. In Firefox, install the **Violentmonkey** or **Tampermonkey** add-on (menu ⋮ → Add-ons).
@@ -22,9 +22,10 @@ Auto-play bot for [pokesurvivor.com](https://pokesurvivor.com/) and [pokesurvivo
 https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.user.js
 ```
 
-4. Tampermonkey opens its install page → tap **Install**.
-5. Open the game. The first time, Tampermonkey asks for access to `raw.githubusercontent.com` (where the bot downloads its code): choose **Always allow**, then reload the page. Without it the bot can't run.
-6. The **PokeSurvivor Bot** panel appears in the top-left corner.
+4. The manager opens its install page → tap **Install**. If an older version is installed, install over it.
+5. Open the game: the **PokeSurvivor Bot** panel appears in the top-left corner.
+
+The manager checks for new versions on its own from time to time. To update right away: open the manager → **Check for updates**, or open the link from step 3 again.
 
 ## Install on iPhone / iPad
 
@@ -37,6 +38,8 @@ https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/psbot.use
 ## Use
 
 The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. On pokesurvivor.com the list also has the TM moves that pokémon can learn (Kecleon Shop): "TM ✓" = already taught, "TM" = not yet (the game only offers taught TMs). PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
+
+**Không gửi bảng xếp hạng** (don't submit to the leaderboard; pokesurvivor.com, on by default): runs the bot plays are not submitted to the leaderboard. Runs you play yourself (bot off) still are. Untick it on the panel to let the bot's runs count.
 
 **🎃 Event Halloween:** this button works while the game has an event on, otherwise it is disabled.
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** runs the event's Waves mode.

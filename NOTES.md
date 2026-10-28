@@ -1,6 +1,6 @@
 # Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-27 (bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b). Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
+Cập nhật: 2026-10-28 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp sẵn: mục 0 bước 8, chưa phát hành). Trước đó 27/10: bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b. Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
 
 ---
 
@@ -18,6 +18,12 @@ Cập nhật: 2026-10-27 (bot v1.6.3 đã phát hành; thêm nhánh Firefox cho 
    - Có: bản đồ đêm có bí ngô, thêm pokémon Ma, kẹo (`bag.candy`, chủ yếu do pokémon Ma và bí ngô rơi), shop Kecleon bán skin bằng kẹo, banner gacha Noche Espectral, phút 30 có Gengar khổng lồ thay Arceus.
    - Profile `default` có `event` (nút bấm được trong 3 ngày đó, chạy như ▶ Chạy).
    - **Chưa làm:** nhận diện kẹo / bí ngô trên canvas (chưa có dữ liệu thật).
+8. **Mới (28/10): `G` trên `/` + userscript gộp sẵn, học từ `OtherTool/pokesurvivor-autofarm`** (BoundlessEgret, MIT; thư mục này không commit). Người dùng thấy tool đó chạy tốt hơn và chạy được trên điện thoại.
+   - **Vì sao nó tốt hơn:** nó không đọc canvas. Ở `document_start` nó đặt setter tạm `Object.prototype.Game`, bắt object nội bộ `ns` của game (chính là `G` của `/dev.html`) ngay trên `/` có tài khoản. Mình làm y vậy trong `sites/default/hook.js` (gán `window.G`), nên `scene()` chạy lại trên `/`.
+   - **Vì sao nó chạy trên điện thoại:** toàn bộ code nằm trong file userscript (`@grant none`, `@inject-into page`), trình quản lý tự chạy code trong trang. Mình làm y vậy: `psbot.user.js` giờ sinh bởi `node build-userscript.js`.
+   - Thêm: không gửi bảng xếp hạng khi bot chạy (bật sẵn, checkbox trên panel).
+   - **Cần test trên game thật:** `!!window.G` và `PSBot.SITE.scene()` khác `null` trên `/` khi đã đăng nhập (tên module trên `/` có thể khác `/dev.html`); trận chạy bình thường; ván bot chơi không gửi bảng xếp hạng. Userscript trên Firefox Android (và thử Edge/Kiwi) trên máy thật.
+   - **Giai đoạn 2 (chưa làm, chờ test xong):** những thứ khác lấy từ tool đó khi có `G`: hook `Hazards.add` để biết lúc nổ, lái bằng `Input.axis`, bỏ mục tiêu khi không tới kịp (TTL), tìm chỗ bắn không bị tường chặn (`World.projectileBlock`), Rift arena / Arceus Judgment, tự dùng orb, đổi thẻ khi cả 3 thẻ đều tệ, tự bỏ pause. **Không lấy:** tự mua nâng cấp / gacha / đổi partner (sửa thẳng save).
 
 ---
 
