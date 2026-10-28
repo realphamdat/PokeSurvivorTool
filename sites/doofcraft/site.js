@@ -239,12 +239,8 @@ window.PSBotSite = h => {
     bySize: { 'canvas:34x16': 'heal', 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
       'canvas:8x23': 'wall', 'canvas:24x28': 'wall', 'canvas:6x20': 'wall', 'canvas:14x11': 'break' },
     evolveNeeds,              // move name -> passive card it needs to evolve
-    // Survival card rules (core levelUp), by card name (game config): Sitrus Berry heals 45 %; Armor adds 0.1 defence
-    // up to 2 (damage taken / (1 + defence): ~67 % less after 20 cards), counted from this run's picks
-    cardFacts(c) {
-      const armor = h.state.picks.Armor || 0;
-      return { heal: c.name === 'Sitrus Berry', armor: c.name === 'Armor' && armor < 20, why: `${armor}/20 thẻ, tối đa giảm ~67% sát thương` };
-    },
+    // Armor cards worth taking: +0.1 defence each up to 2 (damage taken / (1 + defence): ~67 % less), game config
+    armorCards: 20,
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding
     // Digits 1-4 pick the active slot (no consumable hotkeys); E sends a cycleSlot request to the server, so not every frame
     // Chests are solid here (radius 12): "next to" one is farther than a walk-over suitcase
@@ -269,7 +265,7 @@ window.PSBotSite = h => {
           if (/^rare candy/i.test(name)) return { ...o, score: 2, why: 'lên 1 cấp' };
           if (!up) return { ...o, score: 0, why: 'vé gacha' };
           const s = readDcCard(c, i, up[1].trim());
-          return { ...o, score: s.score >= 200 ? 3 : 1, why: `nâng ${up[1].trim()} (${s.why || 'ngoài build'})` };
+          return { ...o, score: s.inBuild ? 3 : 1, why: `nâng ${up[1].trim()} (${s.why || 'ngoài build'})` };
         }));
       }
       h.pickRow(dcTitle(box) || 'chọn', cards.map((c, i) => ({ key: String(i + 1), name: dcName(c), score: -i, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80), el: tapTarget(c) })));

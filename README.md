@@ -51,30 +51,22 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 
 Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ điểm cao nhất. Lý do mỗi lần chọn hiện trong console (F12), ví dụ `chọn 2 Psychic — lấy move build #2`.
 
-**Có Moveset cho pokémon đang chơi** (bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó, hoặc pokémon partner trong save nếu đang ở menu). Pokémon nào chưa tự đặt Moveset thì dùng build mặc định: build tốt nhất mà [SurvivorTiers](https://survivortiers.pages.dev/en/) tìm ra qua các trận mô phỏng (làm mới bằng `node crawl-moves.js --builds`). Thứ tự ưu tiên, tầng trên luôn thắng tầng dưới:
+Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD; nút 🎯 trong popup lấy tên đó, hoặc pokémon partner trong save nếu đang ở menu. Pokémon nào chưa tự đặt Moveset thì dùng build mặc định: build tốt nhất mà [SurvivorTiers](https://survivortiers.pages.dev/en/) tìm ra qua các trận mô phỏng (làm mới bằng `node crawl-moves.js --builds`). Tầng trên luôn thắng tầng dưới:
 
 1. Thẻ **tiến hoá** một skill.
-2. **Lấy move trong build** chưa có (#1 trước #2…).
-3. **Nâng cấp move trong build theo đúng thứ tự Moveset**: move #1 được nâng tới max trước, rồi tới #2… (move tấn công hay buff như nhau). Muốn move nào max trước thì đặt nó lên đầu.
-4. **Lấy move mới ngoài build khi còn ô trống**: bot dùng xoay vòng mọi move, nên càng đủ ô (thường 4) càng nhiều đòn. Ô của các move build chưa có luôn được giữ lại; ví dụ build 2 move thì bot lấy thêm 2 move bất kỳ, build đủ 4 move thì không lấy move ngoài.
-5. **Learning** (nội tại tăng kinh nghiệm nhận được).
-6. **Nội tại mà move trong build cần để tiến hoá** (ví dụ Magnet cho Psychic), khi đã có move đó và chưa có nội tại.
-7. Nội tại khác: tấn công (sát thương, hồi chiêu, tầm…) > phòng thủ (máu, hồi máu, giáp, tốc độ, hút…) > còn lại.
-8. Nâng cấp skill ngoài build (cấp cao trước).
-9. Skill mới ngoài build khi đã hết ô: chỉ lấy khi không còn gì khác.
+2. Nội tại **lấy là tiến hoá ngay** một move đã max (thẻ vàng; pokesurvivor.com).
+3. **Sitrus Berry / Baya Zidra** (hồi 45% máu) khi **máu dưới 35%**. Máu khoẻ thì gần cuối (sau mục 7).
+4. **Lấy move trong build** chưa có (#1 trước #2…). Không có build: lấy move mới bất kỳ khi còn ô.
+5. **Nội tại mà move đang có cần để tiến hoá** (ví dụ Magnet cho Psychic), khi chưa lấy nội tại đó. Đứng trên mọi nâng cấp move.
+6. **Nâng cấp move còn tiến hoá được**: càng gần max càng gấp; move trong build được cộng thêm chút.
+7. **Nội tại**: **giáp** (Armor / Coraza) trước tiên cho tới khi đầy (pokesurvivor.com: -6% sát thương mỗi thẻ, tới 70%; doofcraft: 20 thẻ, khoảng 67%). Sau đó: Power > Reflexes > (Focus / Sniper, doofcraft) > Vigor > Synthesis > Learning > Magnet > Sprint.
+8. **Nâng cấp move không tiến hoá được** (move build trước, theo thứ tự build).
+9. **Move mới ngoài build** khi còn ô thừa (ô của các move build chưa có luôn được giữ lại).
+10. Skill mới khi đã hết ô: chỉ lấy khi không còn gì khác.
 
-Nếu thẻ tốt nhất chỉ thuộc loại 8–9 và còn lượt **Reroll** thì bot đổi thẻ (máy tính; pokesurvivor.com thì cả điện thoại).
-
-**Không có build** (đã xoá build mặc định): lấy skill mới cho tới khi đủ ô > Learning > dồn nâng cấp skill đang có (cấp cao trước) > nội tại cần để tiến hoá > nội tại tấn công > nội tại phòng thủ. Skill không gây sát thương xếp sau. Thẻ tiến hoá vẫn được ưu tiên nhất.
+Nếu không có thẻ nào thuộc mục 1–7 và còn lượt **Reroll** thì bot đổi thẻ (máy tính; pokesurvivor.com thì cả điện thoại).
 
 Số ô move: bản thường đọc từ game (thường 4, nâng cấp được), pokesurvivor.doofcraft.com tính là 4. Các move đã **bond** chỉ chiếm chung 1 ô, nên sau khi bond bot lại lấy thêm move mới. Game chỉ đưa thẻ move mới khi còn ô trống, nên thấy thẻ đó là bot biết còn chỗ.
-
-Bot luôn kèm chế độ farm xu: được cộng thêm điểm cho nội tại hút đồ / kinh nghiệm / xu, nhưng điểm cộng này không bao giờ vượt qua thứ tự build ở trên.
-
-**Luật sống sót** (cả 2 bản), đứng trên thứ tự ở trên:
-- **Sitrus Berry / Baya Zidra** (hồi 45% máu) khi máu dưới 35%: đứng đầu.
-- Nội tại mà **lấy là tiến hoá ngay** một move đã max: ngay sau thẻ tiến hoá (pokesurvivor.com).
-- **Giáp** (Armor / Coraza): trước mọi nâng cấp move, chỉ sau move build chưa có. pokesurvivor.com: -6% sát thương mỗi thẻ, tới 70%. Doofcraft: tới 20 thẻ (~67%).
 
 **Đồ cầm** (cả 2 bản), xếp cho sống lâu: Shell Bell > Leftovers > Quick Claw > Focus Sash > Assault Vest > Rocky Helmet > Lucky Egg > Amulet Coin > Choice Scarf > Life Orb > Choice Band (luôn bỏ).
 

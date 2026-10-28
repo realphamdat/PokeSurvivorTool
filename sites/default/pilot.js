@@ -616,12 +616,12 @@ window.PSBotPilot = h => {
   }
 
   // ---------- level-up cards as the game dealt them (G.LevelUp.offer), by position ----------
-  // { id: 'def' | 'heal' | …, evoNow: a passive that evolves a maxed move at once, hp, armor } or null
+  // { type, id: 'def' | 'heal' | <move id> …, evoNow: a passive that evolves a maxed move at once } or null
   function card(i) {
     const g = G(), p = g && g.Game && g.Game.player, c = (window.__psbotOffer || [])[i];
     if (!p || !c || !c.key) return null;
     const [type, ...rest] = String(c.key).split(':');
-    return { type, id: rest.join(':'), evoNow: type === 'stat' && c.color === '#ffd23f', hp: p.hp / p.maxHp, armor: p.dmgReduce || 0 };
+    return { type, id: rest.join(':'), evoNow: type === 'stat' && c.color === '#ffd23f' };
   }
 
   // Choices are answered through the game (bond / item above, level-up in site.js) once its RunUI is wrapped

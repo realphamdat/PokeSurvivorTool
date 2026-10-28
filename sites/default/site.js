@@ -271,7 +271,10 @@ window.PSBotSite = h => {
         return { ...h.scoreCard({
           key: String(i + 1), name, t: `${c.title || ''} ${c.tag || ''} ${c.desc || ''}`,
           level: c.type === 'new' ? 0 : m ? m.lvl || 1 : 0, isNew: c.type === 'new',
-          evo: c.type === 'evo' || (c.type === 'stat' && c.color === '#ffd23f'), fitLow: false, fitHigh: false,
+          evo: c.type === 'evo', fitLow: false, fitHigh: false,
+          // What the card is, from the game: stat id, a move's max level / evolved, armour capped (-6 % a card up to 70 %)
+          type: c.type, stat: c.type === 'stat' ? id : undefined, maxLvl: m && m.def && m.def.maxLvl, evolved: !!(m && m.evolved),
+          armorFull: (p.dmgReduce || 0) >= 0.69,
         }), pick: () => g.RunUI.pick(i) };
       }),
       rerolls, reroll: () => g.RunUI.reroll(),
@@ -328,13 +331,10 @@ window.PSBotSite = h => {
     // Plays from G when there is one (pilot.js): steering, orbs, active slot, auto-unpause, dialogs; and the results
     // screen / menu by the game's ids (also without G)
     pilot,
-    // Survival card rules (core levelUp), from the cards the game dealt: Sitrus Berry, a passive that evolves a move at
-    // once, Coraza (armour: -6 % damage taken a card, up to 70 %, js/systems/levelup.js)
+    // From the cards the game dealt (core levelUp): a passive that evolves a maxed move at once (gold card)
     cardFacts(c, i) {
       const g = pilot && pilot.card(i);
-      if (!g) return null;
-      return { heal: g.type === 'stat' && g.id === 'heal', evoNow: g.evoNow, armor: g.type === 'stat' && g.id === 'def' && g.armor < 0.69,
-        why: `đang giảm ${Math.round(g.armor * 100)}% sát thương, tối đa 70%` };
+      return g && { evoNow: g.evoNow };
     },
     // Panel checkbox "don't submit to the leaderboard" (wrapper at the top), on by default; only with G
     noRank: window.G ? {

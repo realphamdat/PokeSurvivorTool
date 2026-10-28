@@ -51,30 +51,22 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
 
-**With a Moveset for the pokémon being played** (the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name, or the partner in the save while at the menu). A pokémon without a Moveset of your own uses a default build: the best one [SurvivorTiers](https://survivortiers.pages.dev/en/) found in simulated runs (refreshed with `node crawl-moves.js --builds`). Priority, a higher tier always wins:
+The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD; the 🎯 button in the popup reads that name, or the partner in the save while at the menu. A pokémon without a Moveset of your own uses a default build: the best one [SurvivorTiers](https://survivortiers.pages.dev/en/) found in simulated runs (refreshed with `node crawl-moves.js --builds`). A higher tier always wins:
 
 1. A card that **evolves** a skill.
-2. **A build move** not taken yet (#1 before #2…).
-3. **Upgrade a build move, in Moveset order**: move #1 is maxed first, then #2… (attack and buff moves alike). Put the move you want maxed first at the top.
-4. **A new move outside the build while a slot is free**: the bot cycles through every move, so filling the slots (usually 4) means more attacks. Slots for the build moves not taken yet are always kept; e.g. a 2-move build gets 2 extra moves, a full 4-move build gets none.
-5. **Learning** (the passive that raises the XP you gain).
-6. **A passive a build move needs to evolve** (e.g. Magnet for Psychic), once that move is owned and the passive isn't.
-7. Other passives: attack (damage, cooldown, range…) > defence (HP, regen, armour, speed, pickup…) > the rest.
-8. Upgrade a skill outside the build (highest level first).
-9. A new skill outside the build with no slot left: only when nothing else is offered.
+2. A passive that **evolves a maxed move at once** (gold card; pokesurvivor.com).
+3. **Sitrus Berry** (heals 45% HP) **under 35% HP**. At good HP it's near the bottom (after 7).
+4. **A build move** not taken yet (#1 before #2…). Without a build: any new move while a slot is free.
+5. **A passive an owned move needs to evolve** (e.g. Magnet for Psychic), not taken yet. Above every move upgrade.
+6. **Upgrade a move that can still evolve**: the nearer its max, the sooner; build moves get a little extra.
+7. **Passives**: **Armor** first until capped (pokesurvivor.com: -6% damage taken per card, up to 70%; doofcraft: 20 cards, ~67%). Then Power > Reflexes > (Focus / Sniper, doofcraft) > Vigor > Synthesis > Learning > Magnet > Sprint.
+8. **Upgrade a move that can't evolve** (build moves first, in build order).
+9. **A new move outside the build** while a slot is to spare (slots for the build moves not taken yet are always kept).
+10. A new skill with no slot left: only when nothing else is offered.
 
-If the best card is only of kind 8–9 and a **Reroll** is left, the bot rerolls (PC; on pokesurvivor.com phones too).
-
-**Without a build** (default build deleted): take new skills until the slots are full > Learning > keep upgrading owned skills (highest level first) > passive needed for an evolution > attack passive > defence passive. Moves that deal no damage rank lower. Evolution cards still come first.
+If no card is of kind 1–7 and a **Reroll** is left, the bot rerolls (PC; on pokesurvivor.com phones too).
 
 Move slots: pokesurvivor.com reads them from the game (usually 4, can be upgraded), pokesurvivor.doofcraft.com counts 4. **Bonded** moves share one slot, so after a bond the bot takes more new moves. The game only offers a new move while a slot is free, so such a card tells the bot there is room.
-
-The coin-farming preset is always on: pickup / XP / coin passives get a few extra points, never enough to override the build order above.
-
-**Survival rules** (both versions), above the order above:
-- **Sitrus Berry** (heals 45% HP) under 35% HP: first.
-- A passive that **evolves a maxed move at once**: right after evolution cards (pokesurvivor.com).
-- **Armor**: before any move upgrade, only after build moves not taken yet. pokesurvivor.com: -6% damage taken per card, up to 70%. Doofcraft: up to 20 cards (~67%).
 
 **Held items** (both versions), ranked for survival: Shell Bell > Leftovers > Quick Claw > Focus Sash > Assault Vest > Rocky Helmet > Lucky Egg > Amulet Coin > Choice Scarf > Life Orb > Choice Band (always dropped).
 

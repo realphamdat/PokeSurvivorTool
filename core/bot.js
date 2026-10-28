@@ -33,7 +33,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.6.9';
+  const VERSION = '1.7.0';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -835,10 +835,13 @@
   // passive > defensive passive. Status / no-damage moves rank lower. With a build: see scoreCard
   // getClientRects (not offsetParent, which is null for position:fixed menus) + not hidden
   const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-  const ATK_RE = /damage|dmg|power|attack|crit|cooldown|hit|area|projectile|range|pierce|burst|daño|dano|ataque|dégât/i;
-  // The XP passive (both sites: "Learning — +12% experience gained."), not Magnet's "experience pickup radius"
-  const XP_RE = /^(learning|aprendizaje)$|experience gained|experiencia ganada/i;
-  const DEF_RE = /hp|health|heal|regen|armor|armour|defen|shield|speed|magnet|pickup|vida|salud/i;
+  // Level-up passives by card name (both sites, English / Spanish) -> stat id, and their order once armour is capped,
+  // from BoundlessEgret/pokesurvivor-autofarm: power > reflexes > armour > vigor > synthesis > learning > magnet > sprint
+  // > berry (doofcraft's crit cards, not in that game, sit with the attack ones)
+  const STAT_OF = { vigor: 'hp', power: 'atk', potencia: 'atk', sprint: 'spd', carrera: 'spd', reflexes: 'cd', reflejos: 'cd',
+    armor: 'def', coraza: 'def', synthesis: 'rgn', 'síntesis': 'rgn', magnet: 'mag', 'imán': 'mag', learning: 'xp',
+    aprendizaje: 'xp', 'sitrus berry': 'heal', 'baya zidra': 'heal', focus: 'crit', sniper: 'crit' };
+  const STAT_PRI = { atk: 60, cd: 55, crit: 50, def: 45, hp: 40, rgn: 35, xp: 30, mag: 25, spd: 15 };
   const fontSize = el => parseFloat(getComputedStyle(el).fontSize) || 0;
   // The HUD draws the current pokémon's name; use it to look up its build
   const currentBuild = () => {
@@ -846,94 +849,76 @@
     return null;
   };
   Object.assign(h, { CFG, state, visible, fontSize, scoreCard, pickRow, currentBuild });   // for the site profile's methods
-  function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh }) {
+  // Card order of BoundlessEgret/pokesurvivor-autofarm (inject.js scoreCard), both sites, with or without a build:
+  // evolution 1000 > gold passive that evolves a move at once 980 (levelUp, SITE.cardFacts) > Sitrus Berry under 35 % HP
+  // 950 > build move not taken yet 900 (no build: any new move while a slot is free, 850) > passive an owned move needs
+  // to evolve 700 > upgrade of a move that can still evolve 600-650 (the nearer max, the sooner) > other passives 500+
+  // (armour first until capped, then STAT_PRI) > upgrade of a move that can't evolve 430+ > new move outside the build
+  // with a slot to spare 200 > berry at good HP 10 > new move with no slot -100. Below 500 = nothing that helps: rerolled.
+  // The site may tell what a card is (type 'new' | 'up' | 'evo' | 'stat', stat id, maxLvl, armorFull, evolved: dealt by
+  // the game); else it is told by its name
+  function scoreCard({ key, name, t, level, isNew, evo, fitLow, fitHigh, type, stat, maxLvl, armorFull, evolved }) {
     const build = currentBuild();
     const noDmg = /no damage|sin daño|sem dano/i.test(t);
-    const why = [];
-    let score = 0;
-    // A passive card an owned move needs before it can evolve (evolveNeeds: move -> passive card), not taken yet
+    const lname = name.toLowerCase();
+    const move = moveByName.get(lname);
+    const buildIdx = build ? build.findIndex(m => m.toLowerCase() === lname) : -1;
     const ownedMoves = new Set([...Object.keys(state.picks), ...state.hudTexts].map(n => n.toLowerCase()));
-    const needFor = !state.picks[name]
-      ? [...evolveNeeds].filter(([m, p]) => p.toLowerCase() === name.toLowerCase() && ownedMoves.has(m) && (!build || build.some(b => b.toLowerCase() === m))).map(([m]) => m)
-      : [];
     // Move slots in use: read from the game when the site can (SITE.moveSlots), else the starting move + new ones taken
     // this run. Bonded moves share one slot, so that count runs high; but both games only offer a new move while a
     // slot is free, so a new-move card on offer means at least one is
     const ms = SITE.moveSlots && SITE.moveSlots();
     const slots = ms ? ms.max : CFG.maxSkills;
     const used = ms ? ms.used : isNew ? Math.min(1 + state.newSkills, slots - 1) : 1 + state.newSkills;
-    if (build) {
-      // With a build (Moveset), tiers far apart so a higher one always wins: evolution > build move not taken yet
-      // > upgrade a build move, in build order (#1 maxed first, attack or buff alike) > new move outside the build while
-      // a slot is left over (the build's missing moves keep theirs) > XP passive > passive a build move needs to evolve >
-      // passive (attack > defence > other) > upgrade a skill outside the build > new skill outside it with no slot left
-      // (score < 2: rerolled when possible)
-      const buildIdx = build.findIndex(m => m.toLowerCase() === name.toLowerCase());
-      const move = moveByName.get(name.toLowerCase());
-      const owned = level > 0 && !isNew;
-      const buff = move ? move.cat === 'status' : noDmg;
-      const missing = build.filter(m => !ownedMoves.has(m.toLowerCase())).length;
-      if (evo) { score = 500; why.push('mở tiến hoá skill'); }
-      else if (buildIdx >= 0 && !owned) { score = 400 - buildIdx; why.push(`lấy move build #${buildIdx + 1}`); }
-      else if (buildIdx >= 0) { score = 380 - buildIdx; why.push(`nâng move build #${buildIdx + 1} (cấp ${level}), max theo thứ tự build`); }
-      else if (isNew && used + missing < slots) { score = buff ? 345 : 350; why.push(`thêm move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`); }
-      else if (!move && (XP_RE.test(name) || XP_RE.test(t))) { score = 320; why.push('tăng kinh nghiệm nhận được'); }
-      else if (needFor.length) { score = 250; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
-      else if (owned && move) { score = 100 + level; why.push(`nâng skill ngoài build (cấp ${level})`); }
-      else if (isNew || move) { score = buff ? 0 : 1; why.push('skill mới ngoài build'); }
-      else if (ATK_RE.test(t)) { score = 150; why.push('nội tại tấn công'); }
-      else if (DEF_RE.test(t)) { score = 146; why.push('nội tại phòng thủ'); }
-      else { score = 140; why.push('nội tại khác'); }
-      if (score >= 200) return { key, name, isNew, score, why: why.join(', '), text: t.replace(/\s+/g, ' ').slice(0, 100) };   // fit / preset bonuses below never reorder the build
+    const kind = evo || type === 'evo' ? 'evo' : isNew || type === 'new' ? 'new'
+      : type || (STAT_OF[lname] || !(move || level > 0 || state.hudTexts.has(name)) ? 'stat' : 'up');
+    const sid = kind === 'stat' ? stat || STAT_OF[lname] : null;
+    let score, why;
+    if (kind === 'evo') { score = 1000; why = 'mở tiến hoá skill'; }
+    else if (kind === 'new') {
+      const missing = build ? build.filter(m => !ownedMoves.has(m.toLowerCase())).length : 0;
+      if (buildIdx >= 0) { score = 900 - 5 * buildIdx; why = `lấy move build #${buildIdx + 1}`; }
+      else if (!build && used < slots) { score = noDmg ? 840 : 850; why = `skill mới (${used}/${slots} ô)`; }
+      else if (build && used + missing < slots) { score = 200; why = `move ngoài build (${used}/${slots} ô, giữ ${missing} ô cho build)`; }
+      else { score = -100; why = 'skill mới, hết ô'; }
+    } else if (kind === 'up') {
+      // Moves are cycled (E), so every owned move counts as in use
+      const canEvolve = !evolved && evolveNeeds.has(lname), lv = Math.max(1, level || 1), max = maxLvl || 5;
+      if (canEvolve) { score = 600 + Math.round(40 * Math.min(1, lv / max)) + (buildIdx >= 0 ? 10 : 0); why = `nâng move còn tiến hoá được (cấp ${lv}/${max})`; }
+      else { score = 430 + (buildIdx >= 0 ? 20 - 3 * buildIdx : 0); why = `nâng move (cấp ${lv})`; }
     } else {
-      // A card that completes a maxed skill's evolution beats everything else
-      if (evo) {
-        score += 100; why.push('mở tiến hoá skill');
-      }
-      // New moves first while a slot is free (all of them get cycled), then upgrades
-      if (isNew) {
-        const room = used < slots;
-        score += room ? 50 : -3; why.push(room ? `skill mới (${used}/${slots} ô)` : 'skill mới (hết ô)');
-        if (noDmg) { score -= 6; why.push('không gây sát thương'); }
-      } else if (XP_RE.test(name) || XP_RE.test(t)) { score += 40; why.push('tăng kinh nghiệm nhận được'); }
-      else if (noDmg) { score -= 6; why.push('không gây sát thương'); }
-      else if (level > 0) { score += 8 + 3 * level; why.push(`dồn skill đang có (cấp ${level})`); }
-      else if (needFor.length) { score += 10; why.push(`điều kiện tiến hoá ${needFor.join(', ')}`); }
-      else if (ATK_RE.test(t)) { score += 5; why.push('nội tại tấn công'); }
-      else if (DEF_RE.test(t)) { score += 1; why.push('nội tại phòng thủ'); }
+      // A passive card an owned move still needs to evolve (evolveNeeds: move -> passive card), not taken yet
+      const needFor = !state.picks[name] ? [...evolveNeeds].filter(([m, p]) => p.toLowerCase() === lname && ownedMoves.has(m)).map(([m]) => m) : [];
+      const full = armorFull ?? (state.picks[name] || 0) >= (SITE.armorCards || 12);
+      if (sid === 'heal') { const low = state.hpRatio < 0.35; score = low ? 950 : 10; why = low ? 'hồi máu (máu dưới 35%)' : 'hồi máu tức thì (máu còn khoẻ)'; }
+      else if (needFor.length) { score = 700; why = `điều kiện tiến hoá ${needFor.join(', ')}`; }
+      else if (sid === 'def' && !full) { score = 570; why = 'giáp (lấy tới khi đầy)'; }
+      else { score = 500 + (STAT_PRI[sid] ?? 20); why = `nội tại${sid ? ` ${sid}` : ''}`; }
     }
-    if (fitLow) { score -= 3; why.push('hợp kém với pokémon'); }
-    if (fitHigh) { score += 2; why.push('hợp tốt'); }
-    if (CFG.bonusRe && CFG.bonusRe.test(t)) { score += CFG.bonusScore || 0; why.push('ưu tiên preset'); }   // set by presets (farmMoney.js)
-    return { key, name, isNew, score, why: why.join(', '), text: t.replace(/\s+/g, ' ').slice(0, 100) };
+    const notes = [why];
+    if (fitLow) { score -= 3; notes.push('hợp kém với pokémon'); }
+    if (fitHigh) { score += 2; notes.push('hợp tốt'); }
+    if (CFG.bonusRe && CFG.bonusRe.test(t)) { score += CFG.bonusScore || 0; notes.push('ưu tiên preset'); }   // set by presets (farmMoney.js)
+    return { key, name, isNew: kind === 'new', inBuild: buildIdx >= 0, score, why: notes.join(', '), text: t.replace(/\s+/g, ' ').slice(0, 100) };
   }
   function levelUp() {
     if (!CFG.autoPick || !state.on || performance.now() < state.pickAt) return;
     const found = SITE.levelUp();
     if (!found || !found.cards.length) return;
-    // Survival rules from BoundlessEgret/pokesurvivor-autofarm, with what the site knows of each card (SITE.cardFacts:
-    // { heal, evoNow, armor: the armour card still worth taking, why }): the berry under 35 % HP first, a passive that
-    // evolves a maxed move at once next to an evolution, armour before move upgrades until capped
-    const build = currentBuild();
-    if (SITE.cardFacts) {
-      const tier = build ? { heal: 600, evo: 490, def: 390 } : { heal: 200, evo: 150, def: 45 };
-      found.cards.forEach((c, i) => {
-        const f = SITE.cardFacts(c, i);
-        if (!f) return;
-        const up = (score, why) => { if (c.score < score) Object.assign(c, { score, why }); };
-        if (f.heal && state.hpRatio < 0.35) up(tier.heal, 'hồi máu (máu dưới 35%)');
-        else if (f.evoNow) up(tier.evo, 'lấy là tiến hoá ngay');
-        else if (f.armor) up(tier.def, `giáp (${f.why})`);
-      });
-    }
+    // What the site knows of a card beyond its text (SITE.cardFacts: { evoNow }): a passive that evolves a maxed move at
+    // once ranks right after an evolution (scoreCard's scale)
+    if (SITE.cardFacts) found.cards.forEach((c, i) => {
+      const f = SITE.cardFacts(c, i);
+      if (f && f.evoNow && c.score < 980) Object.assign(c, { score: 980, why: 'lấy là tiến hoá ngay' });
+    });
     const cards = found.cards.sort((a, b) => b.score - a.score);
     state.pickAt = performance.now() + 800;
     console.table(cards);
-    // Reroll when nothing on offer helps: with a build, only upgrades outside it / new moves with no slot (under the
-    // passives' 140), as the tool above rerolls anything that neither evolves, builds nor is a passive.
+    // Reroll when nothing on offer helps (under 500: no evolution, build move, passive or upgrade towards an evolution),
+    // as BoundlessEgret/pokesurvivor-autofarm does.
     // No reroll when tapping (c.el): if R does nothing there, the bot would retry it forever instead of picking. A site
     // that answers through the game (found.reroll / c.pick: pokesurvivor.com with G) needs neither keys nor taps
-    if (cards[0].score < (build ? 140 : 2) && found.rerolls > 0 && (found.reroll || !cards[0].el)) { log('reroll'); if (found.reroll) found.reroll(); else tap('r', 'KeyR', 82); return; }
+    if (cards[0].score < 500 && found.rerolls > 0 && (found.reroll || !cards[0].el)) { log('reroll'); if (found.reroll) found.reroll(); else tap('r', 'KeyR', 82); return; }
     const c = cards[0];
     state.picks[c.name] = (state.picks[c.name] || 0) + 1;
     if (c.isNew) state.newSkills++;
