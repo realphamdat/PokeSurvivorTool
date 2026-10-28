@@ -39,6 +39,8 @@ The manager checks for new versions on its own from time to time. To update righ
 
 The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. On pokesurvivor.com the list also has the TM moves that pokémon can learn (Kecleon Shop): "TM ✓" = already taught, "TM" = not yet (the game only offers taught TMs). PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
 
+**Small screens** (phones, especially held sideways): the panel is more compact and starts collapsed to its title row, with a **▶ / ■** button to run / stop; **+** opens it. The Moveset popup sits beside the panel instead of below it.
+
 **Không gửi bảng xếp hạng** (don't submit to the leaderboard; pokesurvivor.com, on by default): runs the bot plays are not submitted to the leaderboard. Runs you play yourself (bot off) still are. Untick it on the panel to let the bot's runs count.
 
 **🎃 Event Halloween:** this button works while the game has an event on, otherwise it is disabled.
@@ -51,7 +53,7 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 On every level-up the bot scores each card and takes the best one. The reason for each pick is printed in the console (F12), e.g. `chọn 2 Psychic — lấy move build #2` ("take build move #2").
 
-The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD, or the partner in the save while at the menu. The popup follows the pokémon being played (🎯 button green); typing another name stops that, 🎯 resumes it. That tool's builds come built in for 3 pokémon (Shell Bell recommended for all):
+The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD, or the partner in the save while at the menu. The popup follows the pokémon being played: once it's recognised, the popup only shows its name on the title row and the 4 moves. ✎ edits another pokémon's build (type its name); 🎯 goes back to following the one being played. That tool's builds come built in for 3 pokémon (Shell Bell recommended for all):
 - **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
 - **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
 - **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (buy Energy Ball as its "Starting move" in the shop).

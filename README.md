@@ -39,6 +39,8 @@ Trình quản lý tự kiểm tra bản mới định kỳ. Muốn cập nhật 
 
 Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Trên pokesurvivor.com, danh sách có thêm các move TM pokémon đó học được (Kecleon Shop): "TM ✓" là đã dạy, "TM" là chưa dạy (game chỉ đưa thẻ TM đã dạy). Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
 
+**Màn hình nhỏ** (điện thoại, nhất là khi xoay ngang): panel gọn hơn, lần đầu thu gọn sẵn thành một dòng tiêu đề có nút **▶ / ■** để chạy / dừng; bấm **+** để mở ra. Popup Moveset nằm cạnh panel thay vì bên dưới.
+
 **Không gửi bảng xếp hạng** (pokesurvivor.com, bật sẵn): ván do bot chơi không được gửi lên bảng xếp hạng. Ván bạn tự chơi (bot tắt) vẫn được gửi. Muốn ván của bot lên bảng thì bỏ tick ô này trên panel.
 
 **🎃 Event Halloween:** nút này bấm được khi game đang có event, còn lại thì bị khoá.
@@ -51,7 +53,7 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 
 Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ điểm cao nhất. Lý do mỗi lần chọn hiện trong console (F12), ví dụ `chọn 2 Psychic — lấy move build #2`.
 
-Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD, hoặc pokémon partner trong save nếu đang ở menu. Popup tự đổi theo pokémon đang chơi (nút 🎯 sáng xanh); tự gõ tên khác thì thôi theo, bấm 🎯 để theo lại. Có sẵn build của tool đó cho 3 pokémon (đều nên cầm Shell Bell):
+Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD, hoặc pokémon partner trong save nếu đang ở menu. Popup tự đổi theo pokémon đang chơi: khi đã nhận ra pokémon, popup chỉ hiện tên trên tiêu đề và 4 move. Bấm ✎ để sửa build của pokémon khác (gõ tên); bấm 🎯 để quay lại theo pokémon đang chơi. Có sẵn build của tool đó cho 3 pokémon (đều nên cầm Shell Bell):
 - **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
 - **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
 - **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (mua "Starting move" Energy Ball trong shop).

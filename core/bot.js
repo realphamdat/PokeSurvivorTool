@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.3';
+  const VERSION = '1.7.4';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1161,6 +1161,7 @@
   ov.style.cssText = 'position:fixed;pointer-events:none;z-index:99999';
   // Top-left dock (60px down: the pokémon's HP bar sits in that corner) stacking the control panel, the HUD line and the F6 catalog (CSS order keeps that order)
   const dock = document.createElement('div');
+  dock.dataset.psbotDock = '';                                       // laid out in a row on small screens (PSB_CSS)
   dock.style.cssText = 'position:fixed;top:60px;left:0;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-height:calc(100vh - 44px);pointer-events:none';
   const hud = document.createElement('div');
   // Debug counters: only with the F9 overlay (or while tagging), wrapped to the panel's width so it doesn't cover the game
@@ -1254,6 +1255,8 @@
     });
   }
   const dragCss = 'cursor:move;touch-action:none;user-select:none';
+  // Phones (a landscape one is ~360-420 tall) and small windows: a compact panel, collapsed at first (PSB_CSS @media)
+  const SMALL = '(max-height: 520px), (max-width: 600px)';
 
   const ctl = document.createElement('div');
   ctl.dataset.psbotCtl = ctl.dataset.psbotUi = '';
@@ -1294,9 +1297,34 @@
     [data-psbot-ui] .psb-body[hidden] { display:none }
     [data-psbot-ctl][data-min] > :not(:first-child) { display:none !important }
     [data-psbot-ctl][data-min] > .psb-head { border-bottom:0 }
-    @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }`;
+    [data-psbot-ui], [data-psbot-ui] * { scrollbar-width:none }
+    [data-psbot-ui]::-webkit-scrollbar, [data-psbot-ui] *::-webkit-scrollbar { display:none }
+    [data-psbot-ctl]:not([data-min]) [data-ctl="hplay"] { display:none }
+    [data-psbot-ctl][data-min] { width:auto !important }
+    [data-psbot-ctl][data-min] .psb-title { white-space:nowrap }
+    [data-psbot-ui] [data-ctl="hplay"].on { color:#ff9a9a }
+    @media (pointer: coarse) { [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height: 34px; font-size: 14px !important } [data-ctl="keys"] { display: none } }
+    @media ${SMALL} {
+      [data-psbot-dock] { flex-direction:row !important; flex-wrap:wrap }
+      [data-psbot-ui].psb { font-size:12px; border-radius:8px; max-height:calc(100vh - 72px); overflow-y:auto }
+      [data-psbot-ctl] { width:210px !important }
+      [data-psbot-ui][data-psbot-ms] { width:250px !important }
+      [data-psbot-ui] .psb-head { padding:4px 8px; gap:4px }
+      [data-psbot-ui] .psb-title { font-size:11px }
+      [data-psbot-ui] .psb-title a, [data-ctl="tip"], [data-ctl="keys"] { display:none }
+      [data-psbot-ui] .psb-body { padding:6px 8px; gap:5px }
+      [data-psbot-ui] .psb-tab { padding:4px; font-size:12px }
+      [data-psbot-ui] .psb-btn { padding:4px 8px; font-size:12px }
+      [data-psbot-ui] .psb-in { padding:3px 6px; font-size:12px }
+      [data-psbot-ui] .psb-muted, [data-psbot-ui] .psb-tip { font-size:11px }
+      [data-psbot-ui] .psb-foot { padding:4px 8px; font-size:10px }
+      [data-psbot-ui] [data-pane="donate"] img { width:120px !important }
+      [data-psbot-ui] button, [data-psbot-ui] select, [data-psbot-ui] input { min-height:28px !important; font-size:12px !important }
+      [data-psbot-ui] .psb-icon { min-height:0 !important; font-size:16px !important }
+    }`;
   ctl.innerHTML = `
     <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span class="psb-title">PokeSurvivor Bot v${VERSION} <a href="${REPO}" target="_blank" rel="noopener" title="Repo gốc trên GitHub">by damhieu2808</a></span>
+      <button data-ctl="hplay" class="psb-icon" title="Chạy / dừng (panel đang thu gọn)">▶</button>
       <button data-ctl="min" class="psb-icon" title="Thu gọn / mở rộng">–</button></div>
     <style>${PSB_CSS}</style>
     <div class="psb-tabs" role="tablist">
@@ -1345,7 +1373,8 @@
     $('min').textContent = min ? '+' : '–';
     try { localStorage.setItem(MIN_KEY, min ? '1' : ''); } catch {}
   };
-  try { setMin(!!localStorage.getItem(MIN_KEY)); } catch {}
+  // Never chosen yet: collapsed on a small screen (a phone held sideways has little room beside the game)
+  try { const v = localStorage.getItem(MIN_KEY); setMin(v === null ? matchMedia(SMALL).matches : !!v); } catch {}
   $('min').onclick = () => setMin(!('min' in ctl.dataset));
   // Tip line, hidden for good once closed (a new tip gets a new key, so it shows again)
   const TIP_KEY = 'psbot.tip.1';
@@ -1393,8 +1422,9 @@
   checkUpdate();
   const updateTimer = setInterval(checkUpdate, 6 * 3600000);
 
-  // One button: ▶ Chạy (counts runs from 0 again) <-> ■ Dừng
+  // One button: ▶ Chạy (counts runs from 0 again) <-> ■ Dừng; its twin on the title row works while collapsed
   $('play').onclick = () => (state.on ? control.stop() : control.play());
+  $('hplay').onclick = () => (state.on ? control.stop() : control.play());
   // Event button (SITE.event, doofcraft's Halloween waves): the same runs in the event's mode; the site puts the
   // player's own mode back once the bot is off (stopped, or done with its runs)
   $('event').onclick = () => {
@@ -1421,6 +1451,8 @@
     $('play').className = `psb-btn ${state.on && !evRun ? 'stop' : 'go'}`;
     $('play').disabled = evRun;
     $('dot').className = `psb-dot${state.on ? ' on' : ''}`;
+    $('hplay').textContent = state.on ? '■' : '▶';
+    $('hplay').classList.toggle('on', state.on);
     // Phones have no console: whether the bot reads the game itself, and what the pilot is doing
     if ($('gstate')) $('gstate').textContent = !window.G ? 'Đọc game: không (đọc màn hình) — tải lại trang để thử lại'
       : `Đọc game: có${SITE.pilot.active() ? ` · ${SITE.pilot.mode() || 'đang lái'}` : ''}`;
@@ -1475,16 +1507,19 @@
   const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t] || learnsetOf(t))
     || (SITE.partnerName && SITE.partnerName()) || monByDex[(gameSave() || {}).partner] || '';
   const ms = document.createElement('div');
-  ms.dataset.psbotUi = '';
+  ms.dataset.psbotUi = ms.dataset.psbotMs = '';
   ms.className = 'psb';
   ms.style.cssText = 'order:1;flex:0 0 auto;pointer-events:auto;width:320px;max-width:calc(100vw - 8px);display:none';
   ms.innerHTML = `
-    <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span class="psb-title">Moveset</span><span data-ms="close" class="psb-icon" style="font-size:14px">✕</span></div>
+    <div data-drag class="psb-head" style="${dragCss}" title="Kéo để di chuyển"><span data-ms="title" class="psb-title">Moveset</span>
+      <button data-ms="edit" class="psb-icon" style="font-size:14px" title="Sửa build của pokémon khác">✎</button><span data-ms="close" class="psb-icon" style="font-size:14px">✕</span></div>
     <div class="psb-body">
-      <div class="psb-sec">Pokémon</div>
-      <div class="psb-row"><input data-ms="mon" class="psb-in" list="psbot-mons" placeholder="Tên pokémon hoặc bấm 🎯" style="flex:1;min-width:0">
-        <button data-ms="cur" class="psb-btn info" style="flex:0 0 auto" title="Bật: tên và danh sách move tự đổi theo pokémon đang chơi (trong trận: tên trên HUD; ở menu: partner). Tự gõ tên thì tắt">🎯 Đang chơi</button></div>
-      <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
+      <div data-ms="pick" style="display:flex;flex-direction:column;gap:8px">
+        <div class="psb-sec">Pokémon</div>
+        <div class="psb-row"><input data-ms="mon" class="psb-in" list="psbot-mons" placeholder="Tên pokémon hoặc bấm 🎯" style="flex:1;min-width:0">
+          <button data-ms="cur" class="psb-btn info" style="flex:0 0 auto" title="Bật: tên và danh sách move tự đổi theo pokémon đang chơi (trong trận: tên trên HUD; ở menu: partner). Tự gõ tên thì tắt">🎯 Đang chơi</button></div>
+        <datalist id="psbot-mons">${Object.keys(MOVES.mons).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('')}</datalist>
+      </div>
       <div class="psb-sec">4 move ưu tiên</div>
       <div data-ms="slots" style="display:flex;flex-direction:column;gap:5px"></div>
       <div class="psb-row">
@@ -1515,7 +1550,15 @@
     const note = (natural.length && !ls.wiki ? 'Danh sách move lấy từ game. ' : '')
       + (made ? 'Build mặc định (chưa lưu): move khởi đầu → buff tấn công hợp pokémon → Harden; ô trống bot tự chọn. Sửa rồi bấm Lưu để giữ. '
         : build.length && isDefaultBuild(name, build) ? 'Đang dùng build có sẵn (pokesurvivor-autofarm). ' : '');
-    $m('list').innerHTML = note + (saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa tự lưu build nào');
+    // Following the pokémon being played: no picker, its name on the title row and a one-line status, only the 4 moves
+    // below (✎ brings the picker back for another pokémon)
+    const playing = follow && name && name === currentMon();
+    $m('pick').style.display = playing ? 'none' : '';
+    $m('edit').style.display = playing ? '' : 'none';
+    $m('title').textContent = playing ? `Moveset · ${name.replace(/(^|[\s-])\S/g, c => c.toUpperCase())}` : 'Moveset';
+    $m('list').innerHTML = playing
+      ? (made ? 'Build mặc định (chưa lưu) · ô trống bot tự chọn' : isDefaultBuild(name, build) ? 'Build có sẵn (pokesurvivor-autofarm)' : CFG.builds[name] ? 'Build đã lưu' : '')
+      : note + (saved.length ? 'Đã lưu: ' + saved.map(([n, b]) => `<a data-load="${n}" style="color:#f5c542;cursor:pointer;text-decoration:underline" title="${b.join(', ')}">${n}</a>`).join(', ') : 'Chưa tự lưu build nào');
   }
   // Follow mode (on by default, 🎯): the popup switches to the pokémon being played whenever that changes (a new run, a
   // new partner on the menu). Typing a name or loading a saved build turns it off, so an edit isn't swapped away
@@ -1535,6 +1578,7 @@
   $('moveset').onclick = openMoveset;
   $m('close').onclick = openMoveset;
   $m('mon').oninput = () => { setFollow(false); renderMoveset(); };
+  $m('edit').onclick = () => { setFollow(false); renderMoveset(); $m('mon').focus(); $m('mon').select(); };
   $m('cur').onclick = () => { setFollow(true); $m('mon').value = currentMon(); $m('msg').textContent = currentMon() ? '' : 'Chưa thấy tên pokémon (vào trận trước)'; renderMoveset(); };
   setFollow(true);
   $m('save').onclick = () => {
