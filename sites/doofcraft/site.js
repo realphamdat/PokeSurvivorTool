@@ -233,6 +233,15 @@ window.PSBotSite = h => {
   const MENU = '[data-testid="menu-solo"], [data-testid="solo-start"]';
   const RESTART = ['[data-testid="game-exit"]', '[data-testid="saved-run-new-confirm"] [data-testid="dialog-confirm"]',
     '[data-testid="saved-run-resume"]', '[data-testid="solo-start"]', '[data-testid="menu-solo"]'];
+  // Panel box: the Waves chest takes the gacha tickets (kept after the run) over Rare Candy / an upgrade. Level-up cards
+  // never offer currency (game's card types: new, upgrade, evolution, stat, mega, plate, zmove, revive)
+  const FARM_KEY = 'psbot.farmitems';
+  const farmItems = {
+    label: 'Farm vé: rương chọn Tickets',
+    title: 'Rương giữa vòng (chế độ Waves) cho chọn Rare Candy / Upgrade / Tickets. Bật: luôn lấy Tickets (vé gacha, giữ lại sau khi chết). Tắt: nâng move build > Rare Candy > nâng khác > vé',
+    get: () => { try { return localStorage.getItem(FARM_KEY) === '1'; } catch { return false; } },
+    set: on => { try { localStorage.setItem(FARM_KEY, on ? '1' : '0'); } catch {} },
+  };
 
   return {
     id: 'doofcraft', label: 'Doofcraft · pokesurvivor.doofcraft.com',
@@ -275,7 +284,9 @@ window.PSBotSite = h => {
     },
     choiceOpen: () => !!document.querySelector('.ps-choice:not(.hidden) .ps-box'),
     // Waves chest (between rounds, "Pick one: this run, or currency"): upgrading a build move first, then Rare Candy (a
-    // level = a level-up pick), any other upgrade, gacha tickets last. Other choices (Choice Band slot…): the first option
+    // level = a level-up pick), any other upgrade, gacha tickets last (first with farmItems). Other choices (Choice Band slot…): the first
+    // option
+    farmItems,
     otherChoice() {
       const box = dcBox();
       if (!box || /^level|cleared|an item|bond/i.test(dcTitle(box))) return;
@@ -285,7 +296,7 @@ window.PSBotSite = h => {
         return h.pickRow('rương', cards.map((c, i) => {
           const name = dcName(c), up = name.match(/^upgrade:\s*(.+)/i), o = { key: String(i + 1), name, text: c.innerText.replace(/\s+/g, ' ').slice(0, 80), el: tapTarget(c) };
           if (/^rare candy/i.test(name)) return { ...o, score: 2, why: 'lên 1 cấp' };
-          if (!up) return { ...o, score: 0, why: 'vé gacha' };
+          if (!up) return farmItems.get() ? { ...o, score: 9, why: 'vé gacha (farm vé)' } : { ...o, score: 0, why: 'vé gacha' };
           const s = readDcCard(c, i, up[1].trim());
           return { ...o, score: s.inBuild ? 3 : 1, why: `nâng ${up[1].trim()} (${s.why || 'ngoài build'})` };
         }));

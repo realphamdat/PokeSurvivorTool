@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.8';
+  const VERSION = '1.7.9';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1380,6 +1380,7 @@
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
       ${SITE.pilot ? '<div data-ctl="gstate" class="psb-muted" style="font-size:11px"></div><div data-ctl="suggest" class="psb-tip" style="display:none;white-space:pre-line" title="Sức mạnh khi treo máy: move tự ngắm tốt nhất × chỉ số tấn công hợp move × cùng hệ × thời tiết tự tạo × độ trâu × tốc độ × nâng cấp đã mua. Bot không tự đổi pokémon."></div>' : ''}
       <label class="psb-row psb-muted" title="Bật: bot liên tục đổi skill (E). Tắt: không đổi, bạn tự đổi bằng tay"><input data-ctl="autoskill" type="checkbox"> Auto skill</label>
+      ${SITE.farmItems ? `<label class="psb-row psb-muted" title="${SITE.farmItems.title}"><input data-ctl="farmitems" type="checkbox"> ${SITE.farmItems.label}</label>` : ''}
       ${SITE.noRank ? '<label class="psb-row psb-muted" title="Ván do bot chơi không lên bảng xếp hạng"><input data-ctl="norank" type="checkbox"> Không gửi bảng xếp hạng</label>' : ''}
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
@@ -1423,6 +1424,7 @@
   try { CFG.swapSkills = localStorage.getItem(SKILL_KEY) !== '0'; } catch {}
   $('autoskill').checked = CFG.swapSkills;
   $('autoskill').onchange = () => { CFG.swapSkills = $('autoskill').checked; try { localStorage.setItem(SKILL_KEY, CFG.swapSkills ? '1' : '0'); } catch {} };
+  if ($('farmitems')) { $('farmitems').checked = SITE.farmItems.get(); $('farmitems').onchange = () => SITE.farmItems.set($('farmitems').checked); }
   if ($('norank')) { $('norank').checked = SITE.noRank.get(); $('norank').onchange = () => SITE.noRank.set($('norank').checked); }
   // Tabs: Điều khiển (always the one shown at start) / Donate
   ctl.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {

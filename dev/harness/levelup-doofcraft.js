@@ -8,9 +8,11 @@
     levelUp: () => card(1, 'Ember', 'New · Fire', 'deals damage') + card(2, 'Harden', 'New · Normal', 'No damage') + card(3, 'Fire Spin', 'Lv.2 > 3', 'attack power'),
     // Z crystal: its chip is a .tag-chip; its text mentions Mega Evolving, which must not read as an evolution
     zMove: () => card(1, 'Fire Spin', 'Lv.2 > 3', 'attack power') + card(2, 'Firium Z', '<span class="tag-chip">Z-Move</span>', 'Inferno Overdrive: a Fire-type burst that hits every foe around you. Use it from the Z slot, then 2:00 to recharge. Mega Evolving removes it.') + card(3, 'Power', 'Common', '+10% damage'),
+    // Waves chest: Rare Candy / Upgrade / Tickets (tickets first with SITE.farmItems on)
+    chest: () => card(1, 'Rare Candy', '', 'The team goes up a level') + card(2, 'Upgrade: Fire Spin', 'Lv.2 > 3', 'attack power') + card(3, 'Tickets', '', '+5 gacha tickets'),
     band: () => card(1, 'Slot A', '', 'first') + card(2, 'Slot B', '', 'second'),
   };
-  const titles = { levelUp: 'Level up!', zMove: 'Level up!', band: 'Choice Band' };
+  const titles = { levelUp: 'Level up!', zMove: 'Level up!', chest: 'Chest', band: 'Choice Band' };
   window.__scene = async name => {
     __log = { keys: [], taps: [] };
     const stage = document.getElementById('stage');

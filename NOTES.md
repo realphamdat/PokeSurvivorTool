@@ -271,7 +271,7 @@ Nếu bước 2 hỏng: thử đổi manager (Violentmonkey ↔ Tampermonkey) v�
   - Bấm nút: lưu `localStorage['ps.runMode']` cũ, đặt thành `'waves'`, bấm thẻ event nếu đang ở menu, rồi chạy như ▶ Chạy. Chơi lại (Solo → Play) tự giữ chế độ waves.
   - Bot tắt (bấm dừng, hoặc chạy đủ số ván) thì trả `ps.runMode` về như cũ; đã kiểm tra trên game thật.
   - Đang chạy event thì ▶ Chạy bị khoá, và ngược lại.
-- **Rương giữa vòng** (tiêu đề "Chest"): ưu tiên Upgrade move trong build > Rare Candy > Upgrade khác > Tickets (`otherChoice`). **Chưa kiểm chứng:** trận thứ 2 không gặp rương. Trận 1 gặp 2 lần, khi đó bot vẫn chọn ô đầu (Rare Candy).
+- **Rương giữa vòng** (tiêu đề "Chest"): ưu tiên Upgrade move trong build > Rare Candy > Upgrade khác > Tickets (`otherChoice`). **Chưa kiểm chứng:** trận thứ 2 không gặp rương. Trận 1 gặp 2 lần, khi đó bot vẫn chọn ô đầu (Rare Candy). Checkbox panel "Farm vé: rương chọn Tickets" (`SITE.farmItems`, `localStorage['psbot.farmitems']`, mặc định tắt): bật thì rương luôn lấy Tickets (vé gacha mang ra ngoài trận). Thẻ lên cấp không bao giờ có candy/vé (loại thẻ trong mã game: new, upgrade, evolution, stat, mega, plate, zmove, revive). Đã test harness (`__scene('chest')`), chưa test trận thật.
 
 **Luật (từ mã nguồn game và cấu hình server trả về ở `POST /api/runs/start`):**
 - **Vòng:** các vòng nối tiếp không có điểm dừng, mỗi vòng 50 giây, tối đa 45 quái cùng lúc.
