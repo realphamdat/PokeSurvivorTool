@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.7';
+  const VERSION = '1.7.8';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -1089,7 +1089,7 @@
   }
 
   // ---------- auto replay ----------
-  // Runs forever (game over -> Back to menu -> Play -> ...) until the bot is switched off with F8.
+  // Runs forever (game over -> Back to menu -> Save -> Play -> ...) until the bot is switched off with F8.
   // Acts when the game-over screen or the main menu's Play button is on screen, or as a fallback
   // when the HUD timer has stopped ticking (the menu background may keep rendering the map).
   function autoRestart(now) {
@@ -1120,8 +1120,19 @@
     state.runEnded = over;
     if (justEnded) {
       state.done++;
+      state.saveFrom = now;
       log(`xong ván ${state.done}${state.target ? `/${state.target}` : ''}`);
       if (state.target && state.done >= state.target) { state.on = false; applyDir(null); log('đã chơi đủ số ván — dừng'); return; }
+    }
+    // Back on the menu after a run: the game's Save button once, and no new run until it says saved (a minute at most)
+    if (state.saveFrom && menu) {
+      const s = SITE.saveGame && SITE.saveGame();
+      if (s && !s.done && now - state.saveFrom < 60000) {
+        if (!state.saveClicked && !s.busy) { state.saveClicked = true; log('bấm Lưu game'); s.el.click(); }
+        return;
+      }
+      if (state.saveClicked) log(s && !s.done ? 'chưa lưu xong sau 1 phút: chơi tiếp' : 'đã lưu game');
+      state.saveFrom = 0; state.saveClicked = false;
     }
     const b = (pilot && pilot.restartButton()) || SITE.restartButton(buttons);
     // The site may refuse to go on ({ halt: why }, doofcraft: a saved run of another mode): stopped, why on the panel
@@ -1307,6 +1318,8 @@
     [data-psbot-ui] .psb-muted { color:#7d8799; font-size:12px }
     [data-psbot-ui] .psb-foot { order:1; display:block; border-top:1px solid #2e3646; padding:7px 12px; font-size:11px; color:#7d8799; text-decoration:none }
     [data-psbot-ui] .psb-foot b { color:#8fb4ff }
+    /* Donate tab: the pane only, without the rows under it (farm line, author link, update notice) */
+    [data-psbot-ctl][data-tab="donate"] > :not(.psb-head):not(.psb-tabs):not(style):not([data-pane]) { display:none !important }
     [data-psbot-ui] .psb-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#7d8799 }
     [data-psbot-ui] .psb-dot.on { background:#3fbf6e; box-shadow:0 0 6px #3fbf6e }
     [data-psbot-ui] .psb-tip { position:relative; font-size:12px; color:#cfd6e2; background:#262d3b; border:1px solid #3a4356; border-radius:8px; padding:6px 24px 6px 9px }
@@ -1366,6 +1379,7 @@
       ${EVENTS.length ? `<div class="psb-row" style="flex-wrap:wrap">${EVENTS.map((e, i) => `<button data-ctl="event${i}" class="psb-btn evt" title="${e.title}"></button>`).join('')}</div>` : ''}
       <div class="psb-muted"><span data-ctl="dot" class="psb-dot"></span><span data-ctl="status"></span></div>
       ${SITE.pilot ? '<div data-ctl="gstate" class="psb-muted" style="font-size:11px"></div><div data-ctl="suggest" class="psb-tip" style="display:none;white-space:pre-line" title="Sức mạnh khi treo máy: move tự ngắm tốt nhất × chỉ số tấn công hợp move × cùng hệ × thời tiết tự tạo × độ trâu × tốc độ × nâng cấp đã mua. Bot không tự đổi pokémon."></div>' : ''}
+      <label class="psb-row psb-muted" title="Bật: bot liên tục đổi skill (E). Tắt: không đổi, bạn tự đổi bằng tay"><input data-ctl="autoskill" type="checkbox"> Auto skill</label>
       ${SITE.noRank ? '<label class="psb-row psb-muted" title="Ván do bot chơi không lên bảng xếp hạng"><input data-ctl="norank" type="checkbox"> Không gửi bảng xếp hạng</label>' : ''}
       <div data-ctl="keys" class="psb-muted" style="font-size:11px">F8 bật/tắt bot · F9 hiển thị overlay</div>
       <div data-ctl="tip" class="psb-tip"><button data-ctl="tipx" class="psb-icon" title="Ẩn mẹo này">×</button>
@@ -1404,11 +1418,17 @@
   const TIP_KEY = 'psbot.tip.2';
   try { if (localStorage.getItem(TIP_KEY)) $('tip').remove(); } catch {}
   if ($('tipx')) $('tipx').onclick = () => { $('tip').remove(); try { localStorage.setItem(TIP_KEY, '1'); } catch {} };
+  // Auto skill (CFG.swapSkills, panel checkbox): on by default, remembered per browser
+  const SKILL_KEY = 'psbot.autoskill';
+  try { CFG.swapSkills = localStorage.getItem(SKILL_KEY) !== '0'; } catch {}
+  $('autoskill').checked = CFG.swapSkills;
+  $('autoskill').onchange = () => { CFG.swapSkills = $('autoskill').checked; try { localStorage.setItem(SKILL_KEY, CFG.swapSkills ? '1' : '0'); } catch {} };
   if ($('norank')) { $('norank').checked = SITE.noRank.get(); $('norank').onchange = () => SITE.noRank.set($('norank').checked); }
   // Tabs: Điều khiển (always the one shown at start) / Donate
   ctl.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
     ctl.querySelectorAll('[data-tab]').forEach(t => t.setAttribute('aria-selected', t === b));
     ctl.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== b.dataset.tab; });
+    ctl.dataset.tab = b.dataset.tab;
   }));
   $('copyacct').onclick = async () => {
     try { await navigator.clipboard.writeText($('acct').textContent); $('copyacct').textContent = 'Đã copy'; }
@@ -1424,7 +1444,7 @@
       try { localStorage.setItem(RUNS_KEY, String(n)); } catch {}
       // runEnded: null = not known yet; autoRestart's first look sets it, so a results screen already up when ▶ is
       // pressed is not counted as one of the n runs
-      Object.assign(state, { target: n, done: 0, runEnded: null, on: true, started: true, restartAt: 0, halt: null });
+      Object.assign(state, { target: n, done: 0, runEnded: null, saveFrom: 0, saveClicked: false, on: true, started: true, restartAt: 0, halt: null });
       log(`chạy ${n ? `${n} ván` : 'vô hạn'}`);
     },
     pause() { state.on = false; applyDir(null); log('tạm dừng — bạn có thể tự điều khiển'); },

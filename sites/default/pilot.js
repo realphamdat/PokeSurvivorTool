@@ -588,7 +588,7 @@ window.PSBotPilot = h => {
     const t = now();
     autoResume(g, t);
     if (p.dead || g.Game.state !== 'playing') return;
-    if (holdSlot() && t - S.lastSlotCheck > 600 && p.slots.length > 1 && !(p.hasItem && p.hasItem('choiceband'))) {
+    if (h.CFG.swapSkills && holdSlot() && t - S.lastSlotCheck > 600 && p.slots.length > 1 && !(p.hasItem && p.hasItem('choiceband'))) {
       S.lastSlotCheck = t;
       let best = p.active, bs = groupScore(p.slots[p.active] || []);
       p.slots.forEach((grp, i) => { const s = groupScore(grp); if (s > bs + 0.5) { bs = s; best = i; } });

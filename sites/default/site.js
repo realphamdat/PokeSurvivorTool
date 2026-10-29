@@ -400,6 +400,14 @@ window.PSBotSite = h => {
     choiceOpen: () => h.visible(document.getElementById('lvl-num')),
     otherChoice() {},
     menu: buttons => buttons.some(b => /^(play|jugar)/i.test((b.innerText || '').trim()) && /dungeon|mazmorra/i.test(b.innerText)),
+    // Cloud save (js/ui/ui.js): the Save button on the menu's top bar (hidden for guests / local saves) and the sync dot
+    // beside the name: ok = in the cloud, syncing, pending (a save scheduled, MIN_GAP 25 s after the last one), offline
+    saveGame() {
+      const b = document.getElementById('btn-save');
+      if (!b || b.classList.contains('hidden') || !h.visible(b)) return null;
+      const dot = document.querySelector('#user-pill i.sync'), st = dot ? [...dot.classList].find(c => c !== 'sync') : '';
+      return { el: b, done: st === 'ok' || st === 'local' || st === 'guest', busy: b.disabled || st === 'syncing' };
+    },
     restartButton(buttons) {
       for (const re of h.CFG.restartSteps) {
         const b = buttons.find(b => { const x = (b.innerText || '').trim(); return re.test(x) && !h.CFG.restartAvoid.test(x); });

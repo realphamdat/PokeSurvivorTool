@@ -43,6 +43,10 @@ Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại đ
 
 **Không gửi bảng xếp hạng** (pokesurvivor.com, bật sẵn): ván do bot chơi không được gửi lên bảng xếp hạng. Ván bạn tự chơi (bot tắt) vẫn được gửi. Muốn ván của bot lên bảng thì bỏ tick ô này trên panel.
 
+**Auto skill** (bật sẵn): bot liên tục đổi skill (phím E) để dùng hết các move. Bỏ tick thì bot không đổi skill nữa, bạn tự đổi bằng tay.
+
+**Lưu game sau mỗi ván:** trên pokesurvivor.com, hết ván bot về menu, bấm **Guardar** và đợi game báo đã lưu lên cloud rồi mới chơi ván tiếp (đợi tối đa 1 phút). Doofcraft tự lưu lên server khi hết ván nên bot không cần bấm gì.
+
 **🎃 Event Halloween:** nút này bấm được khi game đang có event, còn lại thì bị khoá.
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** chạy chế độ Waves của event.
 - **[pokesurvivor.com](https://pokesurvivor.com/):** từ 30/10 đến 1/11 mọi trận đều là trận Halloween, nút chạy như ▶ Chạy.

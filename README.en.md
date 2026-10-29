@@ -43,6 +43,10 @@ The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) an
 
 **Không gửi bảng xếp hạng** (don't submit to the leaderboard; pokesurvivor.com, on by default): runs the bot plays are not submitted to the leaderboard. Runs you play yourself (bot off) still are. Untick it on the panel to let the bot's runs count.
 
+**Auto skill** (on by default): the bot keeps switching skills (E key) to use every move. Untick it and the bot stops switching; you switch by hand.
+
+**Save after every run:** on pokesurvivor.com, after a run the bot goes back to the menu, presses **Guardar** (Save) and waits until the game says it is saved to the cloud before the next run (a minute at most). Doofcraft saves to its server when a run ends, so there is nothing to press.
+
 **🎃 Event Halloween:** this button works while the game has an event on, otherwise it is disabled.
 - **[pokesurvivor.doofcraft.com](https://pokesurvivor.doofcraft.com/):** runs the event's Waves mode.
 - **[pokesurvivor.com](https://pokesurvivor.com/):** from 30/10 to 1/11 every run is a Halloween run, and the button works like ▶ Chạy.
