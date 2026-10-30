@@ -7,7 +7,8 @@
   // Stays at the repo root, on main as well as release: userscripts / bookmarklets installed earlier fetch it from main.
   // The bot files themselves come from the "release" branch (main = work in progress)
   const site = /doofcraft/i.test(location.hostname) ? 'doofcraft' : 'default';
-  const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, 'core/moves.js', 'core/bot.js', 'core/farmMoney.js'];
+  // moves.js is pokesurvivor.com's table; doofcraft reads its own from the game (SITE.moveTable, since 1.7.10)
+  const FILES = [`sites/${site}/site.js`, `sites/${site}/data.js`, ...(site === 'default' ? ['core/moves.js'] : []), 'core/bot.js', 'core/farmMoney.js'];
   const SOURCES = [
     f => `https://raw.githubusercontent.com/damhieu2808/PokeSurvivorTool/release/${f}?t=${Date.now()}`,
     f => `https://cdn.jsdelivr.net/gh/damhieu2808/PokeSurvivorTool@release/${f}`,
