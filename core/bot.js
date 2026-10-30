@@ -34,7 +34,7 @@
   }
   if (window.PSBot) window.PSBot.unload();
   // Keep VERSION equal to "version" in manifest.json: a higher version on GitHub shows the update notice
-  const VERSION = '1.7.10';
+  const VERSION = '1.7.11';
   const REPO = 'https://github.com/damhieu2808/PokeSurvivorTool';
 
   const CFG = {
@@ -190,11 +190,14 @@
   try { Object.assign(userBuilds, JSON.parse(localStorage.getItem(BUILD_KEY) || '{}')); } catch {}
   // Below data.js: the builds BoundlessEgret/pokesurvivor-autofarm ships (all with Shell Bell, Bulbasaur's needs Energy
   // Ball bought as its starting move). Any other pokémon without a Moveset picks its moves itself (scoreCard: autoNew).
-  // pokesurvivor.com only: doofcraft has none of Nasty Plot, Energy Ball, Leaf Storm, Giga Drain
+  // pokesurvivor.com only: doofcraft has none of Nasty Plot, Energy Ball, Leaf Storm, Giga Drain. By game id, named as
+  // the game's cards ("leaf-storm" is Petal Blizzard, "giga-drain" Grass Knot)
+  const idTable = SITE.moveTable || window.PSBotMoves || { moves: [] };
+  const byGameId = ids => ids.map(id => (idTable.moves.find(m => m.id === id) || { name: id }).name);
   const defaultBuilds = SITE.id === 'default' ? {
-    mewtwo: ['Confusion', 'Harden', 'Nasty Plot', 'Psychic'],
-    kyogre: ['Bubble', 'Nasty Plot', 'Aqua Ring', 'Hydro Pump'],
-    bulbasaur: ['Energy Ball', 'Nasty Plot', 'Leaf Storm', 'Giga Drain'],
+    mewtwo: byGameId(['confusion', 'harden', 'nasty-plot', 'psychic']),
+    kyogre: byGameId(['bubble', 'nasty-plot', 'aqua-ring', 'hydro-pump']),
+    bulbasaur: byGameId(['energy-ball', 'nasty-plot', 'leaf-storm', 'giga-drain']),
   } : {};
   const isDefaultBuild = (n, b) => String(defaultBuilds[n]) === String(b);
   Object.assign(CFG.builds, defaultBuilds, userBuilds);
@@ -901,7 +904,7 @@
   }
   // The default build of a pokémon without one (the player's choice: 3 moves, the 4th left to them): its starting move
   // (always owned: the first damage move) > the attack buff for its side (Nasty Plot / Swords Dance or Dragon Dance)
-  // > Harden, from what it learns (learnsetOf: the game's own lists, else the wiki's). Its side: the game's stats
+  // > Harden, from what it learns (learnsetOf: the game's own lists). Its side: the game's stats
   // (SITE.monSide), else its starting move's category (counting its moves' categories got Gengar wrong). Marked .auto:
   // scoreCard fills the free slot as autoNew would
   const autoBuilds = new Map();                                       // name -> { at, build }
@@ -1520,8 +1523,8 @@
   }
 
   // ---------- moveset popup: pick up to 4 priority moves per pokémon from its learnable list (learnsetOf) ----------
-  // Each game its own table: the site's (doofcraft reads its game config, filled once loaded), else the wiki's (moves.js,
-  // pokesurvivor.com)
+  // Each game its own table: the site's (doofcraft reads its game config, filled once loaded; pokesurvivor.com from G or
+  // its last copy), else moves.js (pokesurvivor.com's, exported from the game by crawl-moves.js)
   const MOVES = SITE.moveTable || window.PSBotMoves || { moves: [], mons: {} };
   const moveByName = new Map();                                       // scoreCard: buff (cat "status") or attack
   let movesRead = 0;
@@ -1529,7 +1532,7 @@
     for (; movesRead < MOVES.moves.length; movesRead++) moveByName.set(MOVES.moves[movesRead].name.toLowerCase(), MOVES.moves[movesRead]);
     return moveByName.get(n);
   };
-  // Move -> stat card it needs to evolve: the site's own (doofcraft reads its game config), else the wiki's (moves.js evo)
+  // Move -> stat card it needs to evolve: the site's own (read from each game), else moves.js evo
   const evolveNeeds = SITE.evolveNeeds || new Map(MOVES.moves.filter(m => m.evo).map(m => [m.name.toLowerCase(), m.evo]));
   // TMs (pokesurvivor.com's Kecleon Shop): moves taught outside the natural list. The game's save, cached in
   // localStorage (ps.cloud.<uid>, or ps.save.<name> offline), keeps the partner and the taught TMs (ptm) by dex
@@ -1554,14 +1557,14 @@
   // What a pokémon learns: { natural (starting move first), taught: TMs taught, tms: TMs not taught yet }, moves as
   // { name, kind, cat ('status' = buff), dmg, cd, stat? }. The game's own lists when the site reads them
   // (SITE.learnset: pokesurvivor.com with G, names in the game's language like its cards; doofcraft from its config and
-  // save), else the wiki's (moves.js)
+  // save), else the table above
   function learnsetOf(name) {
     const n = name.toLowerCase(), game = SITE.learnset && SITE.learnset(n);
     if (game) return game;
     const natural = (MOVES.mons[n] || []).map(i => MOVES.moves[i]).filter(Boolean);
     if (!natural.length) return null;
     const tms = tmMoves(n), taught = taughtTms(n);
-    return { natural, taught: tms.filter(m => taught.has(m.name)), tms: tms.filter(m => !taught.has(m.name)), wiki: true };
+    return { natural, taught: tms.filter(m => taught.has(m.name)), tms: tms.filter(m => !taught.has(m.name)) };
   }
   // In a run: the name on the HUD; at the menu: the partner (the game's save, else its localStorage copy)
   const currentMon = () => [...state.hudTexts].map(t => t.toLowerCase()).find(t => MOVES.mons[t] || learnsetOf(t))
@@ -1600,14 +1603,14 @@
     // Taught TMs first: the game only offers a TM's card once it was taught to this pokémon
     const tmGroups = i => [[ls.taught, 'TM đã dạy', 'TM ✓ '], [ls.tms, `TM chưa dạy (mua ở ${SITE.id === 'doofcraft' ? 'Poké Mart' : 'Kecleon Shop'})`, 'TM ']]
       .filter(([l]) => l.length).map(([l, label, mark]) => `<optgroup label="${label}">${l.map(m => opt(m, i, mark)).join('')}</optgroup>`).join('');
-    // A build move missing from the lists (the wiki lags the game: Leaf Storm, Giga Drain) stays selectable
+    // A build move missing from the lists (an older table, a saved build from another game version) stays selectable
     const listed = new Set([...natural, ...ls.taught, ...ls.tms].map(m => m.name));
     const extra = i => build[i] && !listed.has(build[i]) ? `<option value="${build[i]}" selected>${build[i]}</option>` : '';
     $m('slots').innerHTML = natural.length ? [0, 1, 2, 3].map(i => `<label class="psb-row"><span class="psb-muted" style="width:18px">#${i + 1}</span>
       <select data-slot class="psb-in" style="flex:1;min-width:0"><option value="">(trống)</option>${extra(i)}${natural.map((m, j) => opt(m, i, j ? '' : '★ ')).join('')}${tmGroups(i)}</select></label>`).join('')
       : `<div style="color:#ff9a9a">${name ? 'Không có trong pokedex' : 'Chọn pokémon'}</div>`;
     const saved = Object.entries(CFG.builds).filter(([n, b]) => !isDefaultBuild(n, b));
-    const note = (natural.length && !ls.wiki ? 'Danh sách move lấy từ game. ' : '')
+    const note = (natural.length ?'Danh sách move lấy từ game. ' : '')
       + (made ? 'Build mặc định (chưa lưu): move khởi đầu → buff tấn công hợp pokémon → Harden; ô trống bot tự chọn. Sửa rồi bấm Lưu để giữ. '
         : build.length && isDefaultBuild(name, build) ? 'Đang dùng build có sẵn (pokesurvivor-autofarm). ' : '');
     // Following the pokémon being played: no picker, its name on the title row and a one-line status, only the 4 moves

@@ -62,11 +62,11 @@ On every level-up the bot scores each card and takes the best one. The reason fo
 The order of [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), on both versions. The **build** is the Moveset of the pokémon being played: the bot recognises it by the name on the HUD, or the partner in the save while at the menu. The popup follows the pokémon being played: once it's recognised, the popup only shows its name on the title row and the 4 moves. ✎ edits another pokémon's build (type its name); 🎯 goes back to following the one being played. That tool's builds come built in for 3 pokémon (Shell Bell recommended for all):
 - **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
 - **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
-- **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (buy Energy Ball as its "Starting move" in the shop).
+- **Bulbasaur:** Energy Ball → Nasty Plot → Petal Blizzard → Grass Knot (buy Energy Ball as its "Starting move" in the shop).
 
 Any other pokémon without a Moveset gets a **3-move default build**: its starting move (★) → the attack buff for its side (Nasty Plot if Sp. Atk is higher, Swords Dance / Dragon Dance if Attack is) → Harden. The 4th slot is yours to set; until you save a build, the bot fills it during the run (a damage move that suits its stats, homing shots first). The Moveset popup shows this default build; edit it and press **Lưu** (Save) and the bot follows yours.
 
-Move lists in the popup: on pokesurvivor.com they come **from the game** (the starting move you bought, TMs taught / not yet, names in the game's language) when the bot reads the game; doofcraft uses the wiki's. The attack side comes from the game's stats, else from the starting move.
+Move lists in the popup: on pokesurvivor.com they come **from the game** (the starting move you bought, TMs taught / not yet, names in the game's language) when the bot reads the game, else the copy saved the last time it did (or the bundled table, also exported from the game); doofcraft reads its game config. No wiki. The attack side comes from the game's stats, else from the starting move.
 
 A higher tier always wins:
 

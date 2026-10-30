@@ -255,8 +255,49 @@ window.PSBotSite = h => {
     .filter(c => c.width * c.height >= 200000 && c.getClientRects().length).sort((a, b) => b.width * b.height - a.width * a.height)[0] || null;
 
   const pilot = window.PSBotPilot ? window.PSBotPilot(h) : null;
-  // A pokémon of the game's pokédex by (lower-case) name; null without G
-  const dexEntry = name => { const g = window.G; return (g && g.DEX && g.DEX.find(d => d.name.toLowerCase() === name)) || null; };
+  // A pokémon of the game's pokédex by (lower-case) name, its own or as the game shows it (G.T: "Código Cero" is
+  // "Type: Null"); null without G
+  const dexEntry = name => {
+    const g = window.G, shown = d => (g.T ? g.T(d.name) : d.name).toLowerCase();
+    return (g && g.DEX && (g.DEX.find(d => d.name.toLowerCase() === name) || g.DEX.find(d => shown(d) === name))) || null;
+  };
+  // This game's move table in moves.js's shape, from G: moves [{ id, name, type, kind, cat ('status' = buff), dmg, cd,
+  // stat, evo }], mons[name] = natural moves (starting move first: G.Moves.poolFor without taught TMs), tm[name] = TMs
+  // outside them (G.TM_OF), dex[name]. A maxed move evolves with the passive G.Moves.EVO names (a stat key, its card
+  // G.Moves.NEED_NAME; not on BY_ID). Names through G.T, as the cards show them. base: the starting moves before any
+  // bought one (crawl-moves.js exports it as core/moves.js); desc: keep the move texts
+  function gameTable({ base = false, desc = false } = {}) {
+    const g = window.G, M = g && g.Moves;
+    if (!M || !M.BY_ID || !M.poolFor || !g.DEX || !g.TM_OF) return null;
+    const T = (s, ctx) => (g.T && s ? g.T(s, ctx) : s);
+    const ids = Object.keys(M.BY_ID), at = Object.fromEntries(ids.map((id, i) => [id, i]));
+    const moves = ids.map(id => {
+      const m = M.BY_ID[id], evo = M.EVO && M.NEED_NAME && M.NEED_NAME[M.EVO[id]];
+      return { id, name: T(m.name, 'move'), type: m.type, kind: m.kind, cat: m.kind === 'buff' ? 'status' : m.cat || 'status',
+        dmg: m.dmg, cd: m.cd, stat: m.stat, ...(desc && { desc: T(m.desc) }), ...(evo && { evo: T(evo) }) };
+    });
+    const t = { moves, mons: {}, tm: {}, dex: {} };
+    for (const mon of g.DEX) {
+      const n = T(mon.name).toLowerCase(), start = base ? g.baseStartOf(mon.dex) : g.startMoveOf(mon.dex);
+      const pool = [...new Set([start, ...M.poolFor(mon, true)])].filter(id => id in at);
+      t.dex[n] ??= mon.dex;
+      t.mons[n] = pool.map(id => at[id]);
+      const tm = g.TM_OF(mon.dex).filter(id => id in at && !pool.includes(id)).map(id => at[id]);
+      if (tm.length) t.tm[n] = tm;
+    }
+    return t;
+  }
+  // Kept from the last load with G, for one without (bookmarklet, loader.js, the manager's sandbox): the game's own
+  // lists rather than moves.js, which may be older
+  const TABLE_KEY = 'psbot.moves.default';
+  const moveTable = (() => {
+    const t = gameTable();
+    try {
+      if (t) localStorage.setItem(TABLE_KEY, JSON.stringify({ at: Date.now(), table: t }));
+      else return JSON.parse(localStorage.getItem(TABLE_KEY)).table;
+    } catch {}
+    return t;
+  })();
   // Level-up cards as the game dealt them (pilot.js wraps G.LevelUp.offer), picked with G.RunUI.pick: no reading or
   // tapping the DOM, which phones lay out differently. Null without G (DOM path below)
   function dealtCards() {
@@ -344,7 +385,12 @@ window.PSBotSite = h => {
       const mon = dexEntry(name);
       return mon && mon.pa != null && mon.sa != null && mon.pa !== mon.sa ? (mon.sa > mon.pa ? 'special' : 'physical') : null;
     },
-    // What a pokémon learns, from the game itself rather than the wiki (which lags it): natural moves with the starting
+    // The game's move table (gameTable: G, else the copy kept from the last load with G), else the core takes moves.js
+    moveTable: moveTable || undefined,
+    // Move -> passive card it needs to evolve, from the same table
+    evolveNeeds: moveTable ? new Map(moveTable.moves.filter(m => m.evo).map(m => [m.name.toLowerCase(), m.evo])) : undefined,
+    gameTable,                // crawl-moves.js: core/moves.js exported from the game
+    // What a pokémon learns, from the game itself (live, with the bought starting move and taught TMs): natural moves with the starting
     // move first (bought "Starting move" included: G.startMoveOf), TMs taught / not yet (js/systems/mons.js). Names in the
     // game's language, as its cards show them. Null without G
     learnset(name) {
@@ -364,7 +410,7 @@ window.PSBotSite = h => {
     // The partner picked on the menu, from the game's save (fresher than its localStorage copy)
     partnerName() {
       const g = window.G, sv = g && g.DB && g.DB.save, mon = sv && g.DEX_BY && g.DEX_BY[sv.partner];
-      return mon ? mon.name.toLowerCase() : '';
+      return mon ? (g.T ? g.T(mon.name) : mon.name).toLowerCase() : '';
     },
     // From the cards the game dealt (core levelUp): a passive that evolves a maxed move at once (gold card)
     cardFacts(c, i) {

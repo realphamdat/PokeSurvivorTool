@@ -62,11 +62,11 @@ Mỗi lần lên cấp, bot chấm điểm từng thẻ rồi chọn thẻ đi�
 Thứ tự giống [pokesurvivor-autofarm](https://github.com/BoundlessEgret/pokesurvivor-autofarm) (MIT), áp dụng cho cả 2 bản. **Build** là Moveset của pokémon đang chơi: bot nhận ra pokémon qua tên trên HUD, hoặc pokémon partner trong save nếu đang ở menu. Popup tự đổi theo pokémon đang chơi: khi đã nhận ra pokémon, popup chỉ hiện tên trên tiêu đề và 4 move. Bấm ✎ để sửa build của pokémon khác (gõ tên); bấm 🎯 để quay lại theo pokémon đang chơi. Có sẵn build của tool đó cho 3 pokémon (đều nên cầm Shell Bell):
 - **Mewtwo:** Confusion → Harden → Nasty Plot → Psychic.
 - **Kyogre:** Bubble → Nasty Plot → Aqua Ring → Hydro Pump.
-- **Bulbasaur:** Energy Ball → Nasty Plot → Leaf Storm → Giga Drain (mua "Starting move" Energy Ball trong shop).
+- **Bulbasaur:** Energy Ball → Nasty Plot → Petal Blizzard → Grass Knot (mua "Starting move" Energy Ball trong shop).
 
 Pokémon khác chưa có Moveset thì dùng **build mặc định 3 move**: move khởi đầu (★) → buff tấn công đúng phía (Nasty Plot nếu Sp.Atk cao hơn, Swords Dance / Dragon Dance nếu Atk cao hơn) → Harden. Ô thứ 4 để bạn tự chỉnh; nếu bạn chưa lưu build thì bot tự lấp ô đó trong trận (move sát thương hợp chỉ số, đạn tự ngắm trước). Popup Moveset hiện build mặc định này; sửa rồi bấm **Lưu** thì bot theo build của bạn.
 
-Danh sách move trong popup: pokesurvivor.com lấy **từ game** (đúng move khởi đầu đã mua, TM đã dạy / chưa dạy, tên theo ngôn ngữ game) khi bot đọc được game; doofcraft dùng danh sách từ wiki. Phía tấn công lấy từ chỉ số trong game; không đọc được thì theo move khởi đầu.
+Danh sách move trong popup: pokesurvivor.com lấy **từ game** (đúng move khởi đầu đã mua, TM đã dạy / chưa dạy, tên theo ngôn ngữ game) khi bot đọc được game, không thì dùng bản lưu từ lần gần nhất đọc được game (hoặc bảng có sẵn, cũng xuất từ game); doofcraft đọc từ cấu hình game. Không dùng wiki. Phía tấn công lấy từ chỉ số trong game; không đọc được thì theo move khởi đầu.
 
 Tầng trên luôn thắng tầng dưới:
 

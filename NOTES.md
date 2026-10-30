@@ -1,6 +1,6 @@
 # Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-30 (bảng skill riêng từng bản: mục 0 bước 9). Trước đó 28/10 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp sẵn: mục 0 bước 8, chưa phát hành). Trước đó 27/10: bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b. Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
+Cập nhật: 2026-10-30 tối (bảng skill bản thường lấy từ game, xong: mục 0 bước 9). Trước đó 28/10 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp sẵn: mục 0 bước 8, chưa phát hành). Trước đó 27/10: bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b. Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
 
 ---
 
@@ -42,6 +42,13 @@ Cập nhật: 2026-10-30 (bảng skill riêng từng bản: mục 0 bước 9). 
    - **Việc làm ở nhà (bản thường, cần mạng không chặn pokesurvivor.com):** có `G` thì danh sách move + TM đã lấy từ game; wiki (`moves.js`) chỉ còn dùng khi không có `G` (bookmarklet / `loader.js`, sandbox trình quản lý) và cho bảng tiến hoá (`evolveNeeds`: move cần nội tại nào, tầng 700) kể cả khi có `G`. Repo game đã gỡ `js/data/*.js` (chỉ còn `js/app.min.js` bị obfuscate) nên **`node crawl-moves.js --tm` hỏng** và không đọc tĩnh được như doofcraft. Hướng đã chọn (làm cả 2):
      1. **Lưu từ `G`:** khi có `G`, lưu bảng move / danh sách move từng con / TM / tiến hoá của game vào localStorage; không có `G` thì dùng bản lưu thay wiki.
      2. **`moves.js` xuất từ game:** script chạy trên pokesurvivor.com (có `G`: `G.Moves.BY_ID`, `G.Moves.poolFor`, `G.startMoveOf`, `G.Mons.learnable`, `G.DEX_BY`…) xuất ra `core/moves.js` cùng dạng; bỏ phần crawl wiki trong `crawl-moves.js`. Lấy luôn bảng tiến hoá từ game (`SITE.evolveNeeds` của bản thường), tìm tên trường trong `G.Moves.BY_ID[id]` trên game thật.
+   - **Bản thường: đã làm (tối 30/10, ở nhà, phát hành 1.7.11).**
+     - `sites/default/site.js` `gameTable()` dựng bảng cùng dạng `moves.js` từ `G` (nguồn: CLAUDE.md mục `core/moves.js`). Có `G` thì dựng + lưu `localStorage['psbot.moves.default']` (~110 KB) → `SITE.moveTable` + `SITE.evolveNeeds`; không có `G` thì đọc bản lưu; chưa có bản lưu thì core dùng `moves.js`.
+     - **Tiến hoá không có trong `BY_ID[id]`:** nằm ở `G.Moves.EVO[id]` (khoá chỉ số) + `G.Moves.NEED_NAME` (tên thẻ, dịch bằng `G.T`). `G.Moves.evoInfo(inst)` cũng cần `kind` có trong bảng hiệu ứng tiến hoá; cả 97 move trong `EVO` đều có.
+     - `core/moves.js` xuất lại từ game (`crawl-moves.js` 2 bước, bỏ crawl wiki). So với bảng wiki cũ: TM, move khởi đầu, danh sách move khớp hết; Meteor Mash dmg 34 → 24; thứ tự move theo game (không còn xếp ABC); tên pokémon theo `G.T` (Type: Null; 13 con Paradox tên TBN như game hiện).
+     - **Lỗi cũ đã sửa:** build có sẵn Bulbasaur ghi "Leaf Storm" / "Giga Drain", nhưng game gọi id đó là Petal Blizzard / Grass Knot → 2 move đó không bao giờ khớp thẻ. Build có sẵn giờ ghi theo id game (`byGameId` trong `core/bot.js`). `dexEntry` / `partnerName` khớp cả tên đã dịch.
+     - Đã test trên pokesurvivor.com (tài khoản test, đã đăng nhập): có `G` (hook qua `initScript`) và không có `G` (nạp muộn, đọc bản lưu): popup Moveset Scorbunny giống nhau, TM chưa dạy Electro Ball + U-turn; shop "Today's TMs" chỉ ghi "Scorbunny can learn it" ở U-turn (Body Slam / Fire Spin là move tự nhiên) → khớp. Harness `moveset-scoring.js` + `levelup-dialogs.js` OK. **Chưa chạy trận thật** (không đổi cách chấm thẻ, chỉ đổi nguồn bảng); tài khoản test chưa dạy TM nào nên nhóm "TM đã dạy" chưa xem được trên game.
+     - Đã phát hành 1.7.11 (30/10).
 
 ---
 
@@ -51,7 +58,7 @@ Cập nhật: 2026-10-30 (bảng skill riêng từng bản: mục 0 bước 9). 
 - `sites/default/`: bản thường (`site.js` + `data.js`). **Mọi thứ riêng của bản thường viết vào đây.**
 - `sites/doofcraft/`: doofcraft (`site.js` + `data.js`). Có thể xem làm mẫu.
 - `manifest.json`, `loader.js`: chọn folder theo domain. `loader.js` phải nằm ở gốc repo vì userscript/bookmarklet tải nó từ đó.
-- `crawl-moves.js`: tạo `core/moves.js` từ pokesurvivor.wiki (wiki này viết cho **bản thường**).
+- `crawl-moves.js`: xuất `core/moves.js` từ game (bản thường, cần `G`; cách dùng ở đầu file và CLAUDE.md). Không còn crawl wiki.
 
 ### Profile `site.js` có thể khai báo gì (core đọc các trường này)
 
@@ -64,7 +71,7 @@ Cập nhật: 2026-10-30 (bảng skill riêng từng bản: mục 0 bước 9). 
 | `propFoot` | Vùng chặn của vật thể `wall`/`break`: hình tròn bán kính `r`, cách đáy sprite `up` (đơn vị world); không có thì core đoán theo hình | ✅ `{ up: 2, r: 13 }` | ❌ |
 | `bossAura(src)` | Hình (rộng ≥ 40 world) vẽ dưới chân boss → quái gần nhất có `.boss`: bị đẩy ra trong `CFG.bossRange` (170) tính từ chân, đánh từ `CFG.bossEngage` (210); hình đó không tính là XP | ✅ `fill:#ffd95e` / `#ff4a4a` | ❌ |
 | `hazardShape(d)` | Sửa hình vùng nguy hiểm khi game vẽ khác vùng trúng (trả `null` = giữ nguyên) | ✅ elip nét đứt → hình tròn | ❌ |
-| `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ❌ (core tự dùng `evo` trong `moves.js`, lấy từ wiki) | ✅ (đọc cấu hình game) |
+| `evolveNeeds` | Map tên move → thẻ nội tại cần để tiến hoá | ✅ (`G.Moves.EVO` + `NEED_NAME`, hoặc bản lưu / `moves.js`) | ✅ (đọc cấu hình game) |
 | `cfg` | Ghi đè `CFG` (ví dụ `caseReach`) | `caseReach: 40` | `caseReach: 45`, … |
 | `scene(cam)` | Cả cảnh (quái, nguy hiểm, vật phẩm, tường, địa hình) theo nhãn, toạ độ màn hình; `null` = đọc canvas | ✅ (từ `window.G`, chỉ trên `/dev.html`) | ❌ |
 | `event` / `events` | Nút chạy event / chế độ trong panel: `{ label, title, available(), start(), stop() }` (mục 4b); `events` = danh sách nhiều nút | ✅ (`event`, Halloween) | ✅ (`events`: Halloween Waves, Hyper) |
@@ -81,7 +88,7 @@ Cập nhật: 2026-10-30 (bảng skill riêng từng bản: mục 0 bước 9). 
 |---|---|
 | Tự chọn skill/đồ trên điện thoại (bấm vào thẻ khi ô số bị ẩn) | Tìm thẻ từ `div.key` bị ẩn, nếu không có thì tìm hàng thẻ giống nhau quanh `#lvl-num`. **Chưa thử trên Android thật.** |
 | Chọn skill theo Moveset theo tầng: tiến hoá > move build chưa có > nâng move tấn công build > **nội tại để tiến hoá** > nâng buff build > nội tại > skill ngoài build | Dựa vào tên pokémon game vẽ lên canvas (nút 🎯 trong popup Moveset lấy được tên thì ổn). |
-| Ưu tiên nội tại để tiến hoá (Power, Reflexes, Sprint, Synthesis, Armor, Magnet, Vigor) | Bản thường lấy từ `evo` trong `moves.js` (wiki, 97/103 move). Cần xác nhận **tên thẻ trên game khớp** các tên này: console phải hiện lý do "điều kiện tiến hoá …". |
+| Ưu tiên nội tại để tiến hoá (Power, Reflexes, Sprint, Synthesis, Armor, Magnet, Vigor) | Bản thường lấy từ game (`G.Moves.EVO`, 97/103 move; 30/10: tên thẻ qua `G.T` đúng là Power, Reflexes, Sprint, Synthesis, Armor, Vigor, Magnet). |
 | Panel: Số ván, ▶ Chạy/■ Dừng, ⚔ Moveset, dòng "F8 bật/tắt bot · F9 hiển thị overlay" | F6 danh mục, F7 gắn nhãn vẫn còn. |
 | Tìm đường A* vòng qua vật cản, nhớ điểm kẹt cả trận, bỏ qua mục tiêu không tới được 20s | Bản thường: `terrain` đọc từ mảng nền + nhãn `wall` theo kích thước (cây 30x40/26x40/28x40, đá 22x17, bí ngô 22x20). |
 | Né đạn quái theo đường bay (`shot`), vùng skill (`hazard`), không nhặt đồ trong vùng nguy hiểm | Bản thường (27/10): cảnh báo vẽ **viền nét đứt** theo màu hệ quái (`js/systems/hazards.js`). Core ghi hình nét đứt thành vùng kín, key `dash:<nét>/<độ dày>`. `dash:4,4/2` (vùng tròn) và `dash:6,4/2` (tia, vẽ bằng `strokeRect`) = `hazard`. Vòng `rgba(255,60,80,0.35)` dưới đạn quái = `shot`. Trận thật: 7/7 vùng skill sinh dưới chân, bot ra trước khi nổ. Chưa gặp boss / tia để kiểm tra. |
