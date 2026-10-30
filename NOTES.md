@@ -1,6 +1,6 @@
 # Ghi chú: đã làm gì, còn gì
 
-Cập nhật: 2026-10-28 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp sẵn: mục 0 bước 8, chưa phát hành). Trước đó 27/10: bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b. Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
+Cập nhật: 2026-10-30 (bảng skill riêng từng bản: mục 0 bước 9). Trước đó 28/10 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp sẵn: mục 0 bước 8, chưa phát hành). Trước đó 27/10: bot v1.6.3 đã phát hành; thêm nhánh Firefox cho Android trong `psbot.user.js`, xem mục 3b. Doofcraft test ở nơi làm việc; bản thường (pokesurvivor.com) chỉ test được ở nhà, vì mạng nơi làm việc chặn trang. Tối 26/10 bản thường đã test trên game thật (đọc `window.G` trên `/dev.html`, mục 3). Còn mở: mục 3 bước 9–11, mục 3b (test trên máy Android thật), mục 4.
 
 ---
 
@@ -36,6 +36,12 @@ Cập nhật: 2026-10-28 (`G` trên `/` nhờ `hook.js`, `psbot.user.js` gộp s
    - **Đo:** so thời gian sống trung bình nhiều trận (HUD của `farmMoney.js` ghi theo version) giữa 1.6.7 (canvas) và bản có pilot; ghi lại ở đây.
    - Harness `pathfinding-sim.js`: `cup` không tới đích trong 8 s **cả ở 1.6.6** (lệch với mức mong đợi trong CLAUDE.md từ trước, không do pilot).
    - `blockRank` (core, chặn ghi Firestore/RTDB có "rank" mọi lúc kể cả bot tắt) trùng với noRank mới trong `site.js`; chưa gỡ, chờ người dùng quyết.
+9. **Bảng skill riêng cho từng bản (30/10).** Người dùng: mỗi bản game một bộ skill / TM đúng theo game, không dùng wiki, không dùng chung.
+   - **Doofcraft (đã làm):** `sites/doofcraft/site.js` đọc cấu hình game từ `/assets/*.js` (move, pokedex, starter, bảng TM Poké Mart) + `/api/save` (TM đã dạy, move khởi đầu, partner) → `SITE.learnset` + `SITE.moveTable`. Core dùng `SITE.moveTable` thay `moves.js`; doofcraft không nạp `moves.js` (manifest). Build có sẵn Mewtwo / Kyogre / Bulbasaur chỉ cho bản thường. Đã test trên trang thật (chưa đăng nhập) + harness; **chưa test khi đã đăng nhập (TM đã dạy) và chưa chạy trận**.
+   - **Sau khi phát hành bản này:** bỏ `core/moves.js` khỏi `loader.js` cho doofcraft (loader ở `main` tải bot từ `release`, bỏ sớm thì bot cũ trên doofcraft mất danh sách move).
+   - **Việc làm ở nhà (bản thường, cần mạng không chặn pokesurvivor.com):** có `G` thì danh sách move + TM đã lấy từ game; wiki (`moves.js`) chỉ còn dùng khi không có `G` (bookmarklet / `loader.js`, sandbox trình quản lý) và cho bảng tiến hoá (`evolveNeeds`: move cần nội tại nào, tầng 700) kể cả khi có `G`. Repo game đã gỡ `js/data/*.js` (chỉ còn `js/app.min.js` bị obfuscate) nên **`node crawl-moves.js --tm` hỏng** và không đọc tĩnh được như doofcraft. Hướng đã chọn (làm cả 2):
+     1. **Lưu từ `G`:** khi có `G`, lưu bảng move / danh sách move từng con / TM / tiến hoá của game vào localStorage; không có `G` thì dùng bản lưu thay wiki.
+     2. **`moves.js` xuất từ game:** script chạy trên pokesurvivor.com (có `G`: `G.Moves.BY_ID`, `G.Moves.poolFor`, `G.startMoveOf`, `G.Mons.learnable`, `G.DEX_BY`…) xuất ra `core/moves.js` cùng dạng; bỏ phần crawl wiki trong `crawl-moves.js`. Lấy luôn bảng tiến hoá từ game (`SITE.evolveNeeds` của bản thường), tìm tên trường trong `G.Moves.BY_ID[id]` trên game thật.
 
 ---
 

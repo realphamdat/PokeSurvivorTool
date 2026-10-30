@@ -37,7 +37,7 @@ The manager checks for new versions on its own from time to time. To update righ
 
 ## Use
 
-The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. On pokesurvivor.com the list also has the TM moves that pokémon can learn (Kecleon Shop): "TM ✓" = already taught, "TM" = not yet (the game only offers taught TMs). PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
+The panel is in Vietnamese. Enter **Số ván** (number of runs, 0 = forever) and press **▶ Chạy** (Run); press it again to **■ Dừng** (Stop). **⚔ Moveset** picks the 4 moves the bot prefers for each pokémon. The move list follows each game version, with the TM moves that pokémon can learn (pokesurvivor.com: Kecleon Shop; doofcraft: Poké Mart): "TM ✓" = already taught, "TM" = not yet (the game only offers taught TMs). PC shortcuts: **F8** toggles the bot, **F9** shows an overlay of what the bot sees.
 
 **Small screens** (phones, especially held sideways): the panel is more compact and starts collapsed to its title row, with a **▶ / ■** button to run / stop; **+** opens it. The Moveset popup sits beside the panel instead of below it.
 

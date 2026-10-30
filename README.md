@@ -37,7 +37,7 @@ Trình quản lý tự kiểm tra bản mới định kỳ. Muốn cập nhật 
 
 ## Dùng
 
-Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Trên pokesurvivor.com, danh sách có thêm các move TM pokémon đó học được (Kecleon Shop): "TM ✓" là đã dạy, "TM" là chưa dạy (game chỉ đưa thẻ TM đã dạy). Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
+Nhập **Số ván** (0 = chơi mãi) rồi bấm **▶ Chạy**, bấm lại để **■ Dừng**. **⚔ Moveset** để chọn 4 move bot ưu tiên cho từng pokémon. Danh sách move lấy theo đúng từng bản game, có thêm các move TM pokémon đó học được (pokesurvivor.com: Kecleon Shop; doofcraft: Poké Mart): "TM ✓" là đã dạy, "TM" là chưa dạy (game chỉ đưa thẻ TM đã dạy). Phím tắt trên máy tính: **F8** bật/tắt bot, **F9** hiện lớp vẽ (bot đang thấy gì).
 
 **Màn hình nhỏ** (điện thoại, nhất là khi xoay ngang): panel gọn hơn, lần đầu thu gọn sẵn thành một dòng tiêu đề có nút **▶ / ■** để chạy / dừng; bấm **+** để mở ra. Popup Moveset nằm cạnh panel thay vì bên dưới.
 

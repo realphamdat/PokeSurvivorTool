@@ -46,6 +46,23 @@ window.PSBotSite = h => {
   // Evolutions: a maxed move evolves once the passive it "requires" is owned. Move name (lower-case) -> name of that
   // passive's level-up card ("Power" for attack, "Reflexes" for cooldown, …), from the game config as well
   const evolveNeeds = new Map();
+  // What each pokémon learns, from the game config too (the wiki's lists are pokesurvivor.com's): moves, pokédex,
+  // starters, the Poké Mart's TM table. An object / array literal (or JSON.parse(`…`)) at i, evaluated
+  const dc = { moves: null, dex: null, starters: null, tms: null, byName: new Map(), byDex: new Map(), byId: new Map() };
+  // This game's move table for the core, in moves.js's shape (filled once read): moves [{ name, kind, cat ('status' =
+  // buff, no physical / special here), dmg, cd }], mons[name] = indices of its natural moves
+  const moveTable = { moves: [], mons: {} };
+  const literal = (src, i) => {
+    let depth = 0, q = null;
+    for (let j = i; j < src.length; j++) {
+      const c = src[j];
+      if (q) { if (c === '\\') j++; else if (c === q) q = null; continue; }
+      if (c === '`' || c === '"' || c === "'") q = c;
+      else if ('{[('.includes(c)) depth++;
+      else if ('}])'.includes(c) && --depth === 0) return Function(`return ${src.slice(i, j + 1)}`)();
+    }
+  };
+  const config = (src, re) => { const m = re.exec(src); return m ? literal(src, m.index + m[0].indexOf('=') + 1) : null; };
   (async () => {
     try {
       const entry = PSBotList(document.scripts).map(s => s.src).find(s => /\/assets\/index-[\w-]+\.js/.test(s));
@@ -62,10 +79,63 @@ window.PSBotSite = h => {
         // The level-up passives come first, the shop upgrades (same ids) after them
         for (const m of src.matchAll(/\{id:`([\w-]+)`,icon:`\w+`,name:`([^`]+)`/g)) passiveCard[m[1]] ??= m[2];
         for (const m of src.matchAll(/name:`([^`]+)`,type:`\w+`,kind:`\w+`,description:`[^`]*`,stats:\{[^}]*\},evolution:\{requires:`(\w+)`\}/g)) requires.push([m[1], m[2]]);
+        try {
+          dc.moves ??= config(src, /[,;\s]\w+=\{modifierRules:/);
+          dc.dex ??= config(src, /[,;\s]\w+=JSON\.parse\(`\[\{"dex":1,/);
+          dc.starters ??= config(src, /[,;\s]\w+=\{traits:\[/);
+          dc.tms ??= config(src, /[,;\s]\w+=\{source:\{repository:/);
+        } catch (e) { console.warn('[PSBot] không đọc được bảng move của game', e); }
+      }
+      // A form shares its base's name: the first entry is the base
+      for (const p of dc.dex || []) { dc.byName.has(p.name.toLowerCase()) || dc.byName.set(p.name.toLowerCase(), p); dc.byDex.set(p.dex, p); }
+      if (dc.moves) {
+        for (const m of dc.moves.moves) {
+          const info = { id: m.id, name: m.name, type: m.type, kind: m.kind, cat: m.kind === 'buff' ? 'status' : null, dmg: m.stats.damage, cd: m.stats.cooldown };
+          dc.byId.set(m.id, { cfg: m, info, i: moveTable.moves.push(info) - 1 });
+        }
+        for (const [name, mon] of dc.byName) moveTable.mons[name] = [...poolOf(mon)].map(id => dc.byId.get(id).i);
       }
       for (const [move, id] of requires) if (passiveCard[id]) evolveNeeds.set(move.toLowerCase(), passiveCard[id]);
     } catch (e) { console.warn('[PSBot] không đọc được cấu hình game (bảng màu / tiến hoá)', e); }
   })();
+  // The account's save (/api/save, as the game's own fetchSave): TMs taught per dex (taughtMoves; disabledTms = turned
+  // off, never offered in a run), chosen starting move, partner. Refreshed in the background at most every 30 s
+  let save = null, saveAt = -Infinity;
+  const accountSave = () => {
+    if (performance.now() - saveAt > 30000) {
+      saveAt = performance.now();
+      fetch('/api/save', { credentials: 'same-origin' }).then(r => (r.ok ? r.json() : null)).then(s => { save = s; }).catch(() => {});
+    }
+    return save;
+  };
+  // The game's move pool (movePool): normal + its own types' moves (not exclusive), those listing it as a learner, no
+  // signature moves, starterFor only its own
+  const learnable = (mon, m) => m && !m.signature && (!m.starterFor || m.starterFor.includes(mon.dex));
+  function poolOf(mon) {
+    const pool = new Set(), all = dc.moves.moves;
+    for (const type of ['normal', ...mon.types]) for (const m of all) if (m.type === type && !m.exclusive && learnable(mon, m)) pool.add(m.id);
+    for (const m of all) if (m.learners && m.learners.includes(mon.dex) && learnable(mon, m)) pool.add(m.id);
+    return pool;
+  }
+  // Its pool, then the TMs taught. Starting move: the one chosen in the save, else the starter's, a move made for it,
+  // its first type's
+  function learnset(name) {
+    const mon = dc.byName.get(name), cfg = dc.moves;
+    if (!mon || !cfg || !dc.byId.size) return null;
+    const key = String(mon.dex), sv = accountSave() || {}, pool = poolOf(mon);
+    const ok = id => learnable(mon, (dc.byId.get(id) || {}).cfg);
+    const move = id => (dc.byId.get(id) || {}).info;
+    const starter = ((dc.starters && dc.starters.starters) || []).find(s => s.dex === mon.dex);
+    const taughtIds = ((sv.taughtMoves || {})[key] || []).filter(id => ok(id) && !pool.has(id));
+    const taught = new Set(taughtIds), chosen = (sv.startingMoves || {})[key];
+    const start = chosen && (pool.has(chosen) || taught.has(chosen)) ? chosen
+      : (starter && starter.startingMove) || (cfg.moves.find(m => m.starterFor && m.starterFor.includes(mon.dex)) || {}).id || cfg.startingMoves[mon.types[0] || 'normal'];
+    return {
+      natural: [...new Set([start, ...pool])].map(move).filter(Boolean),
+      taught: taughtIds.filter(id => id !== start).map(move).filter(Boolean),
+      tms: ((dc.tms && dc.tms.pokemon[key]) || []).filter(id => !taught.has(id) && !pool.has(id) && ok(id)).map(move).filter(Boolean),
+    };
+  }
   // Chunk canvas -> Uint8Array(256) of tiles (0 floor, 1 wall, 2 liquid), or null for any other canvas. The biome is the
   // palette matching most pixels; a tile is wall / liquid when over half its pixels are
   const terrainCache = new WeakMap();
@@ -270,6 +340,13 @@ window.PSBotSite = h => {
     bySize: { 'canvas:34x16': 'heal', 'canvas:22x17': 'break', 'canvas:14x14': 'hazard', 'canvas:30x40': 'wall', 'canvas:26x40': 'wall', 'canvas:28x40': 'wall',
       'canvas:8x23': 'wall', 'canvas:24x28': 'wall', 'canvas:6x20': 'wall', 'canvas:14x11': 'break' },
     evolveNeeds,              // move name -> passive card it needs to evolve
+    moveTable,                // this game's moves (the core never uses the wiki's moves.js here)
+    learnset,                 // what a pokémon learns here: natural moves (starting move first), TMs taught / not yet
+    // The partner picked on the menu, from the account's save
+    partnerName() {
+      const sv = accountSave(), mon = sv && sv.partner && dc.byDex.get(sv.partner.dex);
+      return mon ? mon.name.toLowerCase() : '';
+    },
     // Armor cards worth taking: +0.1 defence each up to 2 (damage taken / (1 + defence): ~67 % less), game config
     armorCards: 20,
     terrain,                  // map chunk -> 16x16 tiles (0 floor, 1 wall, 2 liquid) for path finding
